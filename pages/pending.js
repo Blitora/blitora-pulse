@@ -1,14 +1,9 @@
-import { createClient } from "@supabase/supabase-js";
 import Head from "next/head";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
+import { getSupabase } from "../lib/supabase";
 
 export default function Pending() {
   async function handleSignOut() {
-    await supabase.auth.signOut();
+    await getSupabase().auth.signOut();
     window.location.href = "/login";
   }
 
@@ -35,7 +30,7 @@ export default function Pending() {
         .btn-out{width:100%;padding:10px;background:#fff;border:1px solid #e5e3ee;border-radius:8px;font-size:13px;font-weight:500;color:#888;cursor:pointer;transition:border-color .2s}
         .btn-out:hover{border-color:#714B67;color:#714B67}
         .badge{display:inline-flex;align-items:center;gap:6px;background:#faeeda;color:#854F0B;border-radius:20px;padding:5px 14px;font-size:12px;font-weight:600;margin-bottom:20px}
-        .dot{width:7px;height:7px;background:#EF9F27;border-radius:50%;animation:pulse 1.5s infinite}
+        .dot{width:7px;height:7px;background:#EF9F27;border-radius:50%;animation:pulse 1.5s infinite;display:inline-block}
         @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
       `}</style>
 
@@ -47,31 +42,16 @@ export default function Pending() {
             <div className="logo-sub">by Azeem</div>
           </div>
         </div>
-
         <div className="card">
           <div className="icon">⏳</div>
-          <div className="badge"><span className="dot"/>&nbsp;Pending approval</div>
+          <div className="badge"><span className="dot"/> Pending approval</div>
           <div className="title">You're on the waitlist</div>
-          <div className="desc">
-            Your account has been created and is awaiting approval from the admin.
-            You'll get access as soon as it's reviewed.
-          </div>
-
+          <div className="desc">Your account has been created and is awaiting approval from the admin. You'll get access as soon as it's reviewed.</div>
           <div className="steps">
-            <div className="step">
-              <div className="step-num">1</div>
-              <div className="step-text">You signed up and confirmed your email</div>
-            </div>
-            <div className="step">
-              <div className="step-num">2</div>
-              <div className="step-text">Admin reviews and approves your account <span style={{color:"#EF9F27",fontWeight:600}}>← you are here</span></div>
-            </div>
-            <div className="step">
-              <div className="step-num">3</div>
-              <div className="step-text">You get full access to your health dashboard</div>
-            </div>
+            <div className="step"><div className="step-num">1</div><div className="step-text">You signed up and confirmed your email</div></div>
+            <div className="step"><div className="step-num">2</div><div className="step-text">Admin reviews and approves your account <span style={{color:"#EF9F27",fontWeight:600}}>← you are here</span></div></div>
+            <div className="step"><div className="step-num">3</div><div className="step-text">You get full access to your health dashboard</div></div>
           </div>
-
           <button className="btn-out" onClick={handleSignOut}>Sign out and come back later</button>
         </div>
       </div>
