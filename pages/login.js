@@ -1,12 +1,7 @@
-import { useState } from "react";
-import { createClient } from "@supabase/supabase-js";
+import { useState, useEffect } from "react";
 import Head from "next/head";
 import { useRouter } from "next/router";
-
-const getSupabase = () => createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
+import { getSupabase } from "../lib/supabase";
 
 export default function Login() {
   const router = useRouter();
@@ -17,38 +12,68 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
+  const [debug, setDebug] = useState(null);
+
+  useEffect(() => {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!url || !key) {
+      setDebug("ENV MISSING — URL: " + (url ? "ok" : "MISSING") + " | KEY: " + (key ? "ok" : "MISSING"));
+    } else {
+      setDebug("ENV OK — " + url);
+    }
+  }, []);
 
   async function handleEmail(e) {
     e.preventDefault();
     setLoading(true);
     setError(null);
     setMessage(null);
+    const sb = getSupabase();
 
-    if (mode === "login") {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) { setError(error.message); setLoading(false); return; }
-      const { data: profile } = await supabase.from("profiles").select("role,status").eq("id", data.user.id).single();
-      if (profile?.status === "pending") { router.push("/pending"); return; }
-      if (profile?.role === "admin") { router.push("/admin"); return; }
-      router.push("/dashboard");
-    } else {
-      const { error } = await supabase.auth.signUp({
-        email, password,
-        options: { data: { full_name: name } }
-      });
-      if (error) { setError(error.message); setLoading(false); return; }
-      setMessage("Check your email to confirm your account. Once confirmed, your account will be reviewed and activated.");
+    try {
+      if (mode === "login") {
+        const { data, error } = await sb.auth.signInWithPassword({ email, password });
+        if (error) { setError(error.message); setLoading(false); return; }
+        const { data: profile, error: pErr } = await sb.from("profiles").select("role,status").eq("id", data.user.id).single();
+        if (pErr) { setError("Profile error: " + pErr.message); setLoading(false); return; }
+        if (profile?.status === "pending") { router.push("/pending"); return; }
+        if (profile?.role === "admin") { router.push("/admin"); return; }
+        router.push("/dashboard");
+      } else {
+        const { data, error } = await sb.auth.signUp({
+          email, password,
+          options: { data: { full_name: name } }
+        });
+        if (error) { setError(error.message); setLoading(false); return; }
+        if (data?.user && !data?.session) {
+          setMessage("Check your email to confirm your account. Once confirmed, your account will be reviewed.");
+        } else if (data?.user && data?.session) {
+          router.push("/pending");
+        }
+      }
+    } catch (err) {
+      setError("Error: " + err.message);
     }
     setLoading(false);
   }
 
   async function handleGoogle() {
     setLoading(true);
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: `${window.location.origin}/auth/callback` }
-    });
-    if (error) { setError(error.message); setLoading(false); }
+    setError(null);
+    try {
+      const sb = getSupabase();
+      const { error } = await sb.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: window.location.origin + "/auth/callback"
+        }
+      });
+      if (error) { setError(error.message); setLoading(false); }
+    } catch (err) {
+      setError("Google error: " + err.message);
+      setLoading(false);
+    }
   }
 
   return (
@@ -74,13 +99,14 @@ export default function Login() {
         .btn-primary:disabled{background:#b8a0b0;cursor:not-allowed}
         .divider{display:flex;align-items:center;gap:12px;margin:20px 0;color:#ccc;font-size:12px}
         .divider::before,.divider::after{content:'';flex:1;height:1px;background:#e5e3ee}
-        .btn-google{width:100%;padding:10px;background:#fff;border:1px solid #e5e3ee;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;color:#2c1a3a;transition:border-color .2s}
+        .btn-google{width:100%;padding:10px;background:#fff;border:1.5px solid #e5e3ee;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;color:#2c1a3a;transition:border-color .2s}
         .btn-google:hover{border-color:#714B67}
         .toggle{text-align:center;margin-top:20px;font-size:13px;color:#888}
-        .toggle a{color:#714B67;font-weight:600;cursor:pointer;text-decoration:none}
+        .toggle a{color:#714B67;font-weight:600;cursor:pointer}
         .error{background:#fff0f0;border:1px solid #ffd0d0;color:#c0392b;border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:16px}
         .success{background:#f0faf5;border:1px solid #b7e4cc;color:#1a7a4a;border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:16px}
-        .spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;display:inline-block;margin-right:8px}
+        .dbg{background:#f0f0f7;border:1px solid #e5e3ee;border-radius:8px;padding:8px 12px;font-size:11px;color:#666;margin-bottom:12px;word-break:break-all}
+        .spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;display:inline-block;margin-right:8px;vertical-align:middle}
         @keyframes spin{to{transform:rotate(360deg)}}
       `}</style>
 
@@ -97,6 +123,7 @@ export default function Login() {
           <div className="title">{mode === "login" ? "Welcome back" : "Create your account"}</div>
           <div className="sub">{mode === "login" ? "Sign in to your health dashboard" : "Request access to start tracking"}</div>
 
+          {debug && <div className="dbg">{debug}</div>}
           {error && <div className="error">{error}</div>}
           {message && <div className="success">{message}</div>}
 
@@ -106,16 +133,16 @@ export default function Login() {
                 {mode === "signup" && (
                   <div className="input-wrap">
                     <label className="label">Full name</label>
-                    <input className="input" type="text" placeholder="Azeem Sayyed" value={name} onChange={e => setName(e.target.value)} required />
+                    <input className="input" type="text" placeholder="Your name" value={name} onChange={e=>setName(e.target.value)} required/>
                   </div>
                 )}
                 <div className="input-wrap">
                   <label className="label">Email address</label>
-                  <input className="input" type="email" placeholder="you@example.com" value={email} onChange={e => setEmail(e.target.value)} required />
+                  <input className="input" type="email" placeholder="you@example.com" value={email} onChange={e=>setEmail(e.target.value)} required/>
                 </div>
                 <div className="input-wrap">
                   <label className="label">Password</label>
-                  <input className="input" type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required minLength={6} />
+                  <input className="input" type="password" placeholder="••••••••" value={password} onChange={e=>setPassword(e.target.value)} required minLength={6}/>
                 </div>
                 <button className="btn-primary" type="submit" disabled={loading}>
                   {loading && <span className="spinner"/>}
@@ -140,8 +167,8 @@ export default function Login() {
 
         <div className="toggle">
           {mode === "login"
-            ? <>Don't have an account? <a onClick={() => { setMode("signup"); setError(null); setMessage(null); }}>Request access</a></>
-            : <>Already have an account? <a onClick={() => { setMode("login"); setError(null); setMessage(null); }}>Sign in</a></>
+            ? <>Don't have an account? <a onClick={()=>{setMode("signup");setError(null);setMessage(null);}}>Request access</a></>
+            : <>Already have an account? <a onClick={()=>{setMode("login");setError(null);setMessage(null);}}>Sign in</a></>
           }
         </div>
       </div>
