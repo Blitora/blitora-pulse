@@ -1,12 +1,7 @@
 import { useState, useEffect } from "react";
-import { createClient } from "@supabase/supabase-js";
 import Head from "next/head";
 import { useRouter } from "next/router";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
+import { getSupabase } from "../../lib/supabase";
 
 export default function Admin() {
   const router = useRouter();
@@ -17,9 +12,10 @@ export default function Admin() {
 
   useEffect(() => {
     async function init() {
-      const { data: { session } } = await supabase.auth.getSession();
+      const sb = getSupabase();
+      const { data: { session } } = await sb.auth.getSession();
       if (!session) { router.push("/login"); return; }
-      const { data: profile } = await supabase.from("profiles").select("*").eq("id", session.user.id).single();
+      const { data: profile } = await sb.from("profiles").select("*").eq("id", session.user.id).single();
       if (!profile || profile.role !== "admin") { router.push("/dashboard"); return; }
       setMe(profile);
       loadUsers();
@@ -28,19 +24,19 @@ export default function Admin() {
   }, []);
 
   async function loadUsers() {
-    const { data } = await supabase.from("profiles").select("*").order("created_at", { ascending: false });
+    const { data } = await getSupabase().from("profiles").select("*").order("created_at", { ascending: false });
     setUsers(data || []);
     setLoading(false);
   }
 
   async function approve(id) {
-    await supabase.from("profiles").update({ status: "approved" }).eq("id", id);
+    await getSupabase().from("profiles").update({ status: "approved" }).eq("id", id);
     showToast("User approved");
     loadUsers();
   }
 
   async function block(id) {
-    await supabase.from("profiles").update({ status: "blocked" }).eq("id", id);
+    await getSupabase().from("profiles").update({ status: "blocked" }).eq("id", id);
     showToast("User blocked");
     loadUsers();
   }
@@ -51,7 +47,7 @@ export default function Admin() {
   }
 
   async function signOut() {
-    await supabase.auth.signOut();
+    await getSupabase().auth.signOut();
     router.push("/login");
   }
 
