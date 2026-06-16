@@ -1,21 +1,17 @@
 import { useEffect } from "react";
-import { createClient } from "@supabase/supabase-js";
 import { useRouter } from "next/router";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
+import { getSupabase } from "../lib/supabase";
 
 export default function Home() {
   const router = useRouter();
 
   useEffect(() => {
     async function redirect() {
-      const { data: { session } } = await supabase.auth.getSession();
+      const sb = getSupabase();
+      const { data: { session } } = await sb.auth.getSession();
       if (!session) { router.push("/login"); return; }
 
-      const { data: profile } = await supabase
+      const { data: profile } = await sb
         .from("profiles")
         .select("role, status")
         .eq("id", session.user.id)
