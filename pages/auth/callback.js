@@ -2,25 +2,45 @@ import { useEffect } from "react";
 import { useRouter } from "next/router";
 import { getSupabase } from "../../lib/supabase";
 
+async function routeUser(sb, session, router) {
+  const { data: profile } = await sb
+    .from("profiles")
+    .select("role, status")
+    .eq("id", session.user.id)
+    .single();
+
+  if (!profile) { router.push("/login"); return; }
+  if (profile.status === "pending") { router.push("/pending"); return; }
+  if (profile.role === "admin") { router.push("/admin"); return; }
+  router.push("/dashboard");
+}
+
 export default function AuthCallback() {
   const router = useRouter();
 
   useEffect(() => {
     async function handleCallback() {
       const sb = getSupabase();
-      const { data: { session } } = await sb.auth.getSession();
-      if (!session) { router.push("/login"); return; }
 
-      const { data: profile } = await sb
-        .from("profiles")
-        .select("role, status")
-        .eq("id", session.user.id)
-        .single();
+      const { data: { session }, error } = await sb.auth.getSession();
 
-      if (!profile) { router.push("/login"); return; }
-      if (profile.status === "pending") { router.push("/pending"); return; }
-      if (profile.role === "admin") { router.push("/admin"); return; }
-      router.push("/dashboard");
+      if (!session) {
+        const { data: listenData } = sb.auth.onAuthStateChange(async (event, newSession) => {
+          if (event === "SIGNED_IN" && newSession) {
+            listenData.subscription.unsubscribe();
+            await routeUser(sb, newSession, router);
+          }
+        });
+        setTimeout(() => {
+          sb.auth.getSession().then(({ data: { session: s } }) => {
+            if (s) routeUser(sb, s, router);
+            else router.push("/login");
+          });
+        }, 2000);
+        return;
+      }
+
+      await routeUser(sb, session, router);
     }
     handleCallback();
   }, []);
