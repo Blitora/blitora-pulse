@@ -117,7 +117,7 @@ export default function Login() {
           <div className="title">{mode === "login" ? "Welcome back" : "Create your account"}</div>
           <div className="sub">{mode === "login" ? "Sign in to your health dashboard" : "Request access to start tracking"}</div>
 
-          {debug && <div className="dbg">{debug}</div>}
+         
           {error && <div className="error">{error}</div>}
           {message && <div className="success">{message}</div>}
 
