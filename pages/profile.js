@@ -137,7 +137,7 @@ export default function Profile(){
               {bmi&&<span className="ht-badge" style={{background:bmi<25?GL:bmi<30?AL:"#fcebeb",color:bmi<25?G:bmi<30?A:R}}>BMI {bmi}</span>}
             </div>
           </div>
-          <div style={{display:"flex",gap:8",flexShrink:0}}>
+          <div style={{display:"flex",gap:8,flexShrink:0}}>
             {!editing&&<button className="boutline" onClick={()=>setEditing(true)}>Edit</button>}
             {editing&&<button className="boutline" onClick={()=>{setEditing(false);setForm(profile);}}>Cancel</button>}
             <button className="bdanger" onClick={signOut}>Sign out</button>
