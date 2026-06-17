@@ -1,9 +1,10 @@
 import { useRouter } from "next/router";
+import { useEffect, useState } from "react";
 
-const P = "#714B67", PL = "#f3eef1";
-const BORDER = "#e5e3ee", TXT2 = "#888", TXT3 = "#bbb", CARD = "#fff";
+const P = "#714B67", PL = "#f3eef1", PS = "#5a3a53";
+const BORDER = "#e5e3ee", TXT = "#2c1a3a", TXT2 = "#888", TXT3 = "#bbb", CARD = "#fff", BG = "#f0f0f7";
 
-const NAV_ITEMS = [
+const USER_NAV = [
   { label: "Home",     icon: "🏠",  href: "/dashboard" },
   { label: "Meals",    icon: "🍽️",  href: "/meals"     },
   { label: "Progress", icon: "📊",  href: "/progress"  },
@@ -12,314 +13,170 @@ const NAV_ITEMS = [
 ];
 
 const ADMIN_NAV = [
-  { label: "Home",     icon: "🏠",  href: "/dashboard"   },
-  { label: "Users",    icon: "👥",  href: "/admin"        },
-  { label: "Food",     icon: "🥗",  href: "/admin/food"   },
-  { label: "Reports",  icon: "📋",  href: "/reports"      },
-  { label: "Profile",  icon: "👤",  href: "/profile"      },
+  { label: "Home",    icon: "🏠",  href: "/dashboard" },
+  { label: "Users",   icon: "👥",  href: "/admin"     },
+  { label: "Food",    icon: "🥗",  href: "/admin/food"},
+  { label: "Reports", icon: "📋",  href: "/reports"   },
+  { label: "Profile", icon: "👤",  href: "/profile"   },
 ];
 
 export default function Layout({ children, title = "Health Tracker", profile }) {
   const router = useRouter();
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  useEffect(() => {
+    function check() { setIsDesktop(window.innerWidth >= 768); }
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
   const isAdmin = profile?.role === "admin";
-  const items = isAdmin ? ADMIN_NAV : NAV_ITEMS;
+  const items = isAdmin ? ADMIN_NAV : USER_NAV;
   const current = router.pathname;
+
+  function isActive(href) {
+    if (href === "/dashboard") return current === "/dashboard";
+    if (href === "/admin") return current === "/admin";
+    return current.startsWith(href);
+  }
+
+  const SidebarItem = ({ item }) => (
+    <button onClick={() => router.push(item.href)} style={{
+      display: "flex", alignItems: "center", gap: 12,
+      padding: "11px 20px", width: "100%",
+      border: "none", borderLeft: isActive(item.href) ? `3px solid ${P}` : "3px solid transparent",
+      background: isActive(item.href) ? PL : "transparent",
+      color: isActive(item.href) ? P : TXT2,
+      fontFamily: "inherit", fontSize: 13, fontWeight: isActive(item.href) ? 600 : 500,
+      cursor: "pointer", textAlign: "left", transition: "all .15s",
+    }}>
+      <span style={{ fontSize: 18, width: 22, textAlign: "center" }}>{item.icon}</span>
+      {item.label}
+    </button>
+  );
 
   return (
     <>
       <style>{`
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { background: #f0f0f7; font-family: 'Inter', system-ui, sans-serif; color: #2c1a3a; }
-
-        /* ── TOP BAR ── */
-        .ht-topbar {
-          background: ${CARD};
-          border-bottom: 1px solid ${BORDER};
-          padding: 0 16px;
-          height: 52px;
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          position: sticky;
-          top: 0;
-          z-index: 20;
-        }
-        .ht-logo {
-          width: 32px; height: 32px;
-          background: ${P}; border-radius: 8px;
-          display: flex; align-items: center; justify-content: center;
-          color: #fff; font-weight: 700; font-size: 14px;
-          flex-shrink: 0;
-        }
-        .ht-app-name { font-size: 13px; font-weight: 700; color: ${P}; }
-        .ht-page-name { font-size: 12px; color: ${TXT2}; }
-        .ht-divider { color: ${BORDER}; font-size: 18px; }
-        .ht-saving { font-size: 11px; color: ${P}; animation: ht-pulse 1s infinite; }
-        .ht-avatar {
-          width: 32px; height: 32px; border-radius: 50%;
-          background: ${PL}; border: none; cursor: pointer;
-          color: ${P}; font-weight: 700; font-size: 13px;
-          display: flex; align-items: center; justify-content: center;
-        }
-
-        /* ── MAIN CONTENT ── */
-        .ht-main {
-          max-width: 720px;
-          margin: 0 auto;
-          padding: 14px 14px 80px;
-        }
-
-        /* ── BOTTOM NAV (mobile) ── */
-        .ht-bottomnav {
-          position: fixed;
-          bottom: 0; left: 0; right: 0;
-          background: ${CARD};
-          border-top: 1px solid ${BORDER};
-          display: flex;
-          z-index: 20;
-          max-width: 720px;
-          margin: 0 auto;
-          left: 50%;
-          transform: translateX(-50%);
-          width: 100%;
-        }
-        .ht-navbtn {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 2px;
-          padding: 8px 4px;
-          border: none;
-          background: none;
-          cursor: pointer;
-          font-size: 9px;
-          font-weight: 500;
-          font-family: inherit;
-          transition: color .15s;
-          color: ${TXT3};
-          min-width: 0;
-        }
-        .ht-navbtn.active { color: ${P}; font-weight: 700; }
-        .ht-navbtn .ht-nav-ico { font-size: 20px; line-height: 1; }
-        .ht-navbtn .ht-nav-dot {
-          width: 4px; height: 4px; border-radius: 50%;
-          background: ${P}; margin-top: 1px;
-          display: none;
-        }
-        .ht-navbtn.active .ht-nav-dot { display: block; }
-
-        /* ── DESKTOP SIDEBAR ── */
-        @media (min-width: 768px) {
-          .ht-bottomnav { display: none; }
-          .ht-sidebar {
-            position: fixed;
-            top: 0; left: 0;
-            width: 200px;
-            height: 100vh;
-            background: ${CARD};
-            border-right: 1px solid ${BORDER};
-            display: flex;
-            flex-direction: column;
-            padding: 16px 0;
-            z-index: 20;
-          }
-          .ht-sidebar-logo {
-            display: flex; align-items: center; gap: 10px;
-            padding: 0 16px 20px;
-            border-bottom: 1px solid ${BORDER};
-            margin-bottom: 12px;
-          }
-          .ht-sidebar-item {
-            display: flex; align-items: center; gap: 10px;
-            padding: 10px 16px;
-            font-size: 13px; font-weight: 500;
-            cursor: pointer;
-            border: none; background: none;
-            font-family: inherit;
-            color: ${TXT2};
-            width: 100%;
-            text-align: left;
-            transition: all .15s;
-            border-radius: 0;
-          }
-          .ht-sidebar-item:hover { background: #faf9fd; color: #2c1a3a; }
-          .ht-sidebar-item.active {
-            background: ${PL};
-            color: ${P};
-            font-weight: 600;
-            border-right: 3px solid ${P};
-          }
-          .ht-sidebar-item .s-ico { font-size: 17px; width: 22px; text-align: center; }
-          .ht-topbar { margin-left: 200px; }
-          .ht-main { margin-left: 200px; padding: 20px 24px 40px; max-width: calc(720px + 200px); }
-        }
-
-        /* ── SHARED CARD STYLES ── */
-        .ht-card {
-          background: ${CARD};
-          border-radius: 13px;
-          border: 1px solid ${BORDER};
-          padding: 14px;
-          margin-bottom: 12px;
-        }
-        .ht-card-title {
-          font-size: 11px;
-          font-weight: 700;
-          color: ${TXT2};
-          text-transform: uppercase;
-          letter-spacing: .05em;
-          margin-bottom: 11px;
-        }
-        .ht-prow {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 9px 0;
-          border-bottom: 1px solid ${BORDER};
-          font-size: 12px;
-        }
-        .ht-prow:last-child { border-bottom: none; }
-        .ht-badge {
-          display: inline-flex;
-          padding: 2px 10px;
-          border-radius: 20px;
-          font-size: 10px;
-          font-weight: 600;
-        }
-        .ht-btn-primary {
-          width: 100%;
-          padding: 12px;
-          background: ${P};
-          color: #fff;
-          border: none;
-          border-radius: 10px;
-          font-size: 14px;
-          font-weight: 600;
-          cursor: pointer;
-          font-family: inherit;
-          transition: background .2s;
-        }
-        .ht-btn-primary:hover { background: #5a3a53; }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: ${BG}; font-family: 'Inter', system-ui, sans-serif; color: ${TXT}; }
+        .ht-card { background: ${CARD}; border-radius: 13px; border: 1px solid ${BORDER}; padding: 14px; margin-bottom: 12px; }
+        .ht-card-title { font-size: 11px; font-weight: 700; color: ${TXT2}; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 11px; }
+        .ht-badge { display: inline-flex; padding: 2px 10px; border-radius: 20px; font-size: 10px; font-weight: 600; }
+        .ht-toast { position: fixed; bottom: 72px; left: 50%; transform: translateX(-50%); background: ${P}; color: #fff; padding: 8px 20px; border-radius: 24px; font-size: 12px; font-weight: 600; z-index: 200; pointer-events: none; white-space: nowrap; animation: htfadein .2s ease; }
+        .ht-btn-primary { width: 100%; padding: 12px; background: ${P}; color: #fff; border: none; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; }
+        .ht-btn-primary:hover { background: ${PS}; }
         .ht-btn-primary:disabled { background: #b8a0b0; cursor: not-allowed; }
-        .ht-btn-outline {
-          padding: 8px 16px;
-          background: #fff;
-          color: ${P};
-          border: 1.5px solid ${P};
-          border-radius: 9px;
-          font-size: 12px;
-          font-weight: 600;
-          cursor: pointer;
-          font-family: inherit;
-          transition: background .2s;
-        }
-        .ht-btn-outline:hover { background: ${PL}; }
-        .ht-input {
-          width: 100%;
-          padding: 9px 12px;
-          border: 1.5px solid ${BORDER};
-          border-radius: 9px;
-          font-size: 13px;
-          color: #2c1a3a;
-          outline: none;
-          transition: border-color .2s;
-          background: #fff;
-          font-family: inherit;
-        }
+        .ht-input { width: 100%; padding: 9px 12px; border: 1.5px solid ${BORDER}; border-radius: 9px; font-size: 13px; color: ${TXT}; outline: none; background: ${CARD}; font-family: inherit; }
         .ht-input:focus { border-color: ${P}; }
-        .ht-toast {
-          position: fixed;
-          bottom: 72px;
-          left: 50%;
-          transform: translateX(-50%);
-          background: ${P};
-          color: #fff;
-          padding: 8px 20px;
-          border-radius: 24px;
-          font-size: 12px;
-          font-weight: 600;
-          z-index: 100;
-          pointer-events: none;
-          animation: ht-fadein .2s ease;
-          white-space: nowrap;
-        }
-        .ht-spinner {
-          width: 36px; height: 36px;
-          border: 3px solid ${BORDER};
-          border-top-color: ${P};
-          border-radius: 50%;
-          animation: ht-spin .7s linear infinite;
-        }
-        @keyframes ht-spin { to { transform: rotate(360deg); } }
-        @keyframes ht-fadein { from { opacity: 0; transform: translateX(-50%) translateY(8px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
-        @keyframes ht-pulse { 0%,100% { opacity: 1; } 50% { opacity: .4; } }
-
-        @media (max-width: 480px) {
-          .ht-main { padding: 12px 12px 80px; }
-        }
+        .ht-spinner { width: 36px; height: 36px; border: 3px solid ${BORDER}; border-top-color: ${P}; border-radius: 50%; animation: htspin .7s linear infinite; }
+        @keyframes htspin { to { transform: rotate(360deg); } }
+        @keyframes htfadein { from { opacity: 0; transform: translateX(-50%) translateY(8px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+        @keyframes htpulse { 0%,100% { opacity: 1; } 50% { opacity: .4; } }
       `}</style>
 
-      {/* DESKTOP SIDEBAR */}
-      <div className="ht-sidebar" style={{display:"none"}} id="ht-sidebar">
-        <div className="ht-sidebar-logo">
-          <div className="ht-logo">H</div>
-          <div>
-            <div style={{fontSize:13,fontWeight:700,color:P}}>Health Tracker</div>
-            <div style={{fontSize:10,color:TXT2}}>{profile?.full_name||""}</div>
+      <div style={{ display: "flex", minHeight: "100vh" }}>
+
+        {/* ── DESKTOP SIDEBAR ── */}
+        {isDesktop && (
+          <div style={{
+            width: 210, flexShrink: 0, background: CARD,
+            borderRight: `1px solid ${BORDER}`,
+            position: "fixed", top: 0, left: 0, height: "100vh",
+            display: "flex", flexDirection: "column",
+            zIndex: 30,
+          }}>
+            {/* Logo */}
+            <div style={{ padding: "16px 20px 14px", borderBottom: `1px solid ${BORDER}` }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ width: 34, height: 34, background: P, borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700, fontSize: 15, flexShrink: 0 }}>H</div>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: P, lineHeight: 1.2 }}>Health Tracker</div>
+                  <div style={{ fontSize: 10, color: TXT2 }}>{profile?.full_name || ""}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Nav items */}
+            <div style={{ flex: 1, paddingTop: 8, overflowY: "auto" }}>
+              {items.map(item => <SidebarItem key={item.href} item={item} />)}
+            </div>
+
+            {/* Bottom */}
+            <div style={{ padding: "12px 20px", borderTop: `1px solid ${BORDER}` }}>
+              <div style={{ fontSize: 11, color: TXT3 }}>Logged in as</div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: TXT2, marginTop: 2 }}>{profile?.email || ""}</div>
+            </div>
+          </div>
+        )}
+
+        {/* ── MAIN AREA ── */}
+        <div style={{ flex: 1, marginLeft: isDesktop ? 210 : 0, display: "flex", flexDirection: "column", minHeight: "100vh" }}>
+
+          {/* Top bar */}
+          <div style={{
+            background: CARD, borderBottom: `1px solid ${BORDER}`,
+            padding: "0 16px", height: 52,
+            display: "flex", alignItems: "center", gap: 10,
+            position: "sticky", top: 0, zIndex: 20,
+          }}>
+            {!isDesktop && (
+              <div style={{ width: 32, height: 32, background: P, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700, fontSize: 14, flexShrink: 0 }}>H</div>
+            )}
+            <span style={{ fontSize: 13, fontWeight: 700, color: P }}>{isDesktop ? "" : "Health Tracker"}</span>
+            {!isDesktop && <span style={{ color: BORDER, fontSize: 18 }}>|</span>}
+            <span style={{ fontSize: 13, fontWeight: isDesktop ? 700 : 400, color: isDesktop ? TXT : TXT2 }}>{title}</span>
+            <div style={{ flex: 1 }} />
+            <button onClick={() => router.push("/profile")} style={{
+              width: 34, height: 34, borderRadius: "50%",
+              background: PL, border: "none", cursor: "pointer",
+              color: P, fontWeight: 700, fontSize: 13,
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              {profile?.full_name?.[0]?.toUpperCase() || "A"}
+            </button>
+          </div>
+
+          {/* Page content */}
+          <div style={{
+            flex: 1,
+            padding: isDesktop ? "20px 28px 40px" : "14px 14px 80px",
+            maxWidth: isDesktop ? 900 : "100%",
+          }}>
+            {children}
           </div>
         </div>
-        {items.map(item => (
-          <button key={item.href} className={`ht-sidebar-item${current===item.href||current.startsWith(item.href+"/")?" active":""}`}
-            onClick={() => router.push(item.href)}>
-            <span className="s-ico">{item.icon}</span>
-            {item.label}
-          </button>
-        ))}
       </div>
 
-      {/* TOP BAR */}
-      <div className="ht-topbar">
-        <div className="ht-logo">H</div>
-        <span className="ht-app-name">Health Tracker</span>
-        <span className="ht-divider">|</span>
-        <span className="ht-page-name">{title}</span>
-        <div style={{flex:1}}/>
-        <button className="ht-avatar" onClick={() => router.push("/profile")}>
-          {profile?.full_name?.[0]?.toUpperCase() || "A"}
-        </button>
-      </div>
-
-      {/* PAGE CONTENT */}
-      <div className="ht-main">
-        {children}
-      </div>
-
-      {/* BOTTOM NAV (mobile + tablet) */}
-      <nav className="ht-bottomnav">
-        {items.map(item => {
-          const isActive = current === item.href || (item.href !== "/dashboard" && current.startsWith(item.href));
-          return (
-            <button key={item.href} className={`ht-navbtn${isActive ? " active" : ""}`}
-              onClick={() => router.push(item.href)}>
-              <span className="ht-nav-ico">{item.icon}</span>
-              {item.label}
-              <span className="ht-nav-dot"/>
-            </button>
-          );
-        })}
-      </nav>
-
-      {/* Show sidebar on desktop via JS */}
-      <script dangerouslySetInnerHTML={{__html:`
-        (function(){
-          var s=document.getElementById('ht-sidebar');
-          if(s&&window.innerWidth>=768)s.style.display='flex';
-          window.addEventListener('resize',function(){
-            if(s)s.style.display=window.innerWidth>=768?'flex':'none';
-          });
-        })();
-      `}}/>
+      {/* ── BOTTOM NAV (mobile only) ── */}
+      {!isDesktop && (
+        <nav style={{
+          position: "fixed", bottom: 0, left: 0, right: 0,
+          background: CARD, borderTop: `1px solid ${BORDER}`,
+          display: "flex", zIndex: 30,
+          boxShadow: "0 -2px 8px rgba(0,0,0,0.06)",
+        }}>
+          {items.map(item => {
+            const active = isActive(item.href);
+            return (
+              <button key={item.href} onClick={() => router.push(item.href)} style={{
+                flex: 1, display: "flex", flexDirection: "column", alignItems: "center",
+                gap: 2, padding: "8px 4px",
+                border: "none", background: "none", cursor: "pointer",
+                fontFamily: "inherit", fontSize: 9,
+                fontWeight: active ? 700 : 500,
+                color: active ? P : TXT3,
+                transition: "color .15s",
+              }}>
+                <span style={{ fontSize: 20, lineHeight: 1 }}>{item.icon}</span>
+                {item.label}
+                {active && <span style={{ width: 4, height: 4, borderRadius: "50%", background: P, marginTop: 1 }} />}
+              </button>
+            );
+          })}
+        </nav>
+      )}
     </>
   );
 }
