@@ -248,7 +248,19 @@ export default function Dashboard(){
                 {!selKeys.length&&<span style={{fontSize:11,color:TXT3,marginRight:6}}>tap to log</span>}
                 <span style={{fontSize:12,color:TXT3,display:"inline-block",transform:isOpen?"rotate(180deg)":"none",transition:"transform .2s"}}>▾</span>
               </div>
-              {selKeys.length>0&&!isOpen&&<div style={{padding:"5px 13px 9px",display:"flex",flexWrap:"wrap"}}>{selKeys.map(id=>{const f=foods.find(x=>x.id===id||x.name===id);return<span key={id} className="pill">{f?.name||id}</span>;})}</div>}
+              {selKeys.length>0&&!isOpen&&(
+                <div style={{padding:"5px 13px 9px",display:"flex",flexWrap:"wrap",gap:4}}>
+                  {selKeys.map(id=>{
+                    const f=foods.find(x=>x.id===id||x.name===id);
+                    return(
+                      <span key={id} style={{display:"inline-flex",alignItems:"center",gap:4,fontSize:10,padding:"3px 6px 3px 10px",borderRadius:20,background:GL,color:G,border:"1px solid #5DCAA5"}}>
+                        {f?.name||id}
+                        <button onClick={e=>{e.stopPropagation();toggleFood(meal.id,id);}} style={{width:16,height:16,borderRadius:"50%",border:"none",background:"rgba(0,0,0,0.15)",color:"#fff",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,flexShrink:0,lineHeight:1}}>×</button>
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
               {isOpen&&(
                 <div className="mbody">
                   <input className="sinp" placeholder="Search food…" value={search} onChange={e=>setSearch(e.target.value)}/>
