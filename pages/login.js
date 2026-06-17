@@ -12,17 +12,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
-  const [debug, setDebug] = useState(null);
-
-  useEffect(() => {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    if (!url || !key) {
-      setDebug("ENV MISSING — URL: " + (url ? "ok" : "MISSING") + " | KEY: " + (key ? "ok" : "MISSING"));
-    } else {
-      setDebug("ENV OK — " + url);
-    }
-  }, []);
+  
 
   async function handleEmail(e) {
     e.preventDefault();
