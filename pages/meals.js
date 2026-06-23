@@ -16,6 +16,8 @@ const MEAL_DEFS=[
   {id:"dinner",label:"Dinner",time:"7:30 PM",icon:"🌙",bg:"#eeedfe"},
 ];
 
+const EMPTY_CUSTOM={show:false,mealId:null,name:"",cal:"",pro:"",carb:"",fat:"",category:"",saving:false,err:""};
+
 function fmt(d){return d.toISOString().split("T")[0];}
 function today(){return fmt(new Date());}
 function dayLabel(dk){
@@ -35,7 +37,7 @@ export default function Meals(){
   const [catFilter,setCatFilter]=useState("All");
   const [saving,setSaving]=useState(false);
   const [toast,setToast]=useState(null);
-  const [customFood,setCustomFood]=useState({show:false,mealId:null,name:"",cal:"",pro:"",carb:""});
+  const [customFood,setCustomFood]=useState(EMPTY_CUSTOM);
 
   useEffect(()=>{
     async function init(){
@@ -47,7 +49,11 @@ export default function Meals(){
       if(!p.setup_complete){router.push("/setup");return;}
       setProfile(p);
       if(p.active_template_id){
-        const{data:tf}=await sb.from("template_food_items").select("*").eq("template_id",p.active_template_id);
+        // Load template foods + any custom foods this user has added previously
+        const{data:tf}=await sb
+          .from("template_food_items")
+          .select("*")
+          .or(`template_id.eq.${p.active_template_id},and(added_by_user.eq.true,added_by_user_id.eq.${p.id})`);
         setFoods(tf||[]);
       }
     }
@@ -71,29 +77,69 @@ export default function Meals(){
   }
 
   function toggleFood(mealId,foodId){
+    // Always use string comparison — DB uuid vs local string both work
     const mf={...(log.foods[mealId]||{})};
-    mf[foodId]?delete mf[foodId]:(mf[foodId]=true);
+    const key=String(foodId);
+    mf[key]?delete mf[key]:(mf[key]=true);
     persist({foods:{...log.foods,[mealId]:mf}});
   }
 
-  function addCustom(){
-    if(!customFood.name||!customFood.cal)return;
-    const id="custom_"+Date.now();
-    setFoods(f=>[...f,{id,name:customFood.name,calories:+customFood.cal,protein:+customFood.pro||0,carbs:+customFood.carb||0,fat:0,category:"Custom"}]);
-    const mf={...(log.foods[customFood.mealId]||{}),[id]:true};
-    persist({foods:{...log.foods,[customFood.mealId]:mf}});
-    setCustomFood({show:false,mealId:null,name:"",cal:"",pro:"",carb:""});
-    showToast("Custom food added ✓");
+  // ─── FIXED: saves to Supabase, uses real UUID returned by DB ─────────────────
+  async function addCustom(){
+    if(!customFood.name.trim()){
+      setCustomFood(f=>({...f,err:"Food name is required"})); return;
+    }
+    if(!customFood.cal||isNaN(customFood.cal)){
+      setCustomFood(f=>({...f,err:"Valid calories required"})); return;
+    }
+    setCustomFood(f=>({...f,saving:true,err:""}));
+    try{
+      const sb=getSupabase();
+      const newFood={
+        name:         customFood.name.trim(),
+        calories:     parseFloat(customFood.cal)||0,
+        protein:      parseFloat(customFood.pro)||0,
+        carbs:        parseFloat(customFood.carb)||0,
+        fat:          parseFloat(customFood.fat)||0,          // ← fat field was missing before
+        category:     customFood.category.trim()||"Custom",
+        template_id:  profile.active_template_id||null,
+        added_by_user: true,
+        added_by_user_id: profile.id,
+      };
+      const{data,error}=await sb
+        .from("template_food_items")
+        .insert(newFood)
+        .select()
+        .single();
+      if(error) throw error;
+
+      // Add to local foods list using the real DB record (has a real UUID)
+      setFoods(prev=>[...prev,data]);
+
+      // Auto-tick it in the meal that opened the form, using the real UUID
+      const mealId=customFood.mealId;
+      const mf={...(log.foods[mealId]||{}),[String(data.id)]:true};
+      await persist({foods:{...log.foods,[mealId]:mf}});
+
+      setCustomFood(EMPTY_CUSTOM);
+      showToast("Food added & saved ✓");
+    }catch(e){
+      setCustomFood(f=>({...f,saving:false,err:e.message||"Failed to save"}));
+    }
   }
 
+  // ─── Derived values ───────────────────────────────────────────────────────────
   const allIds=Object.values(log.foods).flatMap(m=>Object.keys(m));
   const mac=allIds.reduce((a,id)=>{
-    const f=foods.find(x=>x.id===id||x.name===id);
+    const f=foods.find(x=>String(x.id)===id||x.name===id);
     return f?{cal:a.cal+(f.calories||0),pro:a.pro+(f.protein||0),carb:a.carb+(f.carbs||0),fat:a.fat+(f.fat||0)}:a;
   },{cal:0,pro:0,carb:0,fat:0});
 
   const cats=["All",...new Set(foods.map(f=>f.category).filter(Boolean))];
-  const filtered=foods.filter(f=>(!search||f.name.toLowerCase().includes(search.toLowerCase()))&&(catFilter==="All"||f.category===catFilter));
+  const filtered=foods.filter(f=>
+    (!search||f.name.toLowerCase().includes(search.toLowerCase()))&&
+    (catFilter==="All"||f.category===catFilter)
+  );
   const calTarget=profile?.calorie_target||1600;
   const proTarget=profile?.protein_target||100;
 
@@ -134,10 +180,11 @@ export default function Meals(){
         .frow:hover,.frow.sel{border-color:${G};background:${GL}}
         .fchk{width:17px;height:17px;border-radius:4px;border:1.5px solid ${BORDER};display:flex;align-items:center;justify-content:center;flex-shrink:0}
         .fchk.on{background:${G};border-color:${G}}
-        .pill{font-size:10px;padding:2px 8px;border-radius:20px;background:${GL};color:${G};border:1px solid #5DCAA5;margin:2px}
         .cform{background:#faf9fd;border-radius:10px;padding:12px;margin-top:10px;border:1px dashed ${BORDER}}
-        .cinp{width:100%;padding:7px 10px;border-radius:7px;border:1px solid ${BORDER};font-size:12px;color:${TXT};outline:none;margin-bottom:6px;font-family:inherit}
-        .cingrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:6px}
+        .cinp{width:100%;padding:7px 10px;border-radius:7px;border:1px solid ${BORDER};font-size:12px;color:${TXT};outline:none;font-family:inherit}
+        .cingrid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:6px 0}
+        .add-food-btn{margin-top:10px;width:100%;padding:8px;border:1.5px dashed ${P};border-radius:8px;background:${PL};color:${P};font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px;transition:all .15s}
+        .add-food-btn:hover{background:${P};color:#fff}
         @media(max-width:480px){.sgrid{grid-template-columns:repeat(2,1fr)}}
       `}</style>
 
@@ -157,21 +204,37 @@ export default function Meals(){
           <button className="dbtn" onClick={()=>{const d=new Date(dateKey);d.setDate(d.getDate()+1);if(fmt(d)<=today())setDateKey(fmt(d));}} disabled={dateKey>=today()}>›</button>
         </div>
 
-        {/* SUMMARY */}
+        {/* SUMMARY KPIs */}
         <div className="sgrid">
-          {[{l:"Calories",v:`${mac.cal}/${calTarget}`,c:"#7F77DD"},{l:"Protein",v:`${mac.pro}g/${proTarget}g`,c:G},{l:"Carbs",v:`${mac.carb}g`,c:A},{l:"Fat",v:`${mac.fat}g`,c:"#D85A30"}].map((k,i)=>(
-            <div key={i} className="skpi"><div style={{fontSize:14,fontWeight:700,color:k.c,lineHeight:1,marginBottom:3}}>{k.v}</div><div style={{fontSize:9,color:TXT2,textTransform:"uppercase"}}>{k.l}</div></div>
+          {[
+            {l:"Calories",v:`${mac.cal}/${calTarget}`,c:"#7F77DD"},
+            {l:"Protein", v:`${mac.pro}g/${proTarget}g`,c:G},
+            {l:"Carbs",   v:`${mac.carb}g`,c:A},
+            {l:"Fat",     v:`${mac.fat}g`,c:"#D85A30"},
+          ].map((k,i)=>(
+            <div key={i} className="skpi">
+              <div style={{fontSize:14,fontWeight:700,color:k.c,lineHeight:1,marginBottom:3}}>{k.v}</div>
+              <div style={{fontSize:9,color:TXT2,textTransform:"uppercase"}}>{k.l}</div>
+            </div>
           ))}
         </div>
 
         {/* MACRO BARS */}
         <div className="card">
           <div className="ctitle">Macro progress</div>
-          {[{l:"Calories",v:mac.cal,max:calTarget,c:"#7F77DD",u:" kcal"},{l:"Protein",v:mac.pro,max:proTarget,c:G,u:"g"},{l:"Carbs",v:mac.carb,max:profile?.carb_target||130,c:A,u:"g"},{l:"Fat",v:mac.fat,max:profile?.fat_target||55,c:"#D85A30",u:"g"}].map(b=>{
+          {[
+            {l:"Calories",v:mac.cal,max:calTarget,            c:"#7F77DD",u:" kcal"},
+            {l:"Protein", v:mac.pro,max:proTarget,            c:G,        u:"g"},
+            {l:"Carbs",   v:mac.carb,max:profile?.carb_target||130,c:A,   u:"g"},
+            {l:"Fat",     v:mac.fat, max:profile?.fat_target||55, c:"#D85A30",u:"g"},
+          ].map(b=>{
             const p=Math.min(100,Math.round((b.v/b.max)*100));
             return(
               <div key={b.l} className="pbar">
-                <div className="pbrow"><span style={{color:TXT2}}>{b.l}</span><span style={{fontWeight:600,color:p>100?R:TXT}}>{b.v}{b.u}<span style={{color:TXT3}}> / {b.max}</span></span></div>
+                <div className="pbrow">
+                  <span style={{color:TXT2}}>{b.l}</span>
+                  <span style={{fontWeight:600,color:p>100?R:TXT}}>{b.v}{b.u}<span style={{color:TXT3}}> / {b.max}</span></span>
+                </div>
                 <div className="pbbg"><div className="pbfill" style={{width:`${p}%`,background:p>100?R:b.c}}/></div>
               </div>
             );
@@ -182,46 +245,80 @@ export default function Meals(){
         {MEAL_DEFS.map(meal=>{
           const sel=log.foods[meal.id]||{};
           const selKeys=Object.keys(sel);
-          const mCal=selKeys.reduce((s,id)=>{const f=foods.find(x=>x.id===id||x.name===id);return f?s+(f.calories||0):s;},0);
-          const mPro=selKeys.reduce((s,id)=>{const f=foods.find(x=>x.id===id||x.name===id);return f?s+(f.protein||0):s;},0);
+          const mCal=selKeys.reduce((s,id)=>{const f=foods.find(x=>String(x.id)===id||x.name===id);return f?s+(f.calories||0):s;},0);
+          const mPro=selKeys.reduce((s,id)=>{const f=foods.find(x=>String(x.id)===id||x.name===id);return f?s+(f.protein||0):s;},0);
           const isOpen=openMeal===meal.id;
+          const isCustomFormOpen=customFood.show&&customFood.mealId===meal.id;
+
           return(
             <div key={meal.id} className={`mcard${selKeys.length>0?" done":""}`}>
-              <div className="mhdr" style={{background:selKeys.length>0?GL:CARD}} onClick={()=>{setOpenMeal(isOpen?null:meal.id);setSearch("");setCatFilter("All");}}>
+
+              {/* MEAL HEADER */}
+              <div className="mhdr" style={{background:selKeys.length>0?GL:CARD}}
+                onClick={()=>{setOpenMeal(isOpen?null:meal.id);setSearch("");setCatFilter("All");setCustomFood(EMPTY_CUSTOM);}}>
                 <div style={{width:34,height:34,borderRadius:8,background:meal.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,flexShrink:0}}>{meal.icon}</div>
                 <div style={{flex:1}}>
                   <div style={{fontSize:13,fontWeight:600}}>{meal.label}</div>
                   <div style={{fontSize:11,color:TXT2}}>{meal.time}{selKeys.length>0?` · ${selKeys.length} item${selKeys.length>1?"s":""}`:""}</div>
                 </div>
-                {selKeys.length>0&&<div style={{textAlign:"right",marginRight:6}}><div style={{fontSize:13,fontWeight:700,color:G}}>{mCal} kcal</div><div style={{fontSize:10,color:TXT2}}>{mPro}g P</div></div>}
+                {selKeys.length>0&&(
+                  <div style={{textAlign:"right",marginRight:6}}>
+                    <div style={{fontSize:13,fontWeight:700,color:G}}>{mCal} kcal</div>
+                    <div style={{fontSize:10,color:TXT2}}>{mPro}g P</div>
+                  </div>
+                )}
                 {!selKeys.length&&<span style={{fontSize:11,color:TXT3,marginRight:6}}>tap to log</span>}
                 <span style={{fontSize:12,color:TXT3,display:"inline-block",transform:isOpen?"rotate(180deg)":"none",transition:"transform .2s"}}>▾</span>
               </div>
+
+              {/* LOGGED FOOD PILLS (collapsed view) */}
               {selKeys.length>0&&!isOpen&&(
                 <div style={{padding:"5px 13px 9px",display:"flex",flexWrap:"wrap",gap:4}}>
                   {selKeys.map(id=>{
-                    const f=foods.find(x=>x.id===id||x.name===id);
+                    const f=foods.find(x=>String(x.id)===id||x.name===id);
                     return(
                       <span key={id} style={{display:"inline-flex",alignItems:"center",gap:4,fontSize:10,padding:"3px 6px 3px 10px",borderRadius:20,background:GL,color:G,border:"1px solid #5DCAA5"}}>
                         {f?.name||id}
-                        <button onClick={e=>{e.stopPropagation();toggleFood(meal.id,id);}} style={{width:16,height:16,borderRadius:"50%",border:"none",background:"rgba(0,0,0,0.15)",color:"#fff",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,flexShrink:0,lineHeight:1}}>×</button>
+                        <button onClick={e=>{e.stopPropagation();toggleFood(meal.id,id);}}
+                          style={{width:16,height:16,borderRadius:"50%",border:"none",background:"rgba(0,0,0,0.15)",color:"#fff",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,flexShrink:0,lineHeight:1}}>×</button>
                       </span>
                     );
                   })}
                 </div>
               )}
+
+              {/* OPEN MEAL BODY */}
               {isOpen&&(
                 <div className="mbody">
                   <input className="sinp" placeholder="Search food items…" value={search} onChange={e=>setSearch(e.target.value)}/>
-                  <div className="catbtns">{cats.map(c=><button key={c} className={`catbtn${catFilter===c?" on":""}`} onClick={()=>setCatFilter(c)}>{c}</button>)}</div>
-                  {foods.length===0&&<div style={{textAlign:"center",padding:"20px 0",color:TXT2,fontSize:13}}>No food items assigned yet.<br/>Ask admin to assign a meal plan.</div>}
+                  <div className="catbtns">
+                    {cats.map(c=><button key={c} className={`catbtn${catFilter===c?" on":""}`} onClick={()=>setCatFilter(c)}>{c}</button>)}
+                  </div>
+
+                  {foods.length===0&&(
+                    <div style={{textAlign:"center",padding:"20px 0",color:TXT2,fontSize:13}}>
+                      No food items assigned yet.<br/>Ask admin to assign a meal plan.
+                    </div>
+                  )}
+
+                  {/* FOOD LIST */}
                   <div className="flist">
                     {filtered.map(f=>{
-                      const chk=!!sel[f.id||f.name];
+                      const chk=!!sel[String(f.id)||f.name];
                       return(
-                        <div key={f.id||f.name} className={`frow${chk?" sel":""}`} onClick={()=>toggleFood(meal.id,f.id||f.name)}>
+                        <div key={f.id||f.name} className={`frow${chk?" sel":""}`}
+                          onClick={()=>toggleFood(meal.id,String(f.id)||f.name)}>
                           <div className={`fchk${chk?" on":""}`}>{chk&&<span style={{color:"#fff",fontSize:9,fontWeight:900}}>✓</span>}</div>
-                          <div style={{flex:1}}><div style={{fontSize:12,color:chk?G:TXT,fontWeight:chk?600:400}}>{f.name}</div>{f.category&&<div style={{fontSize:10,color:TXT3}}>{f.category}</div>}</div>
+                          <div style={{flex:1}}>
+                            <div style={{fontSize:12,color:chk?G:TXT,fontWeight:chk?600:400}}>
+                              {f.name}
+                              {/* Show "custom" badge on user-added foods */}
+                              {f.added_by_user&&(
+                                <span style={{fontSize:9,color:TXT3,marginLeft:5,fontWeight:400}}>· custom</span>
+                              )}
+                            </div>
+                            {f.category&&<div style={{fontSize:10,color:TXT3}}>{f.category}</div>}
+                          </div>
                           <div style={{textAlign:"right",flexShrink:0}}>
                             <span style={{fontSize:11,fontWeight:700,color:"#7F77DD"}}>{f.calories||0}</span>
                             <span style={{fontSize:10,color:TXT3}}> kcal</span>
@@ -231,23 +328,63 @@ export default function Meals(){
                       );
                     })}
                   </div>
-                  {customFood.show&&customFood.mealId===meal.id?(
+
+                  {/* ─── ADD CUSTOM FOOD FORM ──────────────────────────────── */}
+                  {isCustomFormOpen?(
                     <div className="cform">
-                      <div style={{fontSize:12,fontWeight:600,marginBottom:8,color:P}}>Add custom food</div>
-                      <input className="cinp" placeholder="Food name (required)" value={customFood.name} onChange={e=>setCustomFood(f=>({...f,name:e.target.value}))}/>
-                      <div className="cingrid">
-                        <input className="cinp" placeholder="Calories" type="number" value={customFood.cal} onChange={e=>setCustomFood(f=>({...f,cal:e.target.value}))}/>
-                        <input className="cinp" placeholder="Protein g" type="number" value={customFood.pro} onChange={e=>setCustomFood(f=>({...f,pro:e.target.value}))}/>
-                        <input className="cinp" placeholder="Carbs g" type="number" value={customFood.carb} onChange={e=>setCustomFood(f=>({...f,carb:e.target.value}))}/>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                        <div>
+                          <div style={{fontSize:12,fontWeight:700,color:P}}>Add food item</div>
+                          <div style={{fontSize:10,color:TXT2}}>Saved to your list permanently</div>
+                        </div>
+                        <button onClick={()=>setCustomFood(EMPTY_CUSTOM)}
+                          style={{width:24,height:24,borderRadius:"50%",border:`1px solid ${BORDER}`,background:"transparent",cursor:"pointer",fontSize:14,color:TXT2,display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
                       </div>
-                      <div style={{display:"flex",gap:8}}>
-                        <button onClick={addCustom} style={{padding:"7px 16px",background:P,color:"#fff",border:"none",borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>Add food</button>
-                        <button onClick={()=>setCustomFood({show:false,mealId:null,name:"",cal:"",pro:"",carb:""})} style={{padding:"7px 12px",background:"transparent",color:TXT2,border:`1px solid ${BORDER}`,borderRadius:8,fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>Cancel</button>
+
+                      {/* Name */}
+                      <input className="cinp" style={{marginBottom:6}} placeholder="Food name (required)"
+                        value={customFood.name} onChange={e=>setCustomFood(f=>({...f,name:e.target.value}))}/>
+
+                      {/* Calories full width */}
+                      <input className="cinp" style={{marginBottom:0}} placeholder="Calories (kcal) — required"
+                        type="number" value={customFood.cal} onChange={e=>setCustomFood(f=>({...f,cal:e.target.value}))}/>
+
+                      {/* Macros 2-column grid */}
+                      <div className="cingrid">
+                        <input className="cinp" placeholder="Protein g" type="number"
+                          value={customFood.pro} onChange={e=>setCustomFood(f=>({...f,pro:e.target.value}))}/>
+                        <input className="cinp" placeholder="Carbs g" type="number"
+                          value={customFood.carb} onChange={e=>setCustomFood(f=>({...f,carb:e.target.value}))}/>
+                        <input className="cinp" placeholder="Fat g" type="number"
+                          value={customFood.fat} onChange={e=>setCustomFood(f=>({...f,fat:e.target.value}))}/>
+                        <input className="cinp" placeholder="Category (optional)"
+                          value={customFood.category} onChange={e=>setCustomFood(f=>({...f,category:e.target.value}))}/>
+                      </div>
+
+                      {/* Error */}
+                      {customFood.err&&(
+                        <div style={{fontSize:11,color:R,padding:"5px 8px",background:"#fff5f5",borderRadius:6,marginBottom:6}}>
+                          {customFood.err}
+                        </div>
+                      )}
+
+                      {/* Buttons */}
+                      <div style={{display:"flex",gap:8,marginTop:2}}>
+                        <button onClick={addCustom} disabled={customFood.saving}
+                          style={{flex:1,padding:"8px",background:customFood.saving?"#aaa":P,color:"#fff",border:"none",borderRadius:8,fontSize:12,fontWeight:700,cursor:customFood.saving?"not-allowed":"pointer",fontFamily:"inherit"}}>
+                          {customFood.saving?"Saving…":"✓ Add food"}
+                        </button>
+                        <button onClick={()=>setCustomFood(EMPTY_CUSTOM)}
+                          style={{padding:"8px 14px",background:"transparent",color:TXT2,border:`1px solid ${BORDER}`,borderRadius:8,fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>
+                          Cancel
+                        </button>
                       </div>
                     </div>
                   ):(
-                    <button onClick={()=>setCustomFood(f=>({...f,show:true,mealId:meal.id}))} style={{marginTop:10,width:"100%",padding:"7px",border:`1px dashed ${BORDER}`,borderRadius:8,background:"transparent",color:TXT2,fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>
-                      + Add custom food not in list
+                    <button className="add-food-btn"
+                      onClick={()=>setCustomFood(f=>({...f,show:true,mealId:meal.id}))}>
+                      <span style={{fontSize:16,lineHeight:1}}>+</span>
+                      Food not in list? Add it
                     </button>
                   )}
                 </div>
