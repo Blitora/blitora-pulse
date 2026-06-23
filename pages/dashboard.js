@@ -18,6 +18,24 @@ function dayLabel(dk){
   return new Date(dk).toLocaleDateString("en-IN",{day:"numeric",month:"short"});
 }
 
+// ─── FIX 1: BMR uses real profile values, not hardcoded fallbacks ─────────────
+// Uses profile.age (integer), profile.weight_current (numeric), profile.height_cm (numeric)
+// Mifflin-St Jeor formula: 10*weight + 6.25*height - 5*age + gender_offset
+function calcBMR(profile){
+  if(!profile) return 1800;
+  const weight = parseFloat(profile.weight_current) || parseFloat(profile.weight_start) || 70;
+  const height = parseFloat(profile.height_cm) || 165;
+  const age    = parseInt(profile.age) || 30;
+  const base   = Math.round(10 * weight + 6.25 * height - 5 * age);
+  return profile.gender === "Female" ? base - 161 : base + 5;
+}
+
+// Activity level multiplier on top of walk calories
+function activityMultiplier(level){
+  const map = { sedentary:1.2, lightly_active:1.375, moderately_active:1.55, very_active:1.725, extra_active:1.9 };
+  return map[level] || 1.2;
+}
+
 function Ring({pct=0,size=72,color,label,sub}){
   const r=(size-8)/2,c=2*Math.PI*r,d=Math.min(pct/100,1)*c;
   return(
@@ -52,6 +70,129 @@ function MBar({label,val,max,color,unit}){
   );
 }
 
+// ─── ADD FOOD MODAL ───────────────────────────────────────────────────────────
+function AddFoodModal({ profile, onSave, onClose }){
+  const [form,setForm]=useState({name:"",calories:"",protein:"",carbs:"",fat:"",category:""});
+  const [saving,setSaving]=useState(false);
+  const [err,setErr]=useState("");
+
+  async function handleSave(){
+    if(!form.name.trim()){ setErr("Food name is required"); return; }
+    if(!form.calories || isNaN(form.calories)){ setErr("Valid calories required"); return; }
+    setSaving(true); setErr("");
+    try {
+      const sb = getSupabase();
+      const newFood = {
+        name: form.name.trim(),
+        calories: parseFloat(form.calories) || 0,
+        protein:  parseFloat(form.protein)  || 0,
+        carbs:    parseFloat(form.carbs)    || 0,
+        fat:      parseFloat(form.fat)      || 0,
+        category: form.category.trim() || "Custom",
+        // ─── FIX: flagged as user-added, linked to their template ───────────
+        template_id:    profile.active_template_id || null,
+        added_by_user:  true,
+        added_by_user_id: profile.id,
+      };
+      const { data, error } = await sb
+        .from("template_food_items")
+        .insert(newFood)
+        .select()
+        .single();
+      if(error) throw error;
+      onSave(data);  // pass new food back to parent to add to local state
+    } catch(e){
+      setErr(e.message || "Failed to save food");
+    }
+    setSaving(false);
+  }
+
+  const inp = (label,key,type="text",placeholder="") => (
+    <div style={{marginBottom:10}}>
+      <div style={{fontSize:11,fontWeight:600,color:TXT2,marginBottom:4}}>{label}</div>
+      <input
+        type={type} placeholder={placeholder}
+        value={form[key]}
+        onChange={e=>setForm(f=>({...f,[key]:e.target.value}))}
+        style={{width:"100%",padding:"8px 12px",borderRadius:8,border:`1px solid ${BORDER}`,
+          fontSize:13,color:TXT,outline:"none",fontFamily:"inherit"}}
+      />
+    </div>
+  );
+
+  return(
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:999,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
+      <div style={{background:CARD,borderRadius:"20px 20px 0 0",width:"100%",maxWidth:480,padding:"20px 18px 32px",maxHeight:"85vh",overflowY:"auto"}}>
+        {/* Header */}
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
+          <div>
+            <div style={{fontSize:15,fontWeight:700,color:TXT}}>Add Food Item</div>
+            <div style={{fontSize:11,color:TXT2}}>Saved to your Food Master & this list</div>
+          </div>
+          <button onClick={onClose} style={{width:30,height:30,borderRadius:"50%",border:`1px solid ${BORDER}`,
+            background:"transparent",cursor:"pointer",fontSize:16,color:TXT2,display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
+        </div>
+
+        {inp("Food Name *","name","text","e.g. Moong Dal Chilla")}
+        {inp("Calories (kcal) *","calories","number","e.g. 180")}
+
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:10}}>
+          {[["Protein (g)","protein"],["Carbs (g)","carbs"],["Fat (g)","fat"]].map(([label,key])=>(
+            <div key={key}>
+              <div style={{fontSize:11,fontWeight:600,color:TXT2,marginBottom:4}}>{label}</div>
+              <input type="number" placeholder="0" value={form[key]}
+                onChange={e=>setForm(f=>({...f,[key]:e.target.value}))}
+                style={{width:"100%",padding:"7px 10px",borderRadius:8,border:`1px solid ${BORDER}`,
+                  fontSize:13,color:TXT,outline:"none",fontFamily:"inherit"}}/>
+            </div>
+          ))}
+        </div>
+
+        {inp("Category","category","text","e.g. Breakfast, Snack, Dal…")}
+
+        {err && <div style={{fontSize:12,color:R,marginBottom:10,padding:"6px 10px",background:"#fff5f5",borderRadius:6}}>{err}</div>}
+
+        <button onClick={handleSave} disabled={saving}
+          style={{width:"100%",padding:"13px",borderRadius:10,background:P,color:"#fff",
+            border:"none",fontSize:14,fontWeight:700,cursor:saving?"not-allowed":"pointer",opacity:saving?0.7:1}}>
+          {saving ? "Saving…" : "✓ Add Food to My List"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── APK DOWNLOAD BANNER (mobile only) ───────────────────────────────────────
+function AppDownloadBanner(){
+  const [visible,setVisible]=useState(false);
+  useEffect(()=>{
+    // Show only on mobile browsers, not in the web2native app itself
+    const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
+    const isStandalone = window.matchMedia("(display-mode: standalone)").matches;
+    setVisible(isMobile && !isStandalone);
+  },[]);
+  if(!visible) return null;
+  return(
+    <div style={{background:`linear-gradient(90deg,${P},#9b6e8e)`,borderRadius:12,padding:"11px 14px",
+      marginBottom:12,display:"flex",alignItems:"center",gap:12}}>
+      <div style={{fontSize:26,flexShrink:0}}>📱</div>
+      <div style={{flex:1}}>
+        <div style={{fontSize:13,fontWeight:700,color:"#fff"}}>Get the MyHealth App</div>
+        <div style={{fontSize:11,color:"rgba(255,255,255,0.8)"}}>Install directly — no Play Store needed</div>
+      </div>
+      <a href="/MyHealthTracker.apk" download="MyHealthTracker.apk"
+        style={{flexShrink:0,background:"#fff",color:P,fontSize:12,fontWeight:700,
+          padding:"8px 14px",borderRadius:8,textDecoration:"none",whiteSpace:"nowrap"}}>
+        Download
+      </a>
+      <button onClick={()=>setVisible(false)}
+        style={{flexShrink:0,background:"transparent",border:"none",color:"rgba(255,255,255,0.7)",
+          fontSize:18,cursor:"pointer",padding:"0 2px"}}>×</button>
+    </div>
+  );
+}
+
+// ─── MAIN DASHBOARD ───────────────────────────────────────────────────────────
 export default function Dashboard(){
   const router=useRouter();
   const [profile,setProfile]=useState(null);
@@ -63,6 +204,8 @@ export default function Dashboard(){
   const [catFilter,setCatFilter]=useState("All");
   const [saving,setSaving]=useState(false);
   const [toast,setToast]=useState(null);
+  const [showAddFood,setShowAddFood]=useState(false);   // ← Add Food modal
+  const [addFoodMeal,setAddFoodMeal]=useState(null);    // ← which meal triggered it
 
   useEffect(()=>{
     async function init(){
@@ -106,6 +249,15 @@ export default function Dashboard(){
     persist({foods:{...log.foods,[mealId]:mf}});
   }
 
+  // ─── Called when AddFoodModal saves successfully ───────────────────────────
+  function handleFoodAdded(newFood){
+    setFoods(prev=>[...prev,newFood]);          // add to local food list immediately
+    toggleFood(addFoodMeal, newFood.id);        // auto-tick it in the meal that triggered +
+    setShowAddFood(false);
+    setAddFoodMeal(null);
+    showToast("Food added ✓");
+  }
+
   const MEAL_DEFS=[
     {id:"morning",label:"Morning",time:"7:00 AM",icon:"☀️",bg:AL},
     {id:"breakfast",label:"Breakfast",time:"8:00 AM",icon:"🍳",bg:PL},
@@ -117,25 +269,30 @@ export default function Dashboard(){
 
   const allIds=Object.values(log.foods).flatMap(m=>Object.keys(m));
   const mac=allIds.reduce((a,id)=>{
-    const f=foods.find(x=>x.id===id||x.name===id);
+    const f=foods.find(x=>String(x.id)===String(id)||x.name===id);
     return f?{cal:a.cal+(f.calories||0),pro:a.pro+(f.protein||0),carb:a.carb+(f.carbs||0),fat:a.fat+(f.fat||0)}:a;
   },{cal:0,pro:0,carb:0,fat:0});
 
-  const burnAct=WALKS.reduce((s,w)=>s+(log.activity[w.k]||0)*(w.k==="morning_walk"?5:4),0);
-  const BMR=profile?Math.round(10*(profile.weight_current||80)+6.25*(profile.height_cm||170)-5*30+(profile.gender==="Female"?-161:5)):1800;
-  const totalBurn=BMR+burnAct;
-  const waterL=(log.water||0)*0.5;
-  const waterTarget=profile?.water_target||3.5;
-  const calTarget=profile?.calorie_target||1600;
-  const proTarget=profile?.protein_target||100;
-  const cats=["All",...new Set(foods.map(f=>f.category).filter(Boolean))];
-  const filtered=foods.filter(f=>(!search||f.name.toLowerCase().includes(search.toLowerCase()))&&(catFilter==="All"||f.category===catFilter));
-  const habDone=Object.values(log.habits).filter(Boolean).length;
-  const mealsDone=Object.values(log.foods).filter(m=>Object.keys(m).length>0).length;
+  // ─── FIX 1: BMR calculated from real profile fields ──────────────────────
+  const BMR = calcBMR(profile);
+  const burnAct = WALKS.reduce((s,w)=>s+(log.activity[w.k]||0)*(w.k==="morning_walk"?5:4),0);
+  const totalBurn = Math.round(BMR * activityMultiplier(profile?.activity_level)) + burnAct;
+  // Ring % for burned: show progress vs calorie intake target (meaningful comparison)
+  const burnRingPct = profile?.calorie_target ? Math.round((totalBurn/profile.calorie_target)*100) : Math.round((totalBurn/2000)*100);
+
+  const waterL    = (log.water||0)*0.5;
+  const waterTarget = profile?.water_target||3.5;
+  const calTarget   = profile?.calorie_target||1600;
+  const proTarget   = profile?.protein_target||100;
+  const cats = ["All",...new Set(foods.map(f=>f.category).filter(Boolean))];
+  const filtered = foods.filter(f=>(!search||f.name.toLowerCase().includes(search.toLowerCase()))&&(catFilter==="All"||f.category===catFilter));
+  const habDone  = Object.values(log.habits).filter(Boolean).length;
+  const mealsDone= Object.values(log.foods).filter(m=>Object.keys(m).length>0).length;
 
   if(!profile)return(
     <div style={{background:BG,minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}>
-      <div className="ht-spinner"/><style>{`.ht-spinner{width:36px;height:36px;border:3px solid #e5e3ee;border-top-color:#714B67;border-radius:50%;animation:s .7s linear infinite}@keyframes s{to{transform:rotate(360deg)}}`}</style>
+      <div className="ht-spinner"/>
+      <style>{`.ht-spinner{width:36px;height:36px;border:3px solid #e5e3ee;border-top-color:#714B67;border-radius:50%;animation:s .7s linear infinite}@keyframes s{to{transform:rotate(360deg)}}`}</style>
     </div>
   );
 
@@ -175,13 +332,26 @@ export default function Dashboard(){
         .frow:hover,.frow.sel{border-color:${G};background:${GL}}
         .fchk{width:17px;height:17px;border-radius:4px;border:1.5px solid ${BORDER};display:flex;align-items:center;justify-content:center;flex-shrink:0}
         .fchk.on{background:${G};border-color:${G}}
-        .pill{font-size:10px;padding:2px 8px;border-radius:20px;background:${GL};color:${G};border:1px solid #5DCAA5;margin:2px}
+        .add-food-btn{display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:8px;border:1.5px dashed ${P};background:${PL};color:${P};font-size:12px;font-weight:700;cursor:pointer;width:100%;margin-top:8px;justify-content:center;transition:all .15s}
+        .add-food-btn:hover{background:${P};color:#fff}
         @media(max-width:480px){.kgrid{grid-template-columns:repeat(2,1fr)}}
       `}</style>
 
       {toast&&<div className="ht-toast">{toast}</div>}
 
+      {/* ADD FOOD MODAL */}
+      {showAddFood && (
+        <AddFoodModal
+          profile={profile}
+          onSave={handleFoodAdded}
+          onClose={()=>{ setShowAddFood(false); setAddFoodMeal(null); }}
+        />
+      )}
+
       <Layout title={`Dashboard${saving?" · saving…":""}`} profile={profile}>
+
+        {/* APK DOWNLOAD BANNER — mobile only */}
+        <AppDownloadBanner/>
 
         {/* DATE NAV */}
         <div className="date-nav">
@@ -199,7 +369,8 @@ export default function Dashboard(){
         <div className="card">
           <div style={{display:"flex",justifyContent:"space-around",marginBottom:10}}>
             <Ring pct={Math.round((mac.cal/calTarget)*100)} color="#7F77DD" label={`${mac.cal}`} sub="kcal in"/>
-            <Ring pct={Math.round((totalBurn/2400)*100)} color={G} label={`${totalBurn}`} sub="burned"/>
+            {/* FIX: burned ring % now uses burnRingPct (vs calorie target), not hardcoded 2400 */}
+            <Ring pct={burnRingPct} color={G} label={`${totalBurn}`} sub="burned"/>
             <Ring pct={Math.round((mac.pro/proTarget)*100)} color={T} label={`${mac.pro}g`} sub="protein"/>
             <Ring pct={Math.round((waterL/waterTarget)*100)} color="#38bdf8" label={`${waterL}L`} sub="water"/>
           </div>
@@ -207,11 +378,20 @@ export default function Dashboard(){
             Net: <span style={{fontWeight:700,color:totalBurn-mac.cal>0?G:R}}>{totalBurn-mac.cal>0?"+":""}{Math.round(totalBurn-mac.cal)} kcal</span>
             <span style={{color:TXT3,marginLeft:8,fontSize:11}}>{mealsDone}/6 meals · {habDone}/5 habits</span>
           </div>
+          {/* FIX: show BMR breakdown so user understands the number */}
+          <div style={{textAlign:"center",fontSize:10,color:TXT3,marginTop:4}}>
+            Base metabolism {BMR} + activity {burnAct} kcal
+          </div>
         </div>
 
         {/* KPI */}
         <div className="kgrid">
-          {[{l:"Calories in",v:mac.cal,c:"#7F77DD"},{l:"Burned",v:Math.round(totalBurn),c:G},{l:"Protein",v:`${mac.pro}g`,c:T},{l:"Net cal",v:`${totalBurn-mac.cal>0?"+":""}${Math.round(totalBurn-mac.cal)}`,c:totalBurn-mac.cal>0?G:R}].map((k,i)=>(
+          {[
+            {l:"Calories in",v:mac.cal,c:"#7F77DD"},
+            {l:"Burned",v:Math.round(totalBurn),c:G},
+            {l:"Protein",v:`${mac.pro}g`,c:T},
+            {l:"Net cal",v:`${totalBurn-mac.cal>0?"+":""}${Math.round(totalBurn-mac.cal)}`,c:totalBurn-mac.cal>0?G:R}
+          ].map((k,i)=>(
             <div key={i} className="kpi">
               <div style={{fontSize:16,fontWeight:700,color:k.c,lineHeight:1,marginBottom:3}}>{k.v}</div>
               <div style={{fontSize:9,color:TXT2,textTransform:"uppercase",letterSpacing:".03em"}}>{k.l}</div>
@@ -233,8 +413,8 @@ export default function Dashboard(){
         {MEAL_DEFS.map(meal=>{
           const sel=log.foods[meal.id]||{};
           const selKeys=Object.keys(sel);
-          const mCal=selKeys.reduce((s,id)=>{const f=foods.find(x=>x.id===id||x.name===id);return f?s+(f.calories||0):s;},0);
-          const mPro=selKeys.reduce((s,id)=>{const f=foods.find(x=>x.id===id||x.name===id);return f?s+(f.protein||0):s;},0);
+          const mCal=selKeys.reduce((s,id)=>{const f=foods.find(x=>String(x.id)===String(id)||x.name===id);return f?s+(f.calories||0):s;},0);
+          const mPro=selKeys.reduce((s,id)=>{const f=foods.find(x=>String(x.id)===String(id)||x.name===id);return f?s+(f.protein||0):s;},0);
           const isOpen=openMeal===meal.id;
           return(
             <div key={meal.id} className={`mcard${selKeys.length>0?" done":""}`}>
@@ -248,10 +428,11 @@ export default function Dashboard(){
                 {!selKeys.length&&<span style={{fontSize:11,color:TXT3,marginRight:6}}>tap to log</span>}
                 <span style={{fontSize:12,color:TXT3,display:"inline-block",transform:isOpen?"rotate(180deg)":"none",transition:"transform .2s"}}>▾</span>
               </div>
+
               {selKeys.length>0&&!isOpen&&(
                 <div style={{padding:"5px 13px 9px",display:"flex",flexWrap:"wrap",gap:4}}>
                   {selKeys.map(id=>{
-                    const f=foods.find(x=>x.id===id||x.name===id);
+                    const f=foods.find(x=>String(x.id)===String(id)||x.name===id);
                     return(
                       <span key={id} style={{display:"inline-flex",alignItems:"center",gap:4,fontSize:10,padding:"3px 6px 3px 10px",borderRadius:20,background:GL,color:G,border:"1px solid #5DCAA5"}}>
                         {f?.name||id}
@@ -261,18 +442,28 @@ export default function Dashboard(){
                   })}
                 </div>
               )}
+
               {isOpen&&(
                 <div className="mbody">
                   <input className="sinp" placeholder="Search food…" value={search} onChange={e=>setSearch(e.target.value)}/>
                   <div className="catbtns">{cats.map(c=><button key={c} className={`catbtn${catFilter===c?" on":""}`} onClick={()=>setCatFilter(c)}>{c}</button>)}</div>
-                  {foods.length===0&&<div style={{textAlign:"center",color:TXT2,fontSize:12,padding:"16px 0"}}>No food items assigned yet — ask admin to assign a plan.</div>}
+
+                  {foods.length===0&&(
+                    <div style={{textAlign:"center",color:TXT2,fontSize:12,padding:"12px 0 4px"}}>
+                      No food items assigned yet — ask admin to assign a plan.
+                    </div>
+                  )}
+
                   <div className="flist">
                     {filtered.map(f=>{
-                      const chk=!!sel[f.id||f.name];
+                      const chk=!!sel[String(f.id)||f.name];
                       return(
-                        <div key={f.id||f.name} className={`frow${chk?" sel":""}`} onClick={()=>toggleFood(meal.id,f.id||f.name)}>
+                        <div key={f.id||f.name} className={`frow${chk?" sel":""}`} onClick={()=>toggleFood(meal.id,String(f.id)||f.name)}>
                           <div className={`fchk${chk?" on":""}`}>{chk&&<span style={{color:"#fff",fontSize:9,fontWeight:900}}>✓</span>}</div>
-                          <span style={{flex:1,fontSize:12,color:chk?G:TXT}}>{f.name}</span>
+                          <span style={{flex:1,fontSize:12,color:chk?G:TXT}}>
+                            {f.name}
+                            {f.added_by_user&&<span style={{fontSize:9,color:TXT3,marginLeft:4}}>· custom</span>}
+                          </span>
                           <span style={{fontSize:11,fontWeight:700,color:"#7F77DD"}}>{f.calories||0}</span>
                           <span style={{fontSize:10,color:TXT3}}> kcal</span>
                           <span style={{fontSize:11,color:G,marginLeft:5}}>{f.protein||0}g P</span>
@@ -280,6 +471,12 @@ export default function Dashboard(){
                       );
                     })}
                   </div>
+
+                  {/* ─── ADD FOOD BUTTON ─────────────────────────────────── */}
+                  <button className="add-food-btn" onClick={()=>{ setAddFoodMeal(meal.id); setShowAddFood(true); }}>
+                    <span style={{fontSize:16,lineHeight:1}}>+</span>
+                    Food not in list? Add it
+                  </button>
                 </div>
               )}
             </div>
