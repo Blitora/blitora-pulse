@@ -158,10 +158,11 @@ export default function AdminFood(){
   const [templates,setTemplates]=useState([]);
   const [users,setUsers]=useState([]);
   const [allFoods,setAllFoods]=useState([]);
+  const [foodLinks,setFoodLinks]=useState([]); // junction: food_item_id -> [template_id]
   const [tab,setTab]=useState("users");
   const [toast,setToast]=useState(null);
   const [detail,setDetail]=useState(null);
-  const [addFoodForm,setAddFoodForm]=useState({name:"",calories:"",protein:"",carbs:"",fat:"",category:"Protein",meal_slots:[],template_id:""});
+  const [addFoodForm,setAddFoodForm]=useState({name:"",calories:"",protein:"",carbs:"",fat:"",category:"Protein",meal_slots:[],template_id:"",selectedTemplates:[]});
   const [saving,setSaving]=useState(false);
   const [selTemplateId,setSelTemplateId]=useState("");
 
@@ -195,14 +196,16 @@ export default function AdminFood(){
 
   async function loadAll(sb){
     const s=sb||getSupabase();
-    const[{data:t},{data:u},{data:f}]=await Promise.all([
+    const[{data:t},{data:u},{data:f},{data:links}]=await Promise.all([
       s.from("meal_templates").select("*").order("name"),
       s.from("profiles").select("*").neq("role","admin").order("created_at",{ascending:false}),
       s.from("template_food_items").select("*,meal_templates(name)").order("category"),
+      s.from("food_template_links").select("food_item_id,template_id"),
     ]);
     setTemplates(t||[]);
     setUsers(u||[]);
     setAllFoods(f||[]);
+    setFoodLinks(links||[]);
     if(t&&t.length>0&&!selTemplateId)setSelTemplateId(t[0].id);
   }
 
@@ -215,16 +218,26 @@ export default function AdminFood(){
   }
 
   async function addFood(){
-    if(!addFoodForm.name||!addFoodForm.calories||!addFoodForm.template_id)return;
+    if(!addFoodForm.name||!addFoodForm.calories||!addFoodForm.selectedTemplates?.length)return;
     setSaving(true);
-    const{error}=await getSupabase().from("template_food_items").insert({
-      template_id:addFoodForm.template_id,name:addFoodForm.name,calories:+addFoodForm.calories,
+    const sb=getSupabase();
+    // Insert master food item (template_id = first selected for backward compat)
+    const{data:newFood,error}=await sb.from("template_food_items").insert({
+      template_id:addFoodForm.selectedTemplates[0],
+      name:addFoodForm.name,calories:+addFoodForm.calories,
       protein:+addFoodForm.protein||0,carbs:+addFoodForm.carbs||0,fat:+addFoodForm.fat||0,
       category:addFoodForm.category,meal_slots:addFoodForm.meal_slots,
-    });
+      is_master:true,
+    }).select().single();
+    if(!error&&newFood){
+      // Insert junction links for all selected templates
+      const links=addFoodForm.selectedTemplates.map(tid=>({food_item_id:newFood.id,template_id:tid}));
+      await sb.from("food_template_links").insert(links);
+      showToast(`Food added to ${links.length} template(s) ✓`);
+      setAddFoodForm(f=>({...f,name:"",calories:"",protein:"",carbs:"",fat:"",selectedTemplates:[]}));
+      await loadAll();
+    } else showToast("Error: "+(error?.message||"unknown"));
     setSaving(false);
-    if(!error){showToast("Food added ✓");setAddFoodForm(f=>({...f,name:"",calories:"",protein:"",carbs:"",fat:""}));await loadAll();}
-    else showToast("Error: "+error.message);
   }
 
   async function saveFood(f){
@@ -271,7 +284,7 @@ export default function AdminFood(){
   }
 
   async function deleteTmpl(t){
-    if(!confirm(`Delete "${t.name}" and all ${allFoods.filter(f=>f.template_id===t.id).length} food items? Cannot be undone.`))return;
+    if(!confirm(`Delete "${t.name}" and all ${(foodLinks.filter(l=>l.template_id===t.id).length||allFoods.filter(f=>f.template_id===t.id).length)} food items? Cannot be undone.`))return;
     await getSupabase().from("template_food_items").delete().eq("template_id",t.id);
     await getSupabase().from("meal_templates").delete().eq("id",t.id);
     showToast("Template deleted");await loadAll();
@@ -384,7 +397,7 @@ function UserDetail({u,onClose,templates,users,allFoods,approveUser,blockUser}){
   );
 }
 
-function FoodDetail({f,onClose,templates,users,saveFood,deleteFood,saving,toggleSlot}){
+function FoodDetail({f,onClose,templates,users,saveFood,deleteFood,saving,toggleSlot,foodLinks,loadAll}){
   const [form,setForm]=useState({...f});
   const tmpl=templates.find(t=>t.id===f.template_id);
   const tmplUsers=users.filter(u=>u.active_template_id===f.template_id);
@@ -426,11 +439,30 @@ function FoodDetail({f,onClose,templates,users,saveFood,deleteFood,saving,toggle
                 </button>
               ))}
             </div></div>
-          <div><div style={{fontSize:11,color:TXT2,fontWeight:700,textTransform:"uppercase",letterSpacing:".04em",marginBottom:6}}>Move to template</div>
-            <select value={form.template_id||""} onChange={e=>setForm(f=>({...f,template_id:e.target.value}))}
-              style={{width:"100%",padding:"9px 12px",border:`1.5px solid ${BORDER}`,borderRadius:9,fontSize:13,color:TXT,outline:"none",background:CARD,fontFamily:"inherit"}}>
-              {templates.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}
-            </select></div>
+          <div>
+            <div style={{fontSize:11,color:TXT2,fontWeight:700,textTransform:"uppercase",letterSpacing:".04em",marginBottom:6}}>
+              Assign to templates
+              <span style={{fontWeight:400,marginLeft:6,textTransform:"none",fontSize:10}}>— changes save immediately</span>
+            </div>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+              {templates.map(t=>{
+                const linked=(foodLinks||[]).some(l=>l.food_item_id===f.id&&l.template_id===t.id);
+                return(
+                  <button key={t.id} type="button"
+                    onClick={async()=>{
+                      const sb=getSupabase();
+                      if(linked){await sb.from("food_template_links").delete().eq("food_item_id",f.id).eq("template_id",t.id);}
+                      else{await sb.from("food_template_links").insert({food_item_id:f.id,template_id:t.id});}
+                      if(loadAll) await loadAll();
+                    }}
+                    style={{padding:"5px 12px",borderRadius:20,border:`1.5px solid ${linked?P:BORDER}`,fontSize:12,cursor:"pointer",background:linked?PL:CARD,color:linked?P:TXT2,fontFamily:"inherit",fontWeight:linked?700:400,transition:"all .15s",display:"flex",alignItems:"center",gap:5}}>
+                    {linked&&<span style={{fontSize:10}}>✓</span>}
+                    {t.name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
         <div style={{display:"flex",gap:10,marginTop:16}}>
           <button disabled={saving} onClick={()=>saveFood(form)} style={{padding:"10px 20px",background:P,color:"#fff",border:"none",borderRadius:9,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit",opacity:saving?.6:1}}>{saving?"Saving…":"Save changes"}</button>
@@ -738,13 +770,13 @@ function TemplatesView({
 
         {/* ── FOODS TAB ── */}
         {tab==="foods"&&(detail?.type==="food"
-          ?<FoodDetail f={detail.data} onClose={()=>setDetail(null)} templates={templates} users={users} saveFood={saveFood} deleteFood={deleteFood} saving={saving} toggleSlot={toggleSlot}/>
+          ?<FoodDetail f={detail.data} onClose={()=>setDetail(null)} templates={templates} users={users} saveFood={saveFood} deleteFood={deleteFood} saving={saving} toggleSlot={toggleSlot} foodLinks={foodLinks} loadAll={loadAll}/>
           :<>
             <div className="tmpl-btns">
               <button className={`tbtn${!selTemplateId?" on":""}`} onClick={()=>setSelTemplateId("")}>All templates</button>
               {templates.map(t=>(
                 <button key={t.id} className={`tbtn${selTemplateId===t.id?" on":""}`} onClick={()=>setSelTemplateId(t.id)}>
-                  {t.name} ({allFoods.filter(f=>f.template_id===t.id).length})
+                  {t.name} ({(foodLinks.filter(l=>l.template_id===t.id).length||allFoods.filter(f=>f.template_id===t.id).length)})
                 </button>
               ))}
             </div>
@@ -777,11 +809,22 @@ function TemplatesView({
         {tab==="add"&&(
           <div className="card">
             <div style={{fontSize:15,fontWeight:700,marginBottom:14}}>Add new food item</div>
-            <label className="label" style={{marginTop:0}}>Template</label>
-            <select className="inp" value={addFoodForm.template_id} onChange={e=>setAddFoodForm(f=>({...f,template_id:e.target.value}))}>
-              <option value="">— Select template —</option>
-              {templates.map(t=><option key={t.id} value={t.id}>{t.name} ({allFoods.filter(f=>f.template_id===t.id).length} items)</option>)}
-            </select>
+            <label className="label" style={{marginTop:0}}>
+              Templates * <span style={{fontSize:10,fontWeight:400,color:TXT2}}>— select one or more</span>
+            </label>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>
+              {templates.map(t=>{
+                const checked=(addFoodForm.selectedTemplates||[]).includes(t.id);
+                return(
+                  <button key={t.id} type="button"
+                    onClick={()=>setAddFoodForm(f=>({...f,selectedTemplates:checked?(f.selectedTemplates||[]).filter(x=>x!==t.id):[...(f.selectedTemplates||[]),t.id]}))}
+                    style={{padding:"5px 12px",borderRadius:20,border:`1.5px solid ${checked?P:BORDER}`,fontSize:12,cursor:"pointer",background:checked?PL:CARD,color:checked?P:TXT2,fontFamily:"inherit",fontWeight:checked?700:400,transition:"all .15s",display:"flex",alignItems:"center",gap:5}}>
+                    {checked&&<span style={{fontSize:10}}>✓</span>}
+                    {t.name}
+                  </button>
+                );
+              })}
+            </div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginTop:0}}>
               <div><label className="label">Food name</label>
                 <input className="inp" placeholder="e.g. Grilled chicken 150g" value={addFoodForm.name} onChange={e=>setAddFoodForm(f=>({...f,name:e.target.value}))}/></div>
@@ -803,12 +846,13 @@ function TemplatesView({
                 <button key={s} className={`sbtn${addFoodForm.meal_slots.includes(s)?" on":""}`} onClick={()=>toggleSlot(s,addFoodForm,setAddFoodForm)}>{s}</button>
               ))}
             </div>
-            {addFoodForm.template_id&&(
+            {(addFoodForm.selectedTemplates||[]).length>0&&(
               <div style={{background:PL,border:`1px solid ${P}`,borderRadius:9,padding:"9px 13px",marginBottom:14,fontSize:12,color:P}}>
-                Adding to: <b>{templates.find(t=>t.id===addFoodForm.template_id)?.name}</b>{" · "}Affects <b>{users.filter(u=>u.active_template_id===addFoodForm.template_id).length}</b> user(s)
+                Adding to <b>{addFoodForm.selectedTemplates.length}</b> template(s): {addFoodForm.selectedTemplates.map(id=>templates.find(t=>t.id===id)?.name).filter(Boolean).join(", ")}
+                {" · "}Affects <b>{users.filter(u=>addFoodForm.selectedTemplates.includes(u.active_template_id)).length}</b> user(s)
               </div>
             )}
-            <button onClick={addFood} disabled={saving||!addFoodForm.name||!addFoodForm.calories||!addFoodForm.template_id}
+            <button onClick={addFood} disabled={saving||!addFoodForm.name||!addFoodForm.calories||!(addFoodForm.selectedTemplates||[]).length}
               style={{padding:"11px 24px",background:P,color:"#fff",border:"none",borderRadius:9,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit",opacity:saving?.6:1}}>
               {saving?"Adding…":"+ Add food item"}
             </button>
