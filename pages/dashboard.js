@@ -10,6 +10,14 @@ const BORDER="#e5e3ee",TXT="#2c1a3a",TXT2="#888",TXT3="#bbb",BG="#f0f0f7",CARD="
 const HABITS=["4 almonds + 2 walnuts","No sugar / jaggery / honey","No fried food today","Dinner before 8 PM","Sleep by 10:30 PM"];
 const WALKS=[{k:"morning_walk",l:"Morning walk",t:40,max:60},{k:"post_lunch_walk",l:"Post-lunch walk",t:15,max:30},{k:"post_dinner_walk",l:"Post-dinner walk",t:20,max:30}];
 
+// Category config — maps food.category string to icon + display order
+const CAT_CONFIG = [
+  {key:"Grains",   icon:"🌾"}, {key:"Protein",  icon:"🥚"},
+  {key:"Dairy",    icon:"🥛"}, {key:"Fruits",   icon:"🍎"},
+  {key:"Drinks",   icon:"🍵"}, {key:"Veggies",  icon:"🥦"},
+  {key:"Snacks",   icon:"🥜"}, {key:"Custom",   icon:"✨"},
+];
+
 function fmt(d){return d.toISOString().split("T")[0];}
 function today(){return fmt(new Date());}
 function dayLabel(dk){
@@ -18,22 +26,18 @@ function dayLabel(dk){
   return new Date(dk).toLocaleDateString("en-IN",{day:"numeric",month:"short"});
 }
 
-// ─── FIX 1: BMR uses real profile values, not hardcoded fallbacks ─────────────
-// Uses profile.age (integer), profile.weight_current (numeric), profile.height_cm (numeric)
-// Mifflin-St Jeor formula: 10*weight + 6.25*height - 5*age + gender_offset
 function calcBMR(profile){
   if(!profile) return 1800;
-  const weight = parseFloat(profile.weight_current) || parseFloat(profile.weight_start) || 70;
-  const height = parseFloat(profile.height_cm) || 165;
-  const age    = parseInt(profile.age) || 30;
-  const base   = Math.round(10 * weight + 6.25 * height - 5 * age);
-  return profile.gender === "Female" ? base - 161 : base + 5;
+  const weight=parseFloat(profile.weight_current)||parseFloat(profile.weight_start)||70;
+  const height=parseFloat(profile.height_cm)||165;
+  const age=parseInt(profile.age)||30;
+  const base=Math.round(10*weight+6.25*height-5*age);
+  return profile.gender==="Female"?base-161:base+5;
 }
 
-// Activity level multiplier on top of walk calories
 function activityMultiplier(level){
-  const map = { sedentary:1.2, lightly_active:1.375, moderately_active:1.55, very_active:1.725, extra_active:1.9 };
-  return map[level] || 1.2;
+  const map={sedentary:1.2,lightly_active:1.375,moderately_active:1.55,very_active:1.725,extra_active:1.9};
+  return map[level]||1.2;
 }
 
 function Ring({pct=0,size=72,color,label,sub}){
@@ -71,123 +75,253 @@ function MBar({label,val,max,color,unit}){
 }
 
 // ─── ADD FOOD MODAL ───────────────────────────────────────────────────────────
-function AddFoodModal({ profile, onSave, onClose }){
+function AddFoodModal({profile,onSave,onClose}){
   const [form,setForm]=useState({name:"",calories:"",protein:"",carbs:"",fat:"",category:""});
   const [saving,setSaving]=useState(false);
   const [err,setErr]=useState("");
 
   async function handleSave(){
-    if(!form.name.trim()){ setErr("Food name is required"); return; }
-    if(!form.calories || isNaN(form.calories)){ setErr("Valid calories required"); return; }
-    setSaving(true); setErr("");
-    try {
-      const sb = getSupabase();
-      const newFood = {
-        name: form.name.trim(),
-        calories: parseFloat(form.calories) || 0,
-        protein:  parseFloat(form.protein)  || 0,
-        carbs:    parseFloat(form.carbs)    || 0,
-        fat:      parseFloat(form.fat)      || 0,
-        category: form.category.trim() || "Custom",
-        // ─── FIX: flagged as user-added, linked to their template ───────────
-        template_id:    profile.active_template_id || null,
-        added_by_user:  true,
-        added_by_user_id: profile.id,
+    if(!form.name.trim()){setErr("Food name is required");return;}
+    if(!form.calories||isNaN(form.calories)){setErr("Valid calories required");return;}
+    setSaving(true);setErr("");
+    try{
+      const sb=getSupabase();
+      const newFood={
+        name:form.name.trim(),
+        calories:parseFloat(form.calories)||0,
+        protein:parseFloat(form.protein)||0,
+        carbs:parseFloat(form.carbs)||0,
+        fat:parseFloat(form.fat)||0,
+        category:form.category.trim()||"Custom",
+        template_id:profile.active_template_id||null,
+        added_by_user:true,
+        added_by_user_id:profile.id,
       };
-      const { data, error } = await sb
-        .from("template_food_items")
-        .insert(newFood)
-        .select()
-        .single();
-      if(error) throw error;
-      onSave(data);  // pass new food back to parent to add to local state
-    } catch(e){
-      setErr(e.message || "Failed to save food");
-    }
+      const{data,error}=await sb.from("template_food_items").insert(newFood).select().single();
+      if(error)throw error;
+      onSave(data);
+    }catch(e){setErr(e.message||"Failed to save food");}
     setSaving(false);
   }
-
-  const inp = (label,key,type="text",placeholder="") => (
-    <div style={{marginBottom:10}}>
-      <div style={{fontSize:11,fontWeight:600,color:TXT2,marginBottom:4}}>{label}</div>
-      <input
-        type={type} placeholder={placeholder}
-        value={form[key]}
-        onChange={e=>setForm(f=>({...f,[key]:e.target.value}))}
-        style={{width:"100%",padding:"8px 12px",borderRadius:8,border:`1px solid ${BORDER}`,
-          fontSize:13,color:TXT,outline:"none",fontFamily:"inherit"}}
-      />
-    </div>
-  );
 
   return(
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:999,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
       <div style={{background:CARD,borderRadius:"20px 20px 0 0",width:"100%",maxWidth:480,padding:"20px 18px 32px",maxHeight:"85vh",overflowY:"auto"}}>
-        {/* Header */}
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
           <div>
             <div style={{fontSize:15,fontWeight:700,color:TXT}}>Add Food Item</div>
-            <div style={{fontSize:11,color:TXT2}}>Saved to your Food Master & this list</div>
+            <div style={{fontSize:11,color:TXT2}}>Saved to Food Master & your list</div>
           </div>
-          <button onClick={onClose} style={{width:30,height:30,borderRadius:"50%",border:`1px solid ${BORDER}`,
-            background:"transparent",cursor:"pointer",fontSize:16,color:TXT2,display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
+          <button onClick={onClose} style={{width:30,height:30,borderRadius:"50%",border:`1px solid ${BORDER}`,background:"transparent",cursor:"pointer",fontSize:16,color:TXT2,display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
         </div>
-
-        {inp("Food Name *","name","text","e.g. Moong Dal Chilla")}
-        {inp("Calories (kcal) *","calories","number","e.g. 180")}
-
+        {[["Food Name *","name","text","e.g. Moong Dal Chilla"],["Calories (kcal) *","calories","number","e.g. 180"]].map(([label,key,type,ph])=>(
+          <div key={key} style={{marginBottom:10}}>
+            <div style={{fontSize:11,fontWeight:600,color:TXT2,marginBottom:4}}>{label}</div>
+            <input type={type} placeholder={ph} value={form[key]} onChange={e=>setForm(f=>({...f,[key]:e.target.value}))}
+              style={{width:"100%",padding:"8px 12px",borderRadius:8,border:`1px solid ${BORDER}`,fontSize:13,color:TXT,outline:"none",fontFamily:"inherit"}}/>
+          </div>
+        ))}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:10}}>
-          {[["Protein (g)","protein"],["Carbs (g)","carbs"],["Fat (g)","fat"]].map(([label,key])=>(
+          {[["Protein g","protein"],["Carbs g","carbs"],["Fat g","fat"]].map(([label,key])=>(
             <div key={key}>
               <div style={{fontSize:11,fontWeight:600,color:TXT2,marginBottom:4}}>{label}</div>
-              <input type="number" placeholder="0" value={form[key]}
-                onChange={e=>setForm(f=>({...f,[key]:e.target.value}))}
-                style={{width:"100%",padding:"7px 10px",borderRadius:8,border:`1px solid ${BORDER}`,
-                  fontSize:13,color:TXT,outline:"none",fontFamily:"inherit"}}/>
+              <input type="number" placeholder="0" value={form[key]} onChange={e=>setForm(f=>({...f,[key]:e.target.value}))}
+                style={{width:"100%",padding:"7px 10px",borderRadius:8,border:`1px solid ${BORDER}`,fontSize:13,color:TXT,outline:"none",fontFamily:"inherit"}}/>
             </div>
           ))}
         </div>
-
-        {inp("Category","category","text","e.g. Breakfast, Snack, Dal…")}
-
-        {err && <div style={{fontSize:12,color:R,marginBottom:10,padding:"6px 10px",background:"#fff5f5",borderRadius:6}}>{err}</div>}
-
+        <div style={{marginBottom:10}}>
+          <div style={{fontSize:11,fontWeight:600,color:TXT2,marginBottom:4}}>Category</div>
+          <select value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))}
+            style={{width:"100%",padding:"8px 12px",borderRadius:8,border:`1px solid ${BORDER}`,fontSize:13,color:TXT,outline:"none",fontFamily:"inherit",background:CARD}}>
+            <option value="">Select category…</option>
+            {CAT_CONFIG.map(c=><option key={c.key} value={c.key}>{c.icon} {c.key}</option>)}
+          </select>
+        </div>
+        {err&&<div style={{fontSize:12,color:R,marginBottom:10,padding:"6px 10px",background:"#fff5f5",borderRadius:6}}>{err}</div>}
         <button onClick={handleSave} disabled={saving}
-          style={{width:"100%",padding:"13px",borderRadius:10,background:P,color:"#fff",
-            border:"none",fontSize:14,fontWeight:700,cursor:saving?"not-allowed":"pointer",opacity:saving?0.7:1}}>
-          {saving ? "Saving…" : "✓ Add Food to My List"}
+          style={{width:"100%",padding:"13px",borderRadius:10,background:P,color:"#fff",border:"none",fontSize:14,fontWeight:700,cursor:saving?"not-allowed":"pointer",opacity:saving?0.7:1}}>
+          {saving?"Saving…":"✓ Add Food to My List"}
         </button>
       </div>
     </div>
   );
 }
 
-// ─── APK DOWNLOAD BANNER (mobile only) ───────────────────────────────────────
+// ─── APK DOWNLOAD BANNER ──────────────────────────────────────────────────────
 function AppDownloadBanner(){
   const [visible,setVisible]=useState(false);
   useEffect(()=>{
-    // Show only on mobile browsers, not in the web2native app itself
-    const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
-    const isStandalone = window.matchMedia("(display-mode: standalone)").matches;
-    setVisible(isMobile && !isStandalone);
+    const isMobile=/Android|iPhone|iPad/i.test(navigator.userAgent);
+    const isStandalone=window.matchMedia("(display-mode: standalone)").matches;
+    setVisible(isMobile&&!isStandalone);
   },[]);
-  if(!visible) return null;
+  if(!visible)return null;
   return(
-    <div style={{background:`linear-gradient(90deg,${P},#9b6e8e)`,borderRadius:12,padding:"11px 14px",
-      marginBottom:12,display:"flex",alignItems:"center",gap:12}}>
+    <div style={{background:`linear-gradient(90deg,${P},#9b6e8e)`,borderRadius:12,padding:"11px 14px",marginBottom:12,display:"flex",alignItems:"center",gap:12}}>
       <div style={{fontSize:26,flexShrink:0}}>📱</div>
       <div style={{flex:1}}>
         <div style={{fontSize:13,fontWeight:700,color:"#fff"}}>Get the MyHealth App</div>
         <div style={{fontSize:11,color:"rgba(255,255,255,0.8)"}}>Install directly — no Play Store needed</div>
       </div>
       <a href="/MyHealthTracker.apk" download="MyHealthTracker.apk"
-        style={{flexShrink:0,background:"#fff",color:P,fontSize:12,fontWeight:700,
-          padding:"8px 14px",borderRadius:8,textDecoration:"none",whiteSpace:"nowrap"}}>
+        style={{flexShrink:0,background:"#fff",color:P,fontSize:12,fontWeight:700,padding:"8px 14px",borderRadius:8,textDecoration:"none",whiteSpace:"nowrap"}}>
         Download
       </a>
       <button onClick={()=>setVisible(false)}
-        style={{flexShrink:0,background:"transparent",border:"none",color:"rgba(255,255,255,0.7)",
-          fontSize:18,cursor:"pointer",padding:"0 2px"}}>×</button>
+        style={{flexShrink:0,background:"transparent",border:"none",color:"rgba(255,255,255,0.7)",fontSize:18,cursor:"pointer",padding:"0 2px"}}>×</button>
+    </div>
+  );
+}
+
+// ─── FOOD CARD (2-column) ────────────────────────────────────────────────────
+function FoodCard({food,checked,onToggle}){
+  return(
+    <div onClick={onToggle} style={{
+      width:"calc(50% - 3px)", borderRadius:10,
+      border:`1.5px solid ${checked?G:BORDER}`,
+      padding:"9px 9px 8px", cursor:"pointer",
+      background:checked?GL:CARD, position:"relative",
+      transition:"all .15s", flexShrink:0,
+    }}>
+      {/* Checkmark */}
+      <div style={{
+        position:"absolute",top:6,right:6,width:17,height:17,
+        borderRadius:"50%",border:`1.5px solid ${checked?G:BORDER}`,
+        background:checked?G:"#fff",
+        display:"flex",alignItems:"center",justifyContent:"center",
+        fontSize:8,color:"#fff",fontWeight:900,transition:"all .15s",
+      }}>{checked?"✓":""}</div>
+      <div style={{fontSize:11,fontWeight:600,color:checked?G:TXT,lineHeight:1.3,paddingRight:20,marginBottom:5}}>{food.name}
+        {food.added_by_user&&<span style={{fontSize:8,color:TXT3,marginLeft:3}}>· custom</span>}
+      </div>
+      <div style={{fontSize:12,fontWeight:800,color:"#7F77DD"}}>{food.calories||0} <span style={{fontSize:9,fontWeight:400,color:TXT3}}>kcal</span></div>
+      <div style={{fontSize:9,color:G,marginTop:2}}>{food.protein||0}g protein</div>
+    </div>
+  );
+}
+
+// ─── MEAL FOOD PANEL (new UI) ────────────────────────────────────────────────
+function MealFoodPanel({meal,foods,sel,onToggle,onAddFood}){
+  const [search,setSearch]=useState("");
+
+  // Group foods by category using CAT_CONFIG order, then any uncategorised
+  const catKeys=CAT_CONFIG.map(c=>c.key);
+  const grouped=catKeys.reduce((acc,key)=>{
+    const items=foods.filter(f=>(f.category||"Custom")===key);
+    if(items.length) acc.push({key,icon:CAT_CONFIG.find(c=>c.key===key)?.icon||"🍴",items});
+    return acc;
+  },{});
+  // Any categories not in CAT_CONFIG config
+  const knownCats=new Set(catKeys);
+  const otherCats=[...new Set(foods.map(f=>f.category||"Custom").filter(c=>!knownCats.has(c)))];
+  otherCats.forEach(cat=>{
+    const items=foods.filter(f=>(f.category||"Custom")===cat);
+    if(items.length) grouped.push({key:cat,icon:"🍴",items});
+  });
+
+  const q=search.toLowerCase();
+  const searchResults=q?foods.filter(f=>f.name.toLowerCase().includes(q)):null;
+
+  return(
+    <div style={{borderTop:`1px solid ${BORDER}`,paddingTop:10,paddingBottom:4}}>
+
+      {/* Search bar */}
+      <div style={{display:"flex",alignItems:"center",gap:7,background:BG,borderRadius:9,padding:"7px 11px",margin:"0 12px 10px"}}>
+        <span style={{fontSize:13,flexShrink:0}}>🔍</span>
+        <input
+          placeholder="Search food…"
+          value={search}
+          onChange={e=>setSearch(e.target.value)}
+          style={{flex:1,border:"none",background:"transparent",fontSize:12,color:TXT,outline:"none",fontFamily:"inherit"}}
+        />
+        {search&&<button onClick={()=>setSearch("")} style={{border:"none",background:"transparent",color:TXT3,cursor:"pointer",fontSize:14,lineHeight:1,padding:0}}>×</button>}
+      </div>
+
+      {/* No foods message */}
+      {foods.length===0&&(
+        <div style={{textAlign:"center",color:TXT2,fontSize:12,padding:"12px 0 8px"}}>
+          No food items assigned yet — ask admin to assign a plan.
+        </div>
+      )}
+
+      {/* Search results — 2 col grid */}
+      {searchResults&&(
+        <div style={{padding:"0 12px",marginBottom:8}}>
+          {searchResults.length===0
+            ?<div style={{textAlign:"center",color:TXT3,fontSize:11,padding:"12px 0"}}>No food found for "{search}"</div>
+            :<div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+              {searchResults.map(f=>(
+                <FoodCard key={f.id} food={f} checked={!!sel[String(f.id)]} onToggle={()=>onToggle(meal.id,String(f.id))}/>
+              ))}
+            </div>
+          }
+        </div>
+      )}
+
+      {/* Category groups with horizontal 2-col rows */}
+      {!searchResults&&Object.values(grouped).map(grp=>(
+        <div key={grp.key} style={{marginBottom:12}}>
+          {/* Category label */}
+          <div style={{
+            fontSize:9,fontWeight:800,color:TXT2,
+            textTransform:"uppercase",letterSpacing:".07em",
+            padding:"0 12px",marginBottom:6,
+            display:"flex",alignItems:"center",gap:5,
+          }}>
+            <span style={{fontSize:13}}>{grp.icon}</span>
+            {grp.key}
+            <span style={{flex:1,height:1,background:BORDER,display:"block",marginLeft:4}}/>
+          </div>
+          {/* Horizontal scroll row of 2-col cards */}
+          <div style={{
+            overflowX:"auto",
+            WebkitOverflowScrolling:"touch",
+            padding:"0 12px 4px",
+          }}>
+            <div style={{
+              display:"flex",flexWrap:"wrap",gap:6,
+              // On mobile: 2 cards fill width; allow horizontal scroll only if more than 4
+              minWidth: grp.items.length>4 ? `${Math.ceil(grp.items.length/2)*120}px` : "auto",
+            }}>
+              {grp.items.map(f=>(
+                <FoodCard key={f.id} food={f} checked={!!sel[String(f.id)]} onToggle={()=>onToggle(meal.id,String(f.id))}/>
+              ))}
+            </div>
+          </div>
+        </div>
+      ))}
+
+      {/* Selected summary bar */}
+      {Object.keys(sel).length>0&&(
+        <div style={{margin:"4px 12px 8px",padding:"8px 10px",background:GL,borderRadius:9,border:`1px solid #5DCAA5`}}>
+          <div style={{fontSize:9,fontWeight:800,color:G,textTransform:"uppercase",letterSpacing:".05em",marginBottom:5}}>
+            ✓ Selected · {Object.keys(sel).reduce((s,id)=>{const f=foods.find(x=>String(x.id)===id);return f?s+(f.calories||0):s;},0)} kcal
+          </div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+            {Object.keys(sel).map(id=>{
+              const f=foods.find(x=>String(x.id)===id);
+              return(
+                <span key={id} style={{display:"inline-flex",alignItems:"center",gap:3,fontSize:10,padding:"3px 5px 3px 8px",borderRadius:20,background:"#fff",color:G,border:"1px solid #5DCAA5"}}>
+                  {f?.name||id}
+                  <button onClick={e=>{e.stopPropagation();onToggle(meal.id,id);}}
+                    style={{width:13,height:13,borderRadius:"50%",border:"none",background:"rgba(0,0,0,0.1)",color:G,cursor:"pointer",fontSize:9,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>×</button>
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Add food button */}
+      <button onClick={onAddFood} style={{
+        display:"flex",alignItems:"center",justifyContent:"center",gap:6,
+        margin:"4px 12px 4px",padding:"8px",width:"calc(100% - 24px)",
+        border:`1.5px dashed ${P}`,borderRadius:9,background:PL,
+        color:P,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"inherit",
+      }}>
+        <span style={{fontSize:14,lineHeight:1}}>＋</span> Food not in list? Add it
+      </button>
     </div>
   );
 }
@@ -200,12 +334,10 @@ export default function Dashboard(){
   const [dateKey,setDateKey]=useState(today());
   const [log,setLog]=useState({foods:{},activity:{},water:0,habits:{},weight:null});
   const [openMeal,setOpenMeal]=useState(null);
-  const [search,setSearch]=useState("");
-  const [catFilter,setCatFilter]=useState("All");
   const [saving,setSaving]=useState(false);
   const [toast,setToast]=useState(null);
-  const [showAddFood,setShowAddFood]=useState(false);   // ← Add Food modal
-  const [addFoodMeal,setAddFoodMeal]=useState(null);    // ← which meal triggered it
+  const [showAddFood,setShowAddFood]=useState(false);
+  const [addFoodMeal,setAddFoodMeal]=useState(null);
 
   useEffect(()=>{
     async function init(){
@@ -218,7 +350,10 @@ export default function Dashboard(){
       if(!p.setup_complete){router.push("/setup");return;}
       setProfile(p);
       if(p.active_template_id){
-        const{data:tf}=await sb.from("template_food_items").select("*").eq("template_id",p.active_template_id);
+        const{data:tf}=await sb
+          .from("template_food_items")
+          .select("*")
+          .or(`template_id.eq.${p.active_template_id},and(added_by_user.eq.true,added_by_user_id.eq.${p.id})`);
         setFoods(tf||[]);
       }
     }
@@ -249,22 +384,20 @@ export default function Dashboard(){
     persist({foods:{...log.foods,[mealId]:mf}});
   }
 
-  // ─── Called when AddFoodModal saves successfully ───────────────────────────
   function handleFoodAdded(newFood){
-    setFoods(prev=>[...prev,newFood]);          // add to local food list immediately
-    toggleFood(addFoodMeal, newFood.id);        // auto-tick it in the meal that triggered +
-    setShowAddFood(false);
-    setAddFoodMeal(null);
+    setFoods(prev=>[...prev,newFood]);
+    toggleFood(addFoodMeal,String(newFood.id));
+    setShowAddFood(false);setAddFoodMeal(null);
     showToast("Food added ✓");
   }
 
   const MEAL_DEFS=[
-    {id:"morning",label:"Morning",time:"7:00 AM",icon:"☀️",bg:AL},
-    {id:"breakfast",label:"Breakfast",time:"8:00 AM",icon:"🍳",bg:PL},
-    {id:"midmorning",label:"Mid-morning",time:"11:00 AM",icon:"☕",bg:"#e0f5f5"},
-    {id:"lunch",label:"Lunch",time:"1:00 PM",icon:"🍽️",bg:GL},
-    {id:"evening",label:"Evening snack",time:"4:30 PM",icon:"🌆",bg:"#FAECE7"},
-    {id:"dinner",label:"Dinner",time:"7:30 PM",icon:"🌙",bg:"#eeedfe"},
+    {id:"morning",   label:"Morning",      time:"7:00 AM",  icon:"☀️", bg:AL},
+    {id:"breakfast", label:"Breakfast",    time:"8:00 AM",  icon:"🍳", bg:PL},
+    {id:"midmorning",label:"Mid-morning",  time:"11:00 AM", icon:"☕", bg:"#e0f5f5"},
+    {id:"lunch",     label:"Lunch",        time:"1:00 PM",  icon:"🍽️",bg:GL},
+    {id:"evening",   label:"Evening snack",time:"4:30 PM",  icon:"🌆", bg:"#FAECE7"},
+    {id:"dinner",    label:"Dinner",       time:"7:30 PM",  icon:"🌙", bg:"#eeedfe"},
   ];
 
   const allIds=Object.values(log.foods).flatMap(m=>Object.keys(m));
@@ -273,32 +406,26 @@ export default function Dashboard(){
     return f?{cal:a.cal+(f.calories||0),pro:a.pro+(f.protein||0),carb:a.carb+(f.carbs||0),fat:a.fat+(f.fat||0)}:a;
   },{cal:0,pro:0,carb:0,fat:0});
 
-  // ─── FIX 1: BMR calculated from real profile fields ──────────────────────
-  const BMR = calcBMR(profile);
-  const burnAct = WALKS.reduce((s,w)=>s+(log.activity[w.k]||0)*(w.k==="morning_walk"?5:4),0);
-  const totalBurn = Math.round(BMR * activityMultiplier(profile?.activity_level)) + burnAct;
-  // Ring % for burned: show progress vs calorie intake target (meaningful comparison)
-  const burnRingPct = profile?.calorie_target ? Math.round((totalBurn/profile.calorie_target)*100) : Math.round((totalBurn/2000)*100);
-
-  const waterL    = (log.water||0)*0.5;
-  const waterTarget = profile?.water_target||3.5;
-  const calTarget   = profile?.calorie_target||1600;
-  const proTarget   = profile?.protein_target||100;
-  const cats = ["All",...new Set(foods.map(f=>f.category).filter(Boolean))];
-  const filtered = foods.filter(f=>(!search||f.name.toLowerCase().includes(search.toLowerCase()))&&(catFilter==="All"||f.category===catFilter));
-  const habDone  = Object.values(log.habits).filter(Boolean).length;
-  const mealsDone= Object.values(log.foods).filter(m=>Object.keys(m).length>0).length;
+  const BMR=calcBMR(profile);
+  const burnAct=WALKS.reduce((s,w)=>s+(log.activity[w.k]||0)*(w.k==="morning_walk"?5:4),0);
+  const totalBurn=Math.round(BMR*activityMultiplier(profile?.activity_level))+burnAct;
+  const burnRingPct=profile?.calorie_target?Math.round((totalBurn/profile.calorie_target)*100):Math.round((totalBurn/2000)*100);
+  const waterL=(log.water||0)*0.5;
+  const waterTarget=profile?.water_target||3.5;
+  const calTarget=profile?.calorie_target||1600;
+  const proTarget=profile?.protein_target||100;
+  const habDone=Object.values(log.habits).filter(Boolean).length;
+  const mealsDone=Object.values(log.foods).filter(m=>Object.keys(m).length>0).length;
 
   if(!profile)return(
     <div style={{background:BG,minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}>
       <div className="ht-spinner"/>
-      <style>{`.ht-spinner{width:36px;height:36px;border:3px solid #e5e3ee;border-top-color:#714B67;border-radius:50%;animation:s .7s linear infinite}@keyframes s{to{transform:rotate(360deg)}}`}</style>
     </div>
   );
 
   return(
     <>
-      <Head><title>Dashboard — Health Tracker</title></Head>
+      <Head><title>Dashboard — MyHealth</title></Head>
       <style>{`
         .card{background:${CARD};border-radius:13px;border:1px solid ${BORDER};padding:14px;margin-bottom:12px}
         .ctitle{font-size:11px;font-weight:700;color:${TXT2};text-transform:uppercase;letter-spacing:.05em;margin-bottom:11px}
@@ -319,38 +446,16 @@ export default function Dashboard(){
         .hchk.on{background:${G};border-color:${G}}
         .mcard{background:${CARD};border-radius:12px;border:1.5px solid ${BORDER};margin-bottom:8px;overflow:hidden;transition:border-color .2s}
         .mcard.done{border-color:${G}}
-        .mhdr{display:flex;align-items:center;gap:10px;padding:11px 13px;cursor:pointer}
-        .mhdr:hover{background:#faf9fd}
-        .mbody{border-top:1px solid ${BORDER};padding:11px 13px}
-        .sinp{width:100%;padding:8px 12px;border-radius:8px;border:1px solid ${BORDER};font-size:12px;color:${TXT};outline:none;margin-bottom:8px;font-family:inherit}
-        .sinp:focus{border-color:${P}}
-        .catbtns{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px}
-        .catbtn{padding:3px 10px;border-radius:20px;border:1px solid ${BORDER};font-size:10px;font-weight:600;color:${TXT2};background:transparent;cursor:pointer}
-        .catbtn.on{border-color:${P};background:${PL};color:${P}}
-        .flist{max-height:240px;overflow-y:auto;display:flex;flex-direction:column;gap:4px}
-        .frow{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;border:1px solid ${BORDER};cursor:pointer;transition:all .15s}
-        .frow:hover,.frow.sel{border-color:${G};background:${GL}}
-        .fchk{width:17px;height:17px;border-radius:4px;border:1.5px solid ${BORDER};display:flex;align-items:center;justify-content:center;flex-shrink:0}
-        .fchk.on{background:${G};border-color:${G}}
-        .add-food-btn{display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:8px;border:1.5px dashed ${P};background:${PL};color:${P};font-size:12px;font-weight:700;cursor:pointer;width:100%;margin-top:8px;justify-content:center;transition:all .15s}
-        .add-food-btn:hover{background:${P};color:#fff}
+        .mhdr{display:flex;align-items:center;gap:10px;padding:11px 13px;cursor:pointer;transition:background .15s}
+        .mhdr:active{background:#faf9fd}
         @media(max-width:480px){.kgrid{grid-template-columns:repeat(2,1fr)}}
       `}</style>
 
       {toast&&<div className="ht-toast">{toast}</div>}
-
-      {/* ADD FOOD MODAL */}
-      {showAddFood && (
-        <AddFoodModal
-          profile={profile}
-          onSave={handleFoodAdded}
-          onClose={()=>{ setShowAddFood(false); setAddFoodMeal(null); }}
-        />
-      )}
+      {showAddFood&&<AddFoodModal profile={profile} onSave={handleFoodAdded} onClose={()=>{setShowAddFood(false);setAddFoodMeal(null);}}/>}
 
       <Layout title={`Dashboard${saving?" · saving…":""}`} profile={profile}>
 
-        {/* APK DOWNLOAD BANNER — mobile only */}
         <AppDownloadBanner/>
 
         {/* DATE NAV */}
@@ -369,7 +474,6 @@ export default function Dashboard(){
         <div className="card">
           <div style={{display:"flex",justifyContent:"space-around",marginBottom:10}}>
             <Ring pct={Math.round((mac.cal/calTarget)*100)} color="#7F77DD" label={`${mac.cal}`} sub="kcal in"/>
-            {/* FIX: burned ring % now uses burnRingPct (vs calorie target), not hardcoded 2400 */}
             <Ring pct={burnRingPct} color={G} label={`${totalBurn}`} sub="burned"/>
             <Ring pct={Math.round((mac.pro/proTarget)*100)} color={T} label={`${mac.pro}g`} sub="protein"/>
             <Ring pct={Math.round((waterL/waterTarget)*100)} color="#38bdf8" label={`${waterL}L`} sub="water"/>
@@ -378,20 +482,14 @@ export default function Dashboard(){
             Net: <span style={{fontWeight:700,color:totalBurn-mac.cal>0?G:R}}>{totalBurn-mac.cal>0?"+":""}{Math.round(totalBurn-mac.cal)} kcal</span>
             <span style={{color:TXT3,marginLeft:8,fontSize:11}}>{mealsDone}/6 meals · {habDone}/5 habits</span>
           </div>
-          {/* FIX: show BMR breakdown so user understands the number */}
           <div style={{textAlign:"center",fontSize:10,color:TXT3,marginTop:4}}>
-            Base metabolism {BMR} + activity {burnAct} kcal
+            Base {BMR} + walks {burnAct} kcal burned
           </div>
         </div>
 
-        {/* KPI */}
+        {/* KPI GRID */}
         <div className="kgrid">
-          {[
-            {l:"Calories in",v:mac.cal,c:"#7F77DD"},
-            {l:"Burned",v:Math.round(totalBurn),c:G},
-            {l:"Protein",v:`${mac.pro}g`,c:T},
-            {l:"Net cal",v:`${totalBurn-mac.cal>0?"+":""}${Math.round(totalBurn-mac.cal)}`,c:totalBurn-mac.cal>0?G:R}
-          ].map((k,i)=>(
+          {[{l:"Calories in",v:mac.cal,c:"#7F77DD"},{l:"Burned",v:Math.round(totalBurn),c:G},{l:"Protein",v:`${mac.pro}g`,c:T},{l:"Net cal",v:`${totalBurn-mac.cal>0?"+":""}${Math.round(totalBurn-mac.cal)}`,c:totalBurn-mac.cal>0?G:R}].map((k,i)=>(
             <div key={i} className="kpi">
               <div style={{fontSize:16,fontWeight:700,color:k.c,lineHeight:1,marginBottom:3}}>{k.v}</div>
               <div style={{fontSize:9,color:TXT2,textTransform:"uppercase",letterSpacing:".03em"}}>{k.l}</div>
@@ -408,76 +506,57 @@ export default function Dashboard(){
           <MBar label="Fat"      val={mac.fat}  max={profile?.fat_target||55}  color="#D85A30" unit="g"/>
         </div>
 
-        {/* MEALS */}
+        {/* ── MEALS — NEW UI ── */}
         <div className="ctitle" style={{padding:"0 2px",marginBottom:8}}>Meals — tap to log food</div>
         {MEAL_DEFS.map(meal=>{
-          const sel=log.foods[meal.id]||{};
-          const selKeys=Object.keys(sel);
-          const mCal=selKeys.reduce((s,id)=>{const f=foods.find(x=>String(x.id)===String(id)||x.name===id);return f?s+(f.calories||0):s;},0);
-          const mPro=selKeys.reduce((s,id)=>{const f=foods.find(x=>String(x.id)===String(id)||x.name===id);return f?s+(f.protein||0):s;},0);
+          const mSel=log.foods[meal.id]||{};
+          const selKeys=Object.keys(mSel);
+          const mCal=selKeys.reduce((s,id)=>{const f=foods.find(x=>String(x.id)===id||x.name===id);return f?s+(f.calories||0):s;},0);
+          const mPro=selKeys.reduce((s,id)=>{const f=foods.find(x=>String(x.id)===id||x.name===id);return f?s+(f.protein||0):s;},0);
           const isOpen=openMeal===meal.id;
           return(
             <div key={meal.id} className={`mcard${selKeys.length>0?" done":""}`}>
-              <div className="mhdr" style={{background:selKeys.length>0?GL:CARD}} onClick={()=>{setOpenMeal(isOpen?null:meal.id);setSearch("");setCatFilter("All");}}>
+              {/* Meal header */}
+              <div className="mhdr" style={{background:selKeys.length>0&&!isOpen?GL:CARD}}
+                onClick={()=>setOpenMeal(isOpen?null:meal.id)}>
                 <div style={{width:34,height:34,borderRadius:8,background:meal.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,flexShrink:0}}>{meal.icon}</div>
                 <div style={{flex:1}}>
-                  <div style={{fontSize:13,fontWeight:600}}>{meal.label}</div>
-                  <div style={{fontSize:11,color:TXT2}}>{meal.time}</div>
+                  <div style={{fontSize:13,fontWeight:600,color:TXT}}>{meal.label}</div>
+                  <div style={{fontSize:11,color:TXT2}}>{meal.time}{selKeys.length>0?` · ${selKeys.length} item${selKeys.length>1?"s":""}`:""}</div>
                 </div>
-                {selKeys.length>0&&<div style={{textAlign:"right",marginRight:6}}><div style={{fontSize:13,fontWeight:700,color:G}}>{mCal} kcal</div><div style={{fontSize:10,color:TXT2}}>{mPro}g P</div></div>}
+                {selKeys.length>0&&<div style={{textAlign:"right",marginRight:6}}>
+                  <div style={{fontSize:13,fontWeight:700,color:G}}>{mCal} kcal</div>
+                  <div style={{fontSize:10,color:TXT2}}>{mPro}g P</div>
+                </div>}
                 {!selKeys.length&&<span style={{fontSize:11,color:TXT3,marginRight:6}}>tap to log</span>}
                 <span style={{fontSize:12,color:TXT3,display:"inline-block",transform:isOpen?"rotate(180deg)":"none",transition:"transform .2s"}}>▾</span>
               </div>
 
+              {/* Collapsed selected pills */}
               {selKeys.length>0&&!isOpen&&(
-                <div style={{padding:"5px 13px 9px",display:"flex",flexWrap:"wrap",gap:4}}>
+                <div style={{padding:"0 13px 9px",display:"flex",flexWrap:"wrap",gap:4}}>
                   {selKeys.map(id=>{
-                    const f=foods.find(x=>String(x.id)===String(id)||x.name===id);
+                    const f=foods.find(x=>String(x.id)===id||x.name===id);
                     return(
-                      <span key={id} style={{display:"inline-flex",alignItems:"center",gap:4,fontSize:10,padding:"3px 6px 3px 10px",borderRadius:20,background:GL,color:G,border:"1px solid #5DCAA5"}}>
+                      <span key={id} style={{display:"inline-flex",alignItems:"center",gap:4,fontSize:10,padding:"3px 5px 3px 9px",borderRadius:20,background:GL,color:G,border:"1px solid #5DCAA5"}}>
                         {f?.name||id}
-                        <button onClick={e=>{e.stopPropagation();toggleFood(meal.id,id);}} style={{width:16,height:16,borderRadius:"50%",border:"none",background:"rgba(0,0,0,0.15)",color:"#fff",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,flexShrink:0,lineHeight:1}}>×</button>
+                        <button onClick={e=>{e.stopPropagation();toggleFood(meal.id,id);}}
+                          style={{width:14,height:14,borderRadius:"50%",border:"none",background:"rgba(0,0,0,0.12)",color:"#fff",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:700,flexShrink:0}}>×</button>
                       </span>
                     );
                   })}
                 </div>
               )}
 
+              {/* ── NEW FOOD PANEL ── */}
               {isOpen&&(
-                <div className="mbody">
-                  <input className="sinp" placeholder="Search food…" value={search} onChange={e=>setSearch(e.target.value)}/>
-                  <div className="catbtns">{cats.map(c=><button key={c} className={`catbtn${catFilter===c?" on":""}`} onClick={()=>setCatFilter(c)}>{c}</button>)}</div>
-
-                  {foods.length===0&&(
-                    <div style={{textAlign:"center",color:TXT2,fontSize:12,padding:"12px 0 4px"}}>
-                      No food items assigned yet — ask admin to assign a plan.
-                    </div>
-                  )}
-
-                  <div className="flist">
-                    {filtered.map(f=>{
-                      const chk=!!sel[String(f.id)||f.name];
-                      return(
-                        <div key={f.id||f.name} className={`frow${chk?" sel":""}`} onClick={()=>toggleFood(meal.id,String(f.id)||f.name)}>
-                          <div className={`fchk${chk?" on":""}`}>{chk&&<span style={{color:"#fff",fontSize:9,fontWeight:900}}>✓</span>}</div>
-                          <span style={{flex:1,fontSize:12,color:chk?G:TXT}}>
-                            {f.name}
-                            {f.added_by_user&&<span style={{fontSize:9,color:TXT3,marginLeft:4}}>· custom</span>}
-                          </span>
-                          <span style={{fontSize:11,fontWeight:700,color:"#7F77DD"}}>{f.calories||0}</span>
-                          <span style={{fontSize:10,color:TXT3}}> kcal</span>
-                          <span style={{fontSize:11,color:G,marginLeft:5}}>{f.protein||0}g P</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* ─── ADD FOOD BUTTON ─────────────────────────────────── */}
-                  <button className="add-food-btn" onClick={()=>{ setAddFoodMeal(meal.id); setShowAddFood(true); }}>
-                    <span style={{fontSize:16,lineHeight:1}}>+</span>
-                    Food not in list? Add it
-                  </button>
-                </div>
+                <MealFoodPanel
+                  meal={meal}
+                  foods={foods}
+                  sel={mSel}
+                  onToggle={toggleFood}
+                  onAddFood={()=>{setAddFoodMeal(meal.id);setShowAddFood(true);}}
+                />
               )}
             </div>
           );
@@ -490,7 +569,7 @@ export default function Dashboard(){
             <span style={{fontSize:12,fontWeight:600,color:waterL>=waterTarget?G:"#0284c7"}}>{waterL}L / {waterTarget}L {waterL>=waterTarget?"✓":""}</span>
           </div>
           <div className="wbtns">
-            {[0.5,1,1.5,2,2.5,3,3.5,4,4.5,5].map((v)=>{
+            {[0.5,1,1.5,2,2.5,3,3.5,4,4.5,5].map(v=>{
               const steps=Math.round(v/0.5);
               return<button key={v} className={`wbtn${(log.water||0)>=steps?" on":""}`} onClick={()=>persist({water:steps})}>{v}L</button>;
             })}
