@@ -206,13 +206,14 @@ function MealFoodPanel({meal,foods,sel,onToggle,onAddFood}){
   const [search,setSearch]=useState("");
 
   // Group foods by category using CAT_CONFIG order, then any uncategorised
+  // Build grouped array — [] not {} so .push and .map work correctly
   const catKeys=CAT_CONFIG.map(c=>c.key);
-  const grouped=catKeys.reduce((acc,key)=>{
+  const grouped=[];
+  catKeys.forEach(key=>{
     const items=foods.filter(f=>(f.category||"Custom")===key);
-    if(items.length) acc.push({key,icon:CAT_CONFIG.find(c=>c.key===key)?.icon||"🍴",items});
-    return acc;
-  },{});
-  // Any categories not in CAT_CONFIG config
+    if(items.length) grouped.push({key,icon:CAT_CONFIG.find(c=>c.key===key)?.icon||"🍴",items});
+  });
+  // Any food categories not covered by CAT_CONFIG
   const knownCats=new Set(catKeys);
   const otherCats=[...new Set(foods.map(f=>f.category||"Custom").filter(c=>!knownCats.has(c)))];
   otherCats.forEach(cat=>{
@@ -260,7 +261,7 @@ function MealFoodPanel({meal,foods,sel,onToggle,onAddFood}){
       )}
 
       {/* Category groups with horizontal 2-col rows */}
-      {!searchResults&&Object.values(grouped).map(grp=>(
+      {!searchResults&&grouped.map(grp=>(
         <div key={grp.key} style={{marginBottom:12}}>
           {/* Category label */}
           <div style={{
