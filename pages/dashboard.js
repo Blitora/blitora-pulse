@@ -477,9 +477,9 @@ export default function Dashboard(){
             <Ring pct={Math.round((mac.cal/calTarget)*100)} color="#7F77DD" label={`${mac.cal}`} sub="kcal in"/>
             {/* Burned ring: grey when no food logged yet — avoids confusing large green surplus */}
             <Ring
-              pct={mac.cal>0?burnRingPct:100}
+              pct={mac.cal>0?burnRingPct:0}
               color={mac.cal>0?G:BORDER}
-              label={`${totalBurn}`}
+              label={mac.cal>0?`${totalBurn}`:"—"}
               sub="burned"
             />
             <Ring pct={Math.round((mac.pro/proTarget)*100)} color={T} label={`${mac.pro}g`} sub="protein"/>
@@ -504,7 +504,7 @@ export default function Dashboard(){
         <div className="kgrid">
           {[
             {l:"Calories in",v:mac.cal,c:"#7F77DD"},
-            {l:"Burned",v:Math.round(totalBurn),c:mac.cal>0?G:TXT3},
+            {l:"Burned",v:mac.cal>0?Math.round(totalBurn):"—",c:mac.cal>0?G:TXT3},
             {l:"Protein",v:`${mac.pro}g`,c:T},
             {l:"Net cal",v:mac.cal>0?`${totalBurn-mac.cal>0?"+":""}${Math.round(totalBurn-mac.cal)}`:"—",c:mac.cal>0?(totalBurn-mac.cal>0?G:R):TXT3}
           ].map((k,i)=>(
