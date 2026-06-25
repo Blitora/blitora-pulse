@@ -328,7 +328,6 @@ function MealFoodPanel({meal,foods,sel,onToggle,onAddFood}){
   );
 }
 
-}
 
 // ─── MEAL FOOD PANEL (new UI) ────────────────────────────────────────────────
 function MealFoodPanel({meal,foods,sel,onToggle,onAddFood}){
