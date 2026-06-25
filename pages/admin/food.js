@@ -721,7 +721,7 @@ export default function AdminFood(){
 
         {/* ── USERS TAB ── */}
         {tab==="users"&&(detail?.type==="user"
-          ?{UserDetail({u:detail.data, onClose:()=>setDetail(null)})}
+          ?UserDetail({u:detail.data, onClose:()=>setDetail(null)})
           :<DataGrid gridKey="admin_users" colsDef={USER_COLS_DEFAULT} rows={users} userId={me.id}
               onRowClick={row=>setDetail({type:"user",data:row})} renderCell={renderUserCell}
               extraActions={<span style={{fontSize:11,color:TXT2}}>Click row to open · Sort by clicking column header</span>}/>
@@ -729,7 +729,7 @@ export default function AdminFood(){
 
         {/* ── FOODS TAB ── */}
         {tab==="foods"&&(detail?.type==="food"
-          ?{FoodDetail({f:detail.data, onClose:()=>setDetail(null)})}
+          ?FoodDetail({f:detail.data, onClose:()=>setDetail(null)})
           :<>
             <div className="tmpl-btns">
               <button className={`tbtn${!selTemplateId?" on":""}`} onClick={()=>setSelTemplateId("")}>All templates</button>
