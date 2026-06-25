@@ -14,12 +14,11 @@ const USER_NAV = [
 ];
 
 const ADMIN_NAV = [
-  { label: "Home",      icon: "🏠",  href: "/dashboard"        },
-  { label: "Users",     icon: "👥",  href: "/admin"            },
-  { label: "Food",      icon: "🥗",  href: "/admin/food"       },
-  { label: "Templates", icon: "📋",  href: "/admin/templates"  },
-  { label: "Reports",   icon: "📊",  href: "/reports"          },
-  { label: "Profile",   icon: "👤",  href: "/profile"          },
+  { label: "Home",    icon: "🏠",  href: "/dashboard" },
+  { label: "Users",   icon: "👥",  href: "/admin"     },
+  { label: "Food",    icon: "🥗",  href: "/admin/food"},
+  { label: "Reports", icon: "📊",  href: "/reports"   },
+  { label: "Profile", icon: "👤",  href: "/profile"   },
 ];
 
 // ─── NEW LOGO COMPONENT ───────────────────────────────────────────────────────
