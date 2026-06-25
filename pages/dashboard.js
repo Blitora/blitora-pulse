@@ -175,14 +175,16 @@ function AppDownloadBanner(){
 }
 
 // ─── FOOD CARD (2-column) ────────────────────────────────────────────────────
+
+// ─── FOOD CARD (CSS grid cell — no fixed width) ──────────────────────────────
 function FoodCard({food,checked,onToggle}){
   return(
     <div onClick={onToggle} style={{
-      width:"calc(50% - 3px)", borderRadius:10,
+      borderRadius:10,
       border:`1.5px solid ${checked?G:BORDER}`,
       padding:"9px 9px 8px", cursor:"pointer",
       background:checked?GL:CARD, position:"relative",
-      transition:"all .15s", flexShrink:0,
+      transition:"all .15s", minWidth:0,  // prevents grid blowout
     }}>
       {/* Checkmark */}
       <div style={{
@@ -192,13 +194,140 @@ function FoodCard({food,checked,onToggle}){
         display:"flex",alignItems:"center",justifyContent:"center",
         fontSize:8,color:"#fff",fontWeight:900,transition:"all .15s",
       }}>{checked?"✓":""}</div>
-      <div style={{fontSize:11,fontWeight:600,color:checked?G:TXT,lineHeight:1.3,paddingRight:20,marginBottom:5}}>{food.name}
+      <div style={{fontSize:11,fontWeight:600,color:checked?G:TXT,lineHeight:1.3,paddingRight:20,marginBottom:5,wordBreak:"break-word"}}>
+        {food.name}
         {food.added_by_user&&<span style={{fontSize:8,color:TXT3,marginLeft:3}}>· custom</span>}
       </div>
       <div style={{fontSize:12,fontWeight:800,color:"#7F77DD"}}>{food.calories||0} <span style={{fontSize:9,fontWeight:400,color:TXT3}}>kcal</span></div>
       <div style={{fontSize:9,color:G,marginTop:2}}>{food.protein||0}g protein</div>
     </div>
   );
+}
+
+// ─── MEAL FOOD PANEL (new UI) ────────────────────────────────────────────────
+function MealFoodPanel({meal,foods,sel,onToggle,onAddFood}){
+  const [search,setSearch]=useState("");
+
+  // Group foods by category
+  const catKeys=CAT_CONFIG.map(c=>c.key);
+  const grouped=[];
+  catKeys.forEach(key=>{
+    const items=foods.filter(f=>(f.category||"Custom")===key);
+    if(items.length) grouped.push({key,icon:CAT_CONFIG.find(c=>c.key===key)?.icon||"🍴",items});
+  });
+  const knownCats=new Set(catKeys);
+  const otherCats=[...new Set(foods.map(f=>f.category||"Custom").filter(c=>!knownCats.has(c)))];
+  otherCats.forEach(cat=>{
+    const items=foods.filter(f=>(f.category||"Custom")===cat);
+    if(items.length) grouped.push({key:cat,icon:"🍴",items});
+  });
+
+  const q=search.toLowerCase();
+  const searchResults=q?foods.filter(f=>f.name.toLowerCase().includes(q)):null;
+
+  // CSS grid: 2 cols on mobile, 3 on tablet, 4 on desktop
+  const foodGrid={
+    display:"grid",
+    gridTemplateColumns:"repeat(auto-fill, minmax(140px, 1fr))",
+    gap:6,
+    width:"100%",
+  };
+
+  return(
+    <div style={{borderTop:`1px solid ${BORDER}`,paddingTop:10,paddingBottom:4}}>
+
+      {/* Search bar */}
+      <div style={{display:"flex",alignItems:"center",gap:7,background:BG,borderRadius:9,padding:"7px 11px",margin:"0 12px 10px"}}>
+        <span style={{fontSize:13,flexShrink:0}}>🔍</span>
+        <input
+          placeholder="Search food…"
+          value={search}
+          onChange={e=>setSearch(e.target.value)}
+          style={{flex:1,border:"none",background:"transparent",fontSize:12,color:TXT,outline:"none",fontFamily:"inherit",minWidth:0}}
+        />
+        {search&&<button onClick={()=>setSearch("")} style={{border:"none",background:"transparent",color:TXT3,cursor:"pointer",fontSize:14,lineHeight:1,padding:0,flexShrink:0}}>×</button>}
+      </div>
+
+      {/* No foods message */}
+      {foods.length===0&&(
+        <div style={{textAlign:"center",color:TXT2,fontSize:12,padding:"12px 0 8px"}}>
+          No food items assigned yet — ask admin to assign a plan.
+        </div>
+      )}
+
+      {/* Search results — responsive grid */}
+      {searchResults&&(
+        <div style={{padding:"0 12px",marginBottom:8}}>
+          {searchResults.length===0
+            ?<div style={{textAlign:"center",color:TXT3,fontSize:11,padding:"12px 0"}}>No food found for "{search}"</div>
+            :<div style={foodGrid}>
+              {searchResults.map(f=>(
+                <FoodCard key={f.id} food={f} checked={!!sel[String(f.id)]} onToggle={()=>onToggle(meal.id,String(f.id))}/>
+              ))}
+            </div>
+          }
+        </div>
+      )}
+
+      {/* Category groups — responsive grid per category */}
+      {!searchResults&&grouped.map(grp=>(
+        <div key={grp.key} style={{marginBottom:12}}>
+          {/* Category label */}
+          <div style={{
+            fontSize:9,fontWeight:800,color:TXT2,
+            textTransform:"uppercase",letterSpacing:".07em",
+            padding:"0 12px",marginBottom:6,
+            display:"flex",alignItems:"center",gap:5,
+          }}>
+            <span style={{fontSize:13}}>{grp.icon}</span>
+            {grp.key}
+            <span style={{flex:1,height:1,background:BORDER,display:"block",marginLeft:4}}/>
+          </div>
+          {/* Responsive grid — no horizontal scroll */}
+          <div style={{padding:"0 12px"}}>
+            <div style={foodGrid}>
+              {grp.items.map(f=>(
+                <FoodCard key={f.id} food={f} checked={!!sel[String(f.id)]} onToggle={()=>onToggle(meal.id,String(f.id))}/>
+              ))}
+            </div>
+          </div>
+        </div>
+      ))}
+
+      {/* Selected summary bar */}
+      {Object.keys(sel).length>0&&(
+        <div style={{margin:"4px 12px 8px",padding:"8px 10px",background:GL,borderRadius:9,border:`1px solid #5DCAA5`}}>
+          <div style={{fontSize:9,fontWeight:800,color:G,textTransform:"uppercase",letterSpacing:".05em",marginBottom:5}}>
+            ✓ Selected · {Object.keys(sel).reduce((s,id)=>{const f=foods.find(x=>String(x.id)===id);return f?s+(f.calories||0):s;},0)} kcal
+          </div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+            {Object.keys(sel).map(id=>{
+              const f=foods.find(x=>String(x.id)===id);
+              return(
+                <span key={id} style={{display:"inline-flex",alignItems:"center",gap:3,fontSize:10,padding:"3px 5px 3px 8px",borderRadius:20,background:"#fff",color:G,border:"1px solid #5DCAA5"}}>
+                  {f?.name||id}
+                  <button onClick={e=>{e.stopPropagation();onToggle(meal.id,id);}}
+                    style={{width:13,height:13,borderRadius:"50%",border:"none",background:"rgba(0,0,0,0.1)",color:G,cursor:"pointer",fontSize:9,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>×</button>
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Add food button */}
+      <button onClick={onAddFood} style={{
+        display:"flex",alignItems:"center",justifyContent:"center",gap:6,
+        margin:"4px 12px 4px",padding:"8px",width:"calc(100% - 24px)",
+        border:`1.5px dashed ${P}`,borderRadius:9,background:PL,
+        color:P,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"inherit",
+      }}>
+        <span style={{fontSize:14,lineHeight:1}}>＋</span> Food not in list? Add it
+      </button>
+    </div>
+  );
+}
+
 }
 
 // ─── MEAL FOOD PANEL (new UI) ────────────────────────────────────────────────
@@ -475,22 +604,39 @@ export default function Dashboard(){
         <div className="card">
           <div style={{display:"flex",justifyContent:"space-around",marginBottom:10}}>
             <Ring pct={Math.round((mac.cal/calTarget)*100)} color="#7F77DD" label={`${mac.cal}`} sub="kcal in"/>
-            <Ring pct={burnRingPct} color={G} label={`${totalBurn}`} sub="burned"/>
+            {/* Burned ring: grey when no food logged yet — avoids confusing large green surplus */}
+            <Ring
+              pct={mac.cal>0?burnRingPct:100}
+              color={mac.cal>0?G:BORDER}
+              label={`${totalBurn}`}
+              sub="burned"
+            />
             <Ring pct={Math.round((mac.pro/proTarget)*100)} color={T} label={`${mac.pro}g`} sub="protein"/>
             <Ring pct={Math.round((waterL/waterTarget)*100)} color="#38bdf8" label={`${waterL}L`} sub="water"/>
           </div>
-          <div style={{textAlign:"center",fontSize:12,color:TXT2}}>
-            Net: <span style={{fontWeight:700,color:totalBurn-mac.cal>0?G:R}}>{totalBurn-mac.cal>0?"+":""}{Math.round(totalBurn-mac.cal)} kcal</span>
-            <span style={{color:TXT3,marginLeft:8,fontSize:11}}>{mealsDone}/6 meals · {habDone}/5 habits</span>
-          </div>
-          <div style={{textAlign:"center",fontSize:10,color:TXT3,marginTop:4}}>
-            Base {BMR} + walks {burnAct} kcal burned
+          {mac.cal===0?(
+            <div style={{textAlign:"center",fontSize:11,color:TXT3,padding:"2px 0 4px"}}>
+              🕐 No meals logged yet today · Your body burns <span style={{fontWeight:600,color:TXT2}}>{totalBurn} kcal</span> at rest
+            </div>
+          ):(
+            <div style={{textAlign:"center",fontSize:12,color:TXT2}}>
+              Net: <span style={{fontWeight:700,color:totalBurn-mac.cal>0?G:R}}>{totalBurn-mac.cal>0?"+":""}{Math.round(totalBurn-mac.cal)} kcal</span>
+              <span style={{color:TXT3,marginLeft:8,fontSize:11}}>{mealsDone}/6 meals · {habDone}/5 habits</span>
+            </div>
+          )}
+          <div style={{textAlign:"center",fontSize:10,color:TXT3,marginTop:3}}>
+            Base metabolism {BMR} + walks {burnAct} kcal
           </div>
         </div>
 
         {/* KPI GRID */}
         <div className="kgrid">
-          {[{l:"Calories in",v:mac.cal,c:"#7F77DD"},{l:"Burned",v:Math.round(totalBurn),c:G},{l:"Protein",v:`${mac.pro}g`,c:T},{l:"Net cal",v:`${totalBurn-mac.cal>0?"+":""}${Math.round(totalBurn-mac.cal)}`,c:totalBurn-mac.cal>0?G:R}].map((k,i)=>(
+          {[
+            {l:"Calories in",v:mac.cal,c:"#7F77DD"},
+            {l:"Burned",v:Math.round(totalBurn),c:mac.cal>0?G:TXT3},
+            {l:"Protein",v:`${mac.pro}g`,c:T},
+            {l:"Net cal",v:mac.cal>0?`${totalBurn-mac.cal>0?"+":""}${Math.round(totalBurn-mac.cal)}`:"—",c:mac.cal>0?(totalBurn-mac.cal>0?G:R):TXT3}
+          ].map((k,i)=>(
             <div key={i} className="kpi">
               <div style={{fontSize:16,fontWeight:700,color:k.c,lineHeight:1,marginBottom:3}}>{k.v}</div>
               <div style={{fontSize:9,color:TXT2,textTransform:"uppercase",letterSpacing:".03em"}}>{k.l}</div>
