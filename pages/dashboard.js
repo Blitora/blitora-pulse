@@ -351,11 +351,23 @@ export default function Dashboard(){
       if(!p.setup_complete){router.push("/setup");return;}
       setProfile(p);
       if(p.active_template_id){
-        const{data:tf}=await sb
-          .from("template_food_items")
-          .select("*")
-          .or(`template_id.eq.${p.active_template_id},and(added_by_user.eq.true,added_by_user_id.eq.${p.id})`);
-        setFoods(tf||[]);
+        // Fetch foods via junction table (multi-template) + user's own custom foods
+        const[{data:linked},{data:custom}]=await Promise.all([
+          // Foods linked to user's template via junction table
+          sb.from("food_template_links")
+            .select("template_food_items(*)")
+            .eq("template_id",p.active_template_id),
+          // User's own custom-added foods
+          sb.from("template_food_items")
+            .select("*")
+            .eq("added_by_user",true)
+            .eq("added_by_user_id",p.id),
+        ]);
+        // Extract food items from junction results, deduplicate by id
+        const junctionFoods=(linked||[]).map(l=>l.template_food_items).filter(Boolean);
+        const allFoodItems=[...junctionFoods,...(custom||[])];
+        const unique=Array.from(new Map(allFoodItems.map(f=>[f.id,f])).values());
+        setFoods(unique);
       }
     }
     init();
