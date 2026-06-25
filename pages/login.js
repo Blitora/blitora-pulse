@@ -3,6 +3,62 @@ import Head from "next/head";
 import { useRouter } from "next/router";
 import { getSupabase } from "../lib/supabase";
 
+const P = "#714B67";
+const G = "#1D9E75";
+
+// ─── INLINE LOGO (no Layout dependency on login page) ────────────────────────
+function MyHealthLogo() {
+  const d = 44;
+  return (
+    <div style={{ display:"flex", alignItems:"center", gap:11, justifyContent:"center", marginBottom:28 }}>
+      {/* Icon */}
+      <div style={{
+        width:d, height:d,
+        borderRadius:Math.round(d*0.24),
+        background:"linear-gradient(140deg,#8B3F7A 0%,#5A1648 100%)",
+        display:"flex", alignItems:"center", justifyContent:"center",
+        flexShrink:0, position:"relative", overflow:"hidden",
+        boxShadow:"0 3px 12px rgba(113,75,103,0.35)",
+      }}>
+        <svg width={d} height={d} style={{position:"absolute",inset:0}} viewBox="0 0 44 44">
+          <circle cx="22" cy="22" r="15.5"
+            fill="none" stroke="rgba(255,255,255,0.82)" strokeWidth="3.2"
+            strokeDasharray="64 97" strokeLinecap="round"
+            style={{transform:"rotate(-195deg)",transformOrigin:"22px 22px"}}
+          />
+          <circle cx="22" cy="22" r="15.5"
+            fill="none" stroke="#1D9E75" strokeWidth="3.2"
+            strokeDasharray="27 97" strokeLinecap="round"
+            style={{transform:"rotate(108deg)",transformOrigin:"22px 22px"}}
+          />
+          <circle cx="34" cy="33" r="6" fill="#1D9E75"/>
+          <path d="M31 33 L33.2 35.2 L37 31.5"
+            fill="none" stroke="white" strokeWidth="1.6"
+            strokeLinecap="round" strokeLinejoin="round"
+          />
+        </svg>
+        <span style={{
+          fontSize:15, fontWeight:800, color:"#fff",
+          letterSpacing:"-0.5px", lineHeight:1, zIndex:1,
+          fontFamily:"-apple-system,'Segoe UI',Arial,sans-serif",
+        }}>MH</span>
+      </div>
+
+      {/* Brand text */}
+      <div>
+        <div style={{
+          fontSize:24, fontWeight:800, lineHeight:1.1, letterSpacing:"-0.5px",
+          fontFamily:"-apple-system,'Segoe UI',Arial,sans-serif",
+        }}>
+          <span style={{color:P}}>My</span>
+          <span style={{color:G}}>Health</span>
+        </div>
+        <div style={{fontSize:11, color:"#aaa", fontWeight:500, marginTop:2}}>Health Tracker Platform</div>
+      </div>
+    </div>
+  );
+}
+
 export default function Login() {
   const router = useRouter();
   const [mode, setMode] = useState("login");
@@ -12,7 +68,6 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
-  
 
   async function handleEmail(e) {
     e.preventDefault();
@@ -57,10 +112,7 @@ export default function Login() {
         provider: "google",
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
-          queryParams: {
-            access_type: "offline",
-            prompt: "consent",
-          },
+          queryParams: { access_type: "offline", prompt: "consent" },
         }
       });
       if (error) { setError(error.message); setLoading(false); }
@@ -72,52 +124,42 @@ export default function Login() {
 
   return (
     <>
-      <Head><title>{mode === "login" ? "Sign in" : "Create account"} — Health Tracker</title></Head>
+      <Head><title>{mode === "login" ? "Sign in" : "Create account"} — MyHealth</title></Head>
       <style>{`
         *{box-sizing:border-box;margin:0;padding:0}
         body{background:#f0f0f7;font-family:'Inter',system-ui,sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center}
         .wrap{width:100%;max-width:420px;padding:24px 16px}
-        .logo{display:flex;align-items:center;gap:10px;justify-content:center;margin-bottom:32px}
-        .logo-mark{width:40px;height:40px;background:#714B67;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:20px;font-weight:700}
-        .logo-text{font-size:20px;font-weight:700;color:#2c1a3a}
-        .logo-sub{font-size:12px;color:#888;font-weight:400}
-        .card{background:#fff;border-radius:16px;border:1px solid #e5e3ee;padding:32px}
+        .card{background:#fff;border-radius:16px;border:1px solid #e5e3ee;padding:28px 28px 32px}
         .title{font-size:18px;font-weight:700;color:#2c1a3a;margin-bottom:4px}
-        .sub{font-size:13px;color:#888;margin-bottom:24px}
+        .sub{font-size:13px;color:#888;margin-bottom:22px}
         .label{display:block;font-size:12px;font-weight:600;color:#444;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em}
-        .input{width:100%;padding:10px 14px;border:1px solid #e5e3ee;border-radius:8px;font-size:14px;color:#2c1a3a;outline:none;transition:border-color .2s;background:#fff}
-        .input:focus{border-color:#714B67}
+        .input{width:100%;padding:10px 14px;border:1.5px solid #e5e3ee;border-radius:9px;font-size:14px;color:#2c1a3a;outline:none;transition:border-color .2s;background:#fff;font-family:inherit}
+        .input:focus{border-color:${P}}
         .input-wrap{margin-bottom:16px}
-        .btn-primary{width:100%;padding:11px;background:#714B67;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:background .2s;margin-top:4px}
+        .btn-primary{width:100%;padding:12px;background:${P};color:#fff;border:none;border-radius:9px;font-size:14px;font-weight:600;cursor:pointer;transition:background .2s;margin-top:4px;font-family:inherit}
         .btn-primary:hover{background:#5a3a53}
         .btn-primary:disabled{background:#b8a0b0;cursor:not-allowed}
-        .divider{display:flex;align-items:center;gap:12px;margin:20px 0;color:#ccc;font-size:12px}
+        .divider{display:flex;align-items:center;gap:12px;margin:18px 0;color:#ccc;font-size:12px}
         .divider::before,.divider::after{content:'';flex:1;height:1px;background:#e5e3ee}
-        .btn-google{width:100%;padding:10px;background:#fff;border:1.5px solid #e5e3ee;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;color:#2c1a3a;transition:border-color .2s}
-        .btn-google:hover{border-color:#714B67}
+        .btn-google{width:100%;padding:11px;background:#fff;border:1.5px solid #e5e3ee;border-radius:9px;font-size:14px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;color:#2c1a3a;transition:border-color .2s;font-family:inherit}
+        .btn-google:hover{border-color:${P}}
         .toggle{text-align:center;margin-top:20px;font-size:13px;color:#888}
-        .toggle a{color:#714B67;font-weight:600;cursor:pointer}
+        .toggle a{color:${P};font-weight:600;cursor:pointer;text-decoration:none}
         .error{background:#fff0f0;border:1px solid #ffd0d0;color:#c0392b;border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:16px}
         .success{background:#f0faf5;border:1px solid #b7e4cc;color:#1a7a4a;border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:16px}
-        .dbg{background:#f0f0f7;border:1px solid #e5e3ee;border-radius:8px;padding:8px 12px;font-size:11px;color:#666;margin-bottom:12px;word-break:break-all}
         .spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;display:inline-block;margin-right:8px;vertical-align:middle}
         @keyframes spin{to{transform:rotate(360deg)}}
       `}</style>
 
       <div className="wrap">
-        <div className="logo">
-          <div className="logo-mark">H</div>
-          <div>
-            <div className="logo-text">Health Tracker</div>
-            <div className="logo-sub">by Azeem</div>
-          </div>
-        </div>
+
+        {/* ── NEW LOGO ── */}
+        <MyHealthLogo />
 
         <div className="card">
           <div className="title">{mode === "login" ? "Welcome back" : "Create your account"}</div>
           <div className="sub">{mode === "login" ? "Sign in to your health dashboard" : "Request access to start tracking"}</div>
 
-         
           {error && <div className="error">{error}</div>}
           {message && <div className="success">{message}</div>}
 
