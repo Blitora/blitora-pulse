@@ -420,8 +420,11 @@ export default function Dashboard(){
   },{cal:0,pro:0,carb:0,fat:0});
 
   const BMR=calcBMR(profile);
+  // Walk calories: ~5 kcal/min for brisk morning walk, ~4 kcal/min for post-meal walks
   const burnAct=WALKS.reduce((s,w)=>s+(log.activity[w.k]||0)*(w.k==="morning_walk"?5:4),0);
-  const totalBurn=Math.round(BMR*activityMultiplier(profile?.activity_level))+burnAct;
+  // totalBurn = BMR (base metabolism) + calories burned from logged walks
+  // We do NOT multiply BMR by activity level since users are logging actual activity
+  const totalBurn=BMR+burnAct;
   const burnRingPct=profile?.calorie_target?Math.round((totalBurn/profile.calorie_target)*100):Math.round((totalBurn/2000)*100);
   const waterL=(log.water||0)*0.5;
   const waterTarget=profile?.water_target||3.5;
@@ -508,7 +511,7 @@ export default function Dashboard(){
             </div>
           )}
           <div style={{textAlign:"center",fontSize:10,color:TXT3,marginTop:3}}>
-            Base metabolism {BMR} + walks {burnAct} kcal
+            BMR {BMR} kcal + {burnAct} kcal from walks today
           </div>
         </div>
 
