@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Head from "next/head";
 import { useRouter } from "next/router";
 import { getSupabase } from "../lib/supabase";
@@ -18,15 +18,63 @@ const PRESETS=[
   {id:"custom",label:"Custom range"},
 ];
 
+// ─── MINI BAR CHART (SVG, no library) ────────────────────────────────────────
+function MiniBarChart({data,color,label,maxVal}){
+  if(!data.length) return null;
+  const W=280, H=60, pad=4;
+  const bw=Math.max(2, Math.floor((W-pad*2)/data.length)-2);
+  const max=maxVal||Math.max(...data.map(d=>d.v),1);
+  return(
+    <div>
+      <div style={{fontSize:10,fontWeight:700,color:TXT2,textTransform:"uppercase",marginBottom:4}}>{label}</div>
+      <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{overflow:"visible"}}>
+        {data.map((d,i)=>{
+          const bh=Math.max(2,((d.v||0)/max)*(H-16));
+          const x=pad+i*(bw+2);
+          return(
+            <g key={i}>
+              <rect x={x} y={H-16-bh} width={bw} height={bh} rx={2} fill={d.v>0?color:"#eee"}/>
+              {data.length<=10&&<text x={x+bw/2} y={H-2} textAnchor="middle" fontSize={7} fill={TXT3}>{d.l}</text>}
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
+// ─── RADIAL COMPLIANCE RING (SVG) ─────────────────────────────────────────────
+function ComplianceRing({pct,color,label,sub}){
+  const r=28,c=2*Math.PI*r,d=(pct/100)*c;
+  return(
+    <div style={{textAlign:"center"}}>
+      <div style={{position:"relative",width:72,height:72,margin:"0 auto 6px"}}>
+        <svg width={72} height={72} style={{transform:"rotate(-90deg)"}}>
+          <circle cx={36} cy={36} r={r} fill="none" stroke={BORDER} strokeWidth={7}/>
+          <circle cx={36} cy={36} r={r} fill="none" stroke={color} strokeWidth={7}
+            strokeDasharray={`${d} ${c}`} strokeLinecap="round"
+            style={{transition:"stroke-dasharray .6s"}}/>
+        </svg>
+        <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
+          <span style={{fontSize:14,fontWeight:700,color:TXT,lineHeight:1}}>{pct}%</span>
+        </div>
+      </div>
+      <div style={{fontSize:11,fontWeight:600,color:TXT}}>{label}</div>
+      {sub&&<div style={{fontSize:10,color:TXT2,marginTop:1}}>{sub}</div>}
+    </div>
+  );
+}
+
 export default function Reports(){
   const router=useRouter();
   const [profile,setProfile]=useState(null);
   const [logs,setLogs]=useState([]);
+  const [foods,setFoods]=useState([]);
   const [preset,setPreset]=useState("7");
   const [customFrom,setCustomFrom]=useState(daysAgo(29));
   const [customTo,setCustomTo]=useState(today());
   const [loading,setLoading]=useState(false);
-  const [exporting,setExporting]=useState(false);
+  const [exportType,setExportType]=useState(null); // 'csv'|'excel'|'pdf'
 
   useEffect(()=>{
     async function init(){
@@ -37,6 +85,13 @@ export default function Reports(){
       if(!p||p.status==="pending"){router.push("/pending");return;}
       if(!p.setup_complete){router.push("/setup");return;}
       setProfile(p);
+      // Load food master for macro calculation
+      if(p.active_template_id){
+        const{data:tf}=await sb
+          .from("template_food_items").select("*")
+          .or(`template_id.eq.${p.active_template_id},and(added_by_user.eq.true,added_by_user_id.eq.${p.id})`);
+        setFoods(tf||[]);
+      }
     }
     init();
   },[]);
@@ -45,9 +100,9 @@ export default function Reports(){
 
   async function load(){
     setLoading(true);
-    const p=PRESETS.find(x=>x.id===preset);
-    const from=preset==="custom"?customFrom:p.from();
-    const to=preset==="custom"?customTo:p.to();
+    const pr=PRESETS.find(x=>x.id===preset);
+    const from=preset==="custom"?customFrom:pr.from();
+    const to=preset==="custom"?customTo:pr.to();
     const{data}=await getSupabase().from("health_logs").select("*")
       .eq("user_id",profile.id).gte("log_date",from).lte("log_date",to)
       .order("log_date",{ascending:true});
@@ -55,23 +110,38 @@ export default function Reports(){
     setLoading(false);
   }
 
-  const rows=logs.map(l=>({
-    date:l.log_date,
-    water:(l.water||0)*0.5,
-    weight:l.weight||null,
-    habDone:Object.values(l.habits||{}).filter(Boolean).length,
-    mealsDone:Object.values(l.foods||{}).filter(m=>Object.keys(m).length>0).length,
-    walkTotal:Object.values(l.activity||{}).reduce((s,v)=>s+v,0),
-    morning_walk:l.activity?.morning_walk||0,
-    post_lunch_walk:l.activity?.post_lunch_walk||0,
-    post_dinner_walk:l.activity?.post_dinner_walk||0,
-  }));
+  // ─── Enrich rows with macro data ─────────────────────────────────────────
+  const rows=logs.map(l=>{
+    const allIds=Object.values(l.foods||{}).flatMap(m=>Object.keys(m));
+    const mac=allIds.reduce((a,id)=>{
+      const f=foods.find(x=>String(x.id)===String(id)||x.name===id);
+      return f?{cal:a.cal+(f.calories||0),pro:a.pro+(f.protein||0),carb:a.carb+(f.carbs||0),fat:a.fat+(f.fat||0)}:a;
+    },{cal:0,pro:0,carb:0,fat:0});
+    // Count custom/deviation foods
+    const deviations=allIds.filter(id=>{
+      const f=foods.find(x=>String(x.id)===String(id));
+      return f?.added_by_user;
+    }).length;
+    return{
+      date:l.log_date,
+      water:(l.water||0)*0.5,
+      weight:l.weight||null,
+      habDone:Object.values(l.habits||{}).filter(Boolean).length,
+      mealsDone:Object.values(l.foods||{}).filter(m=>Object.keys(m).length>0).length,
+      walkTotal:Object.values(l.activity||{}).reduce((s,v)=>s+v,0),
+      morning_walk:l.activity?.morning_walk||0,
+      post_lunch_walk:l.activity?.post_lunch_walk||0,
+      post_dinner_walk:l.activity?.post_dinner_walk||0,
+      calories:mac.cal, protein:mac.pro, carbs:mac.carb, fat:mac.fat,
+      deviations,
+      foodIds:allIds,
+    };
+  });
 
   const n=rows.length;
   const avg=key=>n?+(rows.reduce((s,d)=>s+(d[key]||0),0)/n).toFixed(1):0;
-  const pct=key=>n?Math.round((rows.filter(d=>d[key]).length/n)*100):0;
-
   const waterTarget=profile?.water_target||3.5;
+  const calTarget=profile?.calorie_target||1600;
   const daysAtWaterTarget=rows.filter(d=>d.water>=waterTarget).length;
   const daysFullHabits=rows.filter(d=>d.habDone===5).length;
   const daysWeighed=rows.filter(d=>d.weight).length;
@@ -80,35 +150,273 @@ export default function Reports(){
   const latestW=weights.length?weights[weights.length-1].weight:null;
   const lost=startW&&latestW?+(startW-latestW).toFixed(1):null;
 
-  const bestDay=rows.length?rows.reduce((b,d)=>d.habDone>b.habDone?d:b,rows[0]):null;
-  const worstDay=rows.length?rows.reduce((b,d)=>d.habDone<b.habDone?d:b,rows[0]):null;
-  const bestWater=rows.length?rows.reduce((b,d)=>d.water>b.water?d:b,rows[0]):null;
+  // Chart data
+  const calChart=rows.map(r=>({v:r.calories,l:new Date(r.date).getDate()+""}));
+  const waterChart=rows.map(r=>({v:r.water,l:new Date(r.date).getDate()+""}));
+  const walkChart=rows.map(r=>({v:r.walkTotal,l:new Date(r.date).getDate()+""}));
+  const weightChart=rows.filter(r=>r.weight).map(r=>({v:r.weight,l:new Date(r.date).getDate()+""}));
 
+  // Top foods eaten
+  const foodCount={};
+  rows.forEach(r=>r.foodIds.forEach(id=>{
+    const f=foods.find(x=>String(x.id)===String(id));
+    if(f){foodCount[f.name]=(foodCount[f.name]||0)+1;}
+  }));
+  const topFoods=Object.entries(foodCount).sort((a,b)=>b[1]-a[1]).slice(0,5);
+
+  // Compliance %
+  const waterComp=n?Math.round((daysAtWaterTarget/n)*100):0;
+  const habComp=n?Math.round((daysFullHabits/n)*100):0;
+  const mealComp=n?Math.round((rows.filter(d=>d.mealsDone>=4).length/n)*100):0;
+  const walkComp=n?Math.round((rows.filter(d=>d.walkTotal>=30).length/n)*100):0;
+
+  // ─── CSV EXPORT ──────────────────────────────────────────────────────────
   function exportCSV(){
-    setExporting(true);
-    const headers=["Date","Meals Logged","Water (L)","Morning Walk (min)","Post-Lunch Walk (min)","Post-Dinner Walk (min)","Total Walk (min)","Habits Met","Weight (kg)"];
-    const csvRows=rows.map(r=>[r.date,r.mealsDone,r.water,r.morning_walk,r.post_lunch_walk,r.post_dinner_walk,r.walkTotal,r.habDone,r.weight||""].join(","));
+    setExportType("csv");
+    const headers=["Date","Meals Logged","Calories (kcal)","Protein (g)","Carbs (g)","Fat (g)","Water (L)","Morning Walk (min)","Post-Lunch Walk (min)","Post-Dinner Walk (min)","Total Walk (min)","Habits Met","Weight (kg)","Custom Foods Added"];
+    const csvRows=rows.map(r=>[r.date,r.mealsDone,r.calories,r.protein,r.carbs,r.fat,r.water,r.morning_walk,r.post_lunch_walk,r.post_dinner_walk,r.walkTotal,r.habDone,r.weight||"",r.deviations].join(","));
     const csv=[headers.join(","),...csvRows].join("\n");
     const blob=new Blob([csv],{type:"text/csv"});
     const url=URL.createObjectURL(blob);
     const a=document.createElement("a");
-    a.href=url;
-    a.download=`health-report-${profile.full_name?.replace(" ","-")}-${today()}.csv`;
-    a.click();
+    a.href=url; a.download=`myhealth-report-${profile.full_name?.replace(/\s/g,"-")}-${today()}.csv`; a.click();
     URL.revokeObjectURL(url);
-    setTimeout(()=>setExporting(false),1000);
+    setTimeout(()=>setExportType(null),1500);
   }
+
+  // ─── EXCEL EXPORT (using SheetJS via CDN) ────────────────────────────────
+  async function exportExcel(){
+    setExportType("excel");
+    try{
+      // Dynamically load xlsx
+      if(!window.XLSX){
+        await new Promise((res,rej)=>{
+          const s=document.createElement("script");
+          s.src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+          s.onload=res; s.onerror=rej;
+          document.head.appendChild(s);
+        });
+      }
+      const XLSX=window.XLSX;
+
+      // Sheet 1: Summary
+      const summaryData=[
+        ["MyHealth Report","",""],
+        ["Name",profile.full_name||"",""],
+        ["Period",`${rows[0]?.date||""} to ${rows[rows.length-1]?.date||""}`, ""],
+        ["Days Logged",n,""],
+        [""],
+        ["AVERAGES","Value","Target"],
+        ["Calories",avg("calories")+" kcal",calTarget+" kcal"],
+        ["Protein",avg("protein")+"g",profile.protein_target+"g"],
+        ["Water",avg("water")+"L",waterTarget+"L"],
+        ["Habits",avg("habDone")+"/5","5/5"],
+        ["Total Walk",avg("walkTotal")+" min","75 min"],
+        [""],
+        ["COMPLIANCE","Days Met","% of Period"],
+        ["Water Target",daysAtWaterTarget,waterComp+"%"],
+        ["All 5 Habits",daysFullHabits,habComp+"%"],
+        ["4+ Meals Logged",rows.filter(d=>d.mealsDone>=4).length,mealComp+"%"],
+        ["30+ min Walk",rows.filter(d=>d.walkTotal>=30).length,walkComp+"%"],
+        [""],
+        lost!==null?["Weight Change",(lost>0?"-":"+")+" "+Math.abs(lost)+" kg",`${startW}kg → ${latestW}kg`]:["Weight","Not logged",""],
+      ];
+
+      // Sheet 2: Daily log
+      const dailyData=[
+        ["Date","Meals","Calories","Protein (g)","Carbs (g)","Fat (g)","Water (L)","Morning Walk","Post-Lunch Walk","Post-Dinner Walk","Total Walk","Habits","Weight","Custom Foods"],
+        ...rows.map(r=>[r.date,r.mealsDone,r.calories,r.protein,r.carbs,r.fat,r.water,r.morning_walk,r.post_lunch_walk,r.post_dinner_walk,r.walkTotal,r.habDone,r.weight||"",r.deviations])
+      ];
+
+      // Sheet 3: Top foods
+      const foodData=[
+        ["Food Item","Times Eaten"],
+        ...topFoods.map(([name,count])=>[name,count]),
+      ];
+
+      const wb=XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summaryData), "Summary");
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dailyData), "Daily Log");
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(foodData), "Top Foods");
+      XLSX.writeFile(wb, `myhealth-report-${profile.full_name?.replace(/\s/g,"-")}-${today()}.xlsx`);
+    }catch(e){alert("Excel export failed: "+e.message);}
+    setTimeout(()=>setExportType(null),1500);
+  }
+
+  // ─── PDF EXPORT (using jsPDF via CDN + html2canvas) ──────────────────────
+  async function exportPDF(){
+    setExportType("pdf");
+    try{
+      // Load jsPDF
+      if(!window.jspdf){
+        await new Promise((res,rej)=>{
+          const s=document.createElement("script");
+          s.src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
+          s.onload=res; s.onerror=rej; document.head.appendChild(s);
+        });
+      }
+      const {jsPDF}=window.jspdf;
+      const doc=new jsPDF({orientation:"portrait",unit:"mm",format:"a4"});
+      const W=210, M=14;
+      let y=14;
+
+      // Header
+      doc.setFillColor(113,75,103);
+      doc.rect(0,0,W,28,"F");
+      doc.setTextColor(255,255,255);
+      doc.setFontSize(18); doc.setFont("helvetica","bold");
+      doc.text("MyHealth — Health Report",M,12);
+      doc.setFontSize(9); doc.setFont("helvetica","normal");
+      doc.text(`${profile.full_name||""} · Generated ${today()}`,M,21);
+      doc.setFontSize(9);
+      doc.text(`Period: ${rows[0]?.date||""} to ${rows[rows.length-1]?.date||""}`, 130, 21);
+      y=36;
+
+      // Summary boxes (4 in a row)
+      const boxes=[
+        {label:"Days Logged",val:n+"",color:[113,75,103]},
+        {label:"Avg Water",val:avg("water")+"L",color:[56,189,248]},
+        {label:"Avg Habits",val:avg("habDone")+"/5",color:[29,158,117]},
+        {label:"Avg Walk",val:avg("walkTotal")+"m",color:[239,159,39]},
+      ];
+      const bw=(W-M*2-9)/4;
+      boxes.forEach((b,i)=>{
+        const x=M+i*(bw+3);
+        doc.setFillColor(245,245,250);
+        doc.roundedRect(x,y,bw,20,2,2,"F");
+        doc.setFillColor(...b.color);
+        doc.roundedRect(x,y,bw,4,2,2,"F");
+        doc.setTextColor(...b.color);
+        doc.setFontSize(14); doc.setFont("helvetica","bold");
+        doc.text(b.val,x+bw/2,y+13,{align:"center"});
+        doc.setTextColor(120,120,120);
+        doc.setFontSize(7); doc.setFont("helvetica","normal");
+        doc.text(b.label,x+bw/2,y+18,{align:"center"});
+      });
+      y+=28;
+
+      // Weight change
+      if(lost!==null){
+        doc.setFillColor(lost>0?234:254, lost>0:244, lost>0?246:237);
+        doc.roundedRect(M,y,W-M*2,14,2,2,"F");
+        doc.setTextColor(lost>0?29:239, lost>0?158:100, lost>0?117:39);
+        doc.setFontSize(11); doc.setFont("helvetica","bold");
+        doc.text(`Weight ${lost>0?"Lost":"Gained"}: ${Math.abs(lost)} kg  (${startW}kg → ${latestW}kg · Goal: ${profile.weight_target}kg)`,M+4,y+9);
+        y+=20;
+      }
+
+      // Compliance section
+      doc.setTextColor(113,75,103);
+      doc.setFontSize(10); doc.setFont("helvetica","bold");
+      doc.text("Goal Compliance",M,y); y+=5;
+      const compItems=[
+        {l:"Water target met",v:daysAtWaterTarget,pct:waterComp,c:[56,189,248]},
+        {l:"All 5 habits",v:daysFullHabits,pct:habComp,c:[29,158,117]},
+        {l:"4+ meals logged",v:rows.filter(d=>d.mealsDone>=4).length,pct:mealComp,c:[113,75,103]},
+        {l:"30+ min walk",v:rows.filter(d=>d.walkTotal>=30).length,pct:walkComp,c:[239,159,39]},
+      ];
+      compItems.forEach(c=>{
+        doc.setTextColor(80,80,80); doc.setFontSize(8); doc.setFont("helvetica","normal");
+        doc.text(c.l,M,y+4);
+        doc.text(`${c.v}/${n} days (${c.pct}%)`,150,y+4);
+        doc.setFillColor(235,235,235);
+        doc.roundedRect(M,y+5,W-M*2-50,4,1,1,"F");
+        doc.setFillColor(...c.c);
+        doc.roundedRect(M,y+5,(W-M*2-50)*(c.pct/100),4,1,1,"F");
+        y+=12;
+      });
+      y+=4;
+
+      // Macro averages
+      doc.setTextColor(113,75,103);
+      doc.setFontSize(10); doc.setFont("helvetica","bold");
+      doc.text("Daily Averages vs Targets",M,y); y+=6;
+      const avgItems=[
+        ["Calories",avg("calories")+" kcal",calTarget+" kcal"],
+        ["Protein",avg("protein")+"g",(profile.protein_target||100)+"g"],
+        ["Water",avg("water")+"L",waterTarget+"L"],
+      ];
+      doc.setFontSize(8); doc.setFont("helvetica","normal");
+      avgItems.forEach(([l,a,t])=>{
+        doc.setTextColor(100,100,100); doc.text(l,M,y);
+        doc.setTextColor(44,26,58); doc.text(a,80,y);
+        doc.setTextColor(150,150,150); doc.text("target: "+t,120,y);
+        y+=7;
+      });
+      y+=4;
+
+      // Top foods
+      if(topFoods.length){
+        doc.setTextColor(113,75,103);
+        doc.setFontSize(10); doc.setFont("helvetica","bold");
+        doc.text("Most Eaten Foods This Period",M,y); y+=6;
+        topFoods.forEach(([name,count],i)=>{
+          doc.setFillColor(i%2===0?248:255,i%2===0?245:255,i%2===0?252:255);
+          doc.rect(M,y-4,W-M*2,8,"F");
+          doc.setTextColor(44,26,58); doc.setFontSize(8); doc.setFont("helvetica","normal");
+          doc.text(`${i+1}. ${name}`,M+2,y);
+          doc.setTextColor(29,158,117);
+          doc.text(`${count}x`,W-M-10,y);
+          y+=8;
+        });
+        y+=4;
+      }
+
+      // Daily log table header
+      if(y>240){doc.addPage();y=14;}
+      doc.setTextColor(113,75,103);
+      doc.setFontSize(10); doc.setFont("helvetica","bold");
+      doc.text("Daily Log",M,y); y+=5;
+
+      // Table
+      const cols=["Date","Meals","Cal","Protein","Water","Walk","Habits","Weight"];
+      const colW=[28,16,18,18,16,16,14,18];
+      let x=M;
+      doc.setFillColor(113,75,103);
+      doc.rect(M,y,W-M*2,7,"F");
+      doc.setTextColor(255,255,255); doc.setFontSize(7); doc.setFont("helvetica","bold");
+      cols.forEach((c,i)=>{doc.text(c,x+2,y+5);x+=colW[i];});
+      y+=7;
+
+      rows.forEach((r,ri)=>{
+        if(y>270){doc.addPage();y=14;}
+        doc.setFillColor(ri%2===0?248:255, ri%2===0?245:255, ri%2===0?252:255);
+        doc.rect(M,y,W-M*2,6,"F");
+        doc.setTextColor(44,26,58); doc.setFontSize(6.5); doc.setFont("helvetica","normal");
+        x=M;
+        const cells=[
+          new Date(r.date).toLocaleDateString("en-IN",{day:"2-digit",month:"short"}),
+          r.mealsDone+"/6", r.calories+"", r.protein+"g",
+          r.water+"L", r.walkTotal+"m", r.habDone+"/5",
+          r.weight?r.weight+"kg":"—"
+        ];
+        cells.forEach((c,i)=>{doc.text(c,x+2,y+4.5);x+=colW[i];});
+        y+=6;
+      });
+
+      // Footer
+      doc.setFillColor(113,75,103);
+      doc.rect(0,285,W,12,"F");
+      doc.setTextColor(255,255,255); doc.setFontSize(7);
+      doc.text("MyHealth — Health Tracker Platform · myhealth.grabntrust.in",W/2,292,{align:"center"});
+
+      doc.save(`myhealth-report-${profile.full_name?.replace(/\s/g,"-")}-${today()}.pdf`);
+    }catch(e){alert("PDF export failed: "+e.message);}
+    setTimeout(()=>setExportType(null),1500);
+  }
+
+  const bestDay=rows.length?rows.reduce((b,d)=>d.habDone>b.habDone?d:b,rows[0]):null;
+  const worstDay=rows.length?rows.reduce((b,d)=>d.habDone<b.habDone?d:b,rows[0]):null;
 
   if(!profile)return(
     <div style={{background:BG,minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}>
-      <div style={{width:36,height:36,border:`3px solid ${BORDER}`,borderTopColor:P,borderRadius:"50%",animation:"spin .7s linear infinite"}}/>
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+      <div className="ht-spinner"/>
     </div>
   );
 
   return(
     <>
-      <Head><title>Reports — Health Tracker</title></Head>
+      <Head><title>Reports — MyHealth</title></Head>
       <style>{`
         .card{background:${CARD};border-radius:13px;border:1px solid ${BORDER};padding:14px;margin-bottom:12px}
         .ctitle{font-size:11px;font-weight:700;color:${TXT2};text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px}
@@ -122,32 +430,45 @@ export default function Reports(){
         .ksub{font-size:10px;color:${TXT3};margin-top:2px}
         .insight{display:flex;align-items:flex-start;gap:10px;padding:11px 13px;border-radius:10px;margin-bottom:8px;font-size:12px}
         .twrap{overflow-x:auto;border-radius:12px;border:1px solid ${BORDER};margin-bottom:12px}
-        table{width:100%;border-collapse:collapse;font-size:11px;min-width:500px}
-        th{padding:9px 12px;text-align:left;color:${TXT2};font-size:10px;text-transform:uppercase;letter-spacing:.04em;background:#faf9fd;border-bottom:1px solid ${BORDER};white-space:nowrap}
-        td{padding:9px 12px;border-bottom:1px solid ${BORDER};white-space:nowrap}
+        table{width:100%;border-collapse:collapse;font-size:11px;min-width:560px}
+        th{padding:9px 10px;text-align:left;color:${TXT2};font-size:10px;text-transform:uppercase;letter-spacing:.04em;background:#faf9fd;border-bottom:1px solid ${BORDER};white-space:nowrap}
+        td{padding:8px 10px;border-bottom:1px solid ${BORDER};white-space:nowrap}
         tr:last-child td{border-bottom:none}
         tr:nth-child(even) td{background:#fafafa}
         .prow{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid ${BORDER};font-size:12px}
         .prow:last-child{border-bottom:none}
-        .compliance-bar{height:8px;background:${BORDER};border-radius:4px;overflow:hidden;margin-top:6px}
+        .compliance-bar{height:7px;background:${BORDER};border-radius:4px;overflow:hidden;margin-top:5px}
         .compliance-fill{height:100%;border-radius:4px;transition:width .5s}
-        .btn-export{display:flex;align-items:center;gap:8px;padding:11px 20px;background:${P};color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .2s}
-        .btn-export:hover{background:#5a3a53}
-        .btn-export:disabled{background:#b8a0b0;cursor:not-allowed}
-        @media(max-width:480px){.kgrid{grid-template-columns:1fr}}
+        .export-row{display:flex;gap:8px;flex-wrap:wrap}
+        .btn-export{display:flex;align-items:center;gap:7px;padding:10px 18px;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .2s}
+        .btn-export:disabled{opacity:.6;cursor:not-allowed}
+        .charts-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:12px}
+        @media(max-width:520px){.kgrid,.charts-grid{grid-template-columns:1fr}}
       `}</style>
 
       <Layout title="Reports" profile={profile}>
 
-        {/* HEADER ROW */}
+        {/* HEADER */}
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20,flexWrap:"wrap",gap:10}}>
           <div>
             <div style={{fontSize:20,fontWeight:700,marginBottom:2}}>Reports</div>
-            <div style={{fontSize:12,color:TXT2}}>Download and review your health data</div>
+            <div style={{fontSize:12,color:TXT2}}>Analyse and export your health data</div>
           </div>
-          <button className="btn-export" onClick={exportCSV} disabled={exporting||!rows.length}>
-            {exporting?"Downloading…":"⬇ Export CSV"}
-          </button>
+          {/* 3 EXPORT BUTTONS */}
+          <div className="export-row">
+            <button className="btn-export" disabled={!rows.length||exportType==="csv"}
+              style={{background:"#16a34a",color:"#fff"}} onClick={exportCSV}>
+              {exportType==="csv"?"Downloading…":"📄 CSV"}
+            </button>
+            <button className="btn-export" disabled={!rows.length||exportType==="excel"}
+              style={{background:"#1d4ed8",color:"#fff"}} onClick={exportExcel}>
+              {exportType==="excel"?"Creating…":"📊 Excel"}
+            </button>
+            <button className="btn-export" disabled={!rows.length||exportType==="pdf"}
+              style={{background:P,color:"#fff"}} onClick={exportPDF}>
+              {exportType==="pdf"?"Generating…":"📑 PDF Report"}
+            </button>
+          </div>
         </div>
 
         {/* PRESETS */}
@@ -187,7 +508,7 @@ export default function Reports(){
 
         {!loading&&rows.length>0&&<>
 
-          {/* SUMMARY KPIS */}
+          {/* SUMMARY KPIs */}
           <div className="kgrid">
             <div className="kcard">
               <div className="kval" style={{color:P}}>{n}</div>
@@ -200,9 +521,9 @@ export default function Reports(){
               <div className="ksub">Target: {waterTarget}L</div>
             </div>
             <div className="kcard">
-              <div className="kval" style={{color:G}}>{avg("habDone")}/5</div>
-              <div className="klbl">Avg habits / day</div>
-              <div className="ksub">{Math.round((+avg("habDone")/5)*100)}% compliance</div>
+              <div className="kval" style={{color:G}}>{avg("calories")} kcal</div>
+              <div className="klbl">Avg calories / day</div>
+              <div className="ksub">Target: {calTarget} kcal</div>
             </div>
             <div className="kcard">
               <div className="kval" style={{color:A}}>{avg("walkTotal")} min</div>
@@ -223,9 +544,55 @@ export default function Reports(){
             )}
           </div>
 
-          {/* GOAL COMPLIANCE */}
+          {/* COMPLIANCE RINGS */}
           <div className="card">
-            <div className="ctitle">Goal compliance</div>
+            <div className="ctitle">Compliance overview</div>
+            <div style={{display:"flex",justifyContent:"space-around",flexWrap:"wrap",gap:12}}>
+              <ComplianceRing pct={waterComp} color="#38bdf8" label="Water" sub={`${daysAtWaterTarget}/${n} days`}/>
+              <ComplianceRing pct={habComp}  color={P}       label="Habits" sub={`${daysFullHabits}/${n} days`}/>
+              <ComplianceRing pct={mealComp} color={G}       label="Meals"  sub={`4+ meals`}/>
+              <ComplianceRing pct={walkComp} color={A}       label="Walks"  sub={`30+ min`}/>
+            </div>
+          </div>
+
+          {/* CHARTS */}
+          <div className="charts-grid">
+            <div className="card">
+              <MiniBarChart data={calChart} color="#7F77DD" label="Calories eaten (kcal)" maxVal={calTarget*1.3}/>
+            </div>
+            <div className="card">
+              <MiniBarChart data={waterChart} color="#38bdf8" label="Water (L)" maxVal={waterTarget*1.3}/>
+            </div>
+            <div className="card">
+              <MiniBarChart data={walkChart} color={G} label="Total walk (min)" maxVal={90}/>
+            </div>
+            {weightChart.length>1&&(
+              <div className="card">
+                <MiniBarChart data={weightChart} color={P} label="Weight trend (kg)" maxVal={Math.max(...weightChart.map(d=>d.v))*1.05}/>
+              </div>
+            )}
+          </div>
+
+          {/* TOP FOODS */}
+          {topFoods.length>0&&(
+            <div className="card">
+              <div className="ctitle">Most eaten foods this period</div>
+              {topFoods.map(([name,count],i)=>(
+                <div key={name} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:i<topFoods.length-1?`1px solid ${BORDER}`:"none"}}>
+                  <div style={{width:22,height:22,borderRadius:"50%",background:PL,color:P,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,flexShrink:0}}>{i+1}</div>
+                  <span style={{flex:1,fontSize:12,color:TXT}}>{name}</span>
+                  <span style={{fontSize:12,fontWeight:700,color:G}}>{count}×</span>
+                  <div style={{width:60,height:6,background:BORDER,borderRadius:3,overflow:"hidden"}}>
+                    <div style={{height:"100%",background:G,borderRadius:3,width:`${Math.round((count/topFoods[0][1])*100)}%`}}/>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* GOAL COMPLIANCE BARS */}
+          <div className="card">
+            <div className="ctitle">Goal compliance breakdown</div>
             {[
               {l:"Water target met",v:daysAtWaterTarget,color:"#38bdf8"},
               {l:"All 5 habits completed",v:daysFullHabits,color:P},
@@ -257,39 +624,16 @@ export default function Reports(){
             </div>}
             {worstDay&&worstDay.date!==bestDay?.date&&<div className="insight" style={{background:AL,border:`1px solid ${A}`}}>
               <span style={{fontSize:20}}>⚠️</span>
-              <div><b style={{color:A}}>Needs improvement:</b> {new Date(worstDay.date).toLocaleDateString("en-IN",{day:"numeric",month:"short"})} — {worstDay.habDone}/5 habits only</div>
+              <div><b style={{color:A}}>Needs improvement:</b> {new Date(worstDay.date).toLocaleDateString("en-IN",{day:"numeric",month:"short"})} — only {worstDay.habDone}/5 habits</div>
             </div>}
-            {bestWater&&<div className="insight" style={{background:"rgba(56,189,248,0.08)",border:"1px solid #38bdf8"}}>
-              <span style={{fontSize:20}}>💧</span>
-              <div><b style={{color:"#0284c7"}}>Best hydration:</b> {new Date(bestWater.date).toLocaleDateString("en-IN",{day:"numeric",month:"short"})} — {bestWater.water}L</div>
+            {avg("calories")>0&&+avg("calories")<calTarget*0.7&&<div className="insight" style={{background:"#fff0f0",border:`1px solid ${R}`}}>
+              <span style={{fontSize:20}}>🍽️</span>
+              <div><b style={{color:R}}>Low intake alert:</b> Your average calorie intake ({avg("calories")} kcal) is below 70% of your target. Ensure you're logging all meals.</div>
             </div>}
             {daysAtWaterTarget<n*0.5&&<div className="insight" style={{background:"#fff0f0",border:`1px solid ${R}`}}>
-              <span style={{fontSize:20}}>🚨</span>
-              <div><b style={{color:R}}>Water alert:</b> You met your {waterTarget}L water target on only {daysAtWaterTarget} of {n} days. Try keeping a bottle at your desk.</div>
+              <span style={{fontSize:20}}>💧</span>
+              <div><b style={{color:R}}>Water alert:</b> You met your {waterTarget}L target on only {daysAtWaterTarget} of {n} days.</div>
             </div>}
-            {avg("walkTotal")<30&&<div className="insight" style={{background:AL,border:`1px solid ${A}`}}>
-              <span style={{fontSize:20}}>🚶</span>
-              <div><b style={{color:A}}>Walk reminder:</b> Average walk is {avg("walkTotal")} min/day. Post-meal walks reduce blood sugar significantly — aim for 15 min after lunch.</div>
-            </div>}
-          </div>
-
-          {/* AVERAGES TABLE */}
-          <div className="card">
-            <div className="ctitle">Period averages vs targets</div>
-            {[
-              {l:"Water",avg:`${avg("water")}L`,target:`${waterTarget}L`,met:+avg("water")>=waterTarget},
-              {l:"Habits",avg:`${avg("habDone")}/5`,target:"5/5",met:+avg("habDone")>=4},
-              {l:"Morning walk",avg:`${avg("morning_walk")} min`,target:"40 min",met:+avg("morning_walk")>=35},
-              {l:"Total walk",avg:`${avg("walkTotal")} min`,target:"75 min",met:+avg("walkTotal")>=65},
-              {l:"Meals logged",avg:`${avg("mealsDone")}/6`,target:"6/6",met:+avg("mealsDone")>=5},
-            ].map((r,i)=>(
-              <div key={i} className="prow">
-                <span style={{color:TXT2,flex:1}}>{r.l}</span>
-                <span style={{fontWeight:600,color:TXT,marginRight:16}}>{r.avg}</span>
-                <span style={{color:TXT3,marginRight:12,fontSize:11}}>target: {r.target}</span>
-                <span style={{fontSize:14}}>{r.met?"✅":"⚠️"}</span>
-              </div>
-            ))}
           </div>
 
           {/* DAILY LOG TABLE */}
@@ -300,10 +644,10 @@ export default function Reports(){
                 <tr>
                   <th>Date</th>
                   <th>Meals</th>
+                  <th>Calories</th>
+                  <th>Protein</th>
                   <th>Water</th>
-                  <th>Morning walk</th>
-                  <th>Post-lunch</th>
-                  <th>Post-dinner</th>
+                  <th>Walk</th>
                   <th>Habits</th>
                   <th>Weight</th>
                 </tr>
@@ -312,23 +656,29 @@ export default function Reports(){
                 {rows.map((r,i)=>(
                   <tr key={i}>
                     <td style={{fontWeight:500}}>{new Date(r.date).toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short"})}</td>
-                    <td><span className="ht-badge" style={{background:r.mealsDone>=5?GL:"#faf9fd",color:r.mealsDone>=5?G:TXT2}}>{r.mealsDone}/6</span></td>
+                    <td><span className="ht-badge" style={{background:r.mealsDone>=5?GL:"#faf9fd",color:r.mealsDone>=5?G:TXT2,padding:"2px 8px",borderRadius:20,fontSize:10}}>{r.mealsDone}/6</span></td>
+                    <td style={{color:r.calories>0?TXT:TXT3}}>{r.calories>0?r.calories+" kcal":"—"}</td>
+                    <td style={{color:r.protein>0?G:TXT3}}>{r.protein>0?r.protein+"g":"—"}</td>
                     <td style={{color:r.water>=waterTarget?G:r.water>0?A:TXT3,fontWeight:600}}>{r.water}L</td>
-                    <td style={{color:r.morning_walk>=35?G:r.morning_walk>0?A:TXT3}}>{r.morning_walk}m</td>
-                    <td style={{color:r.post_lunch_walk>=15?G:r.post_lunch_walk>0?A:TXT3}}>{r.post_lunch_walk}m</td>
-                    <td style={{color:r.post_dinner_walk>=20?G:r.post_dinner_walk>0?A:TXT3}}>{r.post_dinner_walk}m</td>
-                    <td><span className="ht-badge" style={{background:r.habDone>=4?GL:r.habDone>=3?AL:"#faf9fd",color:r.habDone>=4?G:r.habDone>=3?A:TXT2}}>{r.habDone}/5</span></td>
-                    <td style={{color:TXT,fontWeight:r.weight?500:300}}>{r.weight?`${r.weight}kg`:"—"}</td>
+                    <td style={{color:r.walkTotal>=30?G:r.walkTotal>0?A:TXT3}}>{r.walkTotal}m</td>
+                    <td><span className="ht-badge" style={{background:r.habDone>=4?GL:r.habDone>=3?AL:"#faf9fd",color:r.habDone>=4?G:r.habDone>=3?A:TXT2,padding:"2px 8px",borderRadius:20,fontSize:10}}>{r.habDone}/5</span></td>
+                    <td style={{fontWeight:r.weight?500:300,color:r.weight?TXT:TXT3}}>{r.weight?`${r.weight}kg`:"—"}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
 
-          {/* EXPORT BOTTOM */}
-          <div style={{display:"flex",justifyContent:"center",marginTop:8}}>
-            <button className="btn-export" onClick={exportCSV} disabled={exporting}>
-              {exporting?"Downloading…":"⬇ Export full report as CSV"}
+          {/* EXPORT ROW BOTTOM */}
+          <div className="export-row" style={{justifyContent:"center",marginTop:8,marginBottom:16}}>
+            <button className="btn-export" disabled={exportType==="csv"} style={{background:"#16a34a",color:"#fff"}} onClick={exportCSV}>
+              {exportType==="csv"?"Downloading…":"📄 Download CSV"}
+            </button>
+            <button className="btn-export" disabled={exportType==="excel"} style={{background:"#1d4ed8",color:"#fff"}} onClick={exportExcel}>
+              {exportType==="excel"?"Creating…":"📊 Download Excel"}
+            </button>
+            <button className="btn-export" disabled={exportType==="pdf"} style={{background:P,color:"#fff"}} onClick={exportPDF}>
+              {exportType==="pdf"?"Generating…":"📑 Download PDF Report"}
             </button>
           </div>
 
