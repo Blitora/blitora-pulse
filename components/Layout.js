@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 
 const P = "#714B67", PL = "#f3eef1", PS = "#5a3a53";
 const BORDER = "#e5e3ee", TXT = "#2c1a3a", TXT2 = "#888", TXT3 = "#bbb", CARD = "#fff", BG = "#f0f0f7";
+const G = "#1D9E75";
 
 const USER_NAV = [
   { label: "Home",     icon: "🏠",  href: "/dashboard" },
@@ -19,6 +20,78 @@ const ADMIN_NAV = [
   { label: "Reports", icon: "📋",  href: "/reports"   },
   { label: "Profile", icon: "👤",  href: "/profile"   },
 ];
+
+// ─── NEW LOGO COMPONENT ───────────────────────────────────────────────────────
+// Replaces the old "H" purple square everywhere in the app
+function MyHealthLogo({ size = "md", showText = true }) {
+  const d  = size === "sm" ? 30 : size === "lg" ? 46 : 36;
+  const ts = size === "sm" ? 13 : size === "lg" ? 20 : 15;
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: size === "sm" ? 7 : 9, flexShrink: 0 }}>
+      {/* Icon — purple bg, white ring, green arc + checkmark, MH text */}
+      <div style={{
+        width: d, height: d,
+        borderRadius: Math.round(d * 0.24),
+        background: `linear-gradient(140deg, #8B3F7A 0%, #5A1648 100%)`,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        flexShrink: 0, position: "relative", overflow: "hidden",
+        boxShadow: "0 2px 8px rgba(113,75,103,0.30)",
+      }}>
+        {/* Ring SVG */}
+        <svg width={d} height={d} style={{ position: "absolute", inset: 0 }} viewBox="0 0 36 36">
+          {/* White arc — left + bottom ~265° */}
+          <circle cx="18" cy="18" r="12.5"
+            fill="none" stroke="rgba(255,255,255,0.82)" strokeWidth="2.8"
+            strokeDasharray="52 79" strokeLinecap="round"
+            style={{ transform: "rotate(-195deg)", transformOrigin: "18px 18px" }}
+          />
+          {/* Green arc — top right ~90° */}
+          <circle cx="18" cy="18" r="12.5"
+            fill="none" stroke="#1D9E75" strokeWidth="2.8"
+            strokeDasharray="22 79" strokeLinecap="round"
+            style={{ transform: "rotate(105deg)", transformOrigin: "18px 18px" }}
+          />
+          {/* Green checkmark circle — bottom right */}
+          <circle cx="27.5" cy="26.5" r="5" fill="#1D9E75" />
+          <path d="M25 26.5 L26.8 28.4 L30 25"
+            fill="none" stroke="white" strokeWidth="1.4"
+            strokeLinecap="round" strokeLinejoin="round"
+          />
+        </svg>
+        {/* MH letters */}
+        <span style={{
+          fontSize: Math.round(d * 0.33),
+          fontWeight: 800,
+          color: "#fff",
+          letterSpacing: "-0.5px",
+          lineHeight: 1,
+          zIndex: 1,
+          fontFamily: "-apple-system, 'Segoe UI', Arial, sans-serif",
+          marginBottom: Math.round(d * 0.03),
+        }}>MH</span>
+      </div>
+
+      {/* Brand name */}
+      {showText && (
+        <div>
+          <div style={{
+            fontSize: ts, fontWeight: 800, lineHeight: 1.1, letterSpacing: "-0.3px",
+            fontFamily: "-apple-system, 'Segoe UI', Arial, sans-serif",
+          }}>
+            <span style={{ color: P }}>My</span>
+            <span style={{ color: G }}>Health</span>
+          </div>
+          {size === "lg" && (
+            <div style={{ fontSize: 9, color: TXT3, fontWeight: 600, letterSpacing: ".07em", textTransform: "uppercase", marginTop: 2 }}>
+              Health Tracker
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function Layout({ children, title = "Health Tracker", profile }) {
   const router = useRouter();
@@ -87,15 +160,14 @@ export default function Layout({ children, title = "Health Tracker", profile }) 
             display: "flex", flexDirection: "column",
             zIndex: 30,
           }}>
-            {/* Logo */}
+            {/* ── NEW LOGO in sidebar ── */}
             <div style={{ padding: "16px 20px 14px", borderBottom: `1px solid ${BORDER}` }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div style={{ width: 34, height: 34, background: P, borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700, fontSize: 15, flexShrink: 0 }}>H</div>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: P, lineHeight: 1.2 }}>Health Tracker</div>
-                  <div style={{ fontSize: 10, color: TXT2 }}>{profile?.full_name || ""}</div>
+              <MyHealthLogo size="md" showText={true} />
+              {profile?.full_name && (
+                <div style={{ fontSize: 10, color: TXT2, marginTop: 8, paddingLeft: 2 }}>
+                  {profile.full_name}
                 </div>
-              </div>
+              )}
             </div>
 
             {/* Nav items */}
@@ -114,24 +186,28 @@ export default function Layout({ children, title = "Health Tracker", profile }) 
         {/* ── MAIN AREA ── */}
         <div style={{ flex: 1, marginLeft: isDesktop ? 210 : 0, display: "flex", flexDirection: "column", minHeight: "100vh" }}>
 
-          {/* Top bar */}
+          {/* ── TOP BAR ── */}
           <div style={{
             background: CARD, borderBottom: `1px solid ${BORDER}`,
             padding: "0 16px", height: 52,
             display: "flex", alignItems: "center", gap: 10,
             position: "sticky", top: 0, zIndex: 20,
           }}>
-            {!isDesktop && (
-              <div style={{ width: 32, height: 32, background: P, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700, fontSize: 14, flexShrink: 0 }}>H</div>
-            )}
-            <span style={{ fontSize: 13, fontWeight: 700, color: P }}>{isDesktop ? "" : "Health Tracker"}</span>
-            {!isDesktop && <span style={{ color: BORDER, fontSize: 18 }}>|</span>}
-            <span style={{ fontSize: 13, fontWeight: isDesktop ? 700 : 400, color: isDesktop ? TXT : TXT2 }}>{title}</span>
+            {/* ── NEW LOGO in mobile top bar ── */}
+            {!isDesktop && <MyHealthLogo size="sm" showText={true} />}
+
+            {!isDesktop && <span style={{ color: BORDER, fontSize: 18, marginLeft: 2 }}>|</span>}
+            <span style={{
+              fontSize: 13,
+              fontWeight: isDesktop ? 700 : 400,
+              color: isDesktop ? TXT : TXT2,
+            }}>{title}</span>
             <div style={{ flex: 1 }} />
+            {/* Avatar button */}
             <button onClick={() => router.push("/profile")} style={{
               width: 34, height: 34, borderRadius: "50%",
-              background: PL, border: "none", cursor: "pointer",
-              color: P, fontWeight: 700, fontSize: 13,
+              background: PL, border: `1.5px solid ${BORDER}`,
+              cursor: "pointer", color: P, fontWeight: 700, fontSize: 13,
               display: "flex", alignItems: "center", justifyContent: "center",
             }}>
               {profile?.full_name?.[0]?.toUpperCase() || "A"}
