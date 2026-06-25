@@ -297,7 +297,7 @@ export default function Reports(){
 
       // Weight change
       if(lost!==null){
-        doc.setFillColor(lost>0?234:254, lost>0:244, lost>0?246:237);
+        doc.setFillColor(lost>0?234:254, lost>0?244:240, lost>0?246:237);
         doc.roundedRect(M,y,W-M*2,14,2,2,"F");
         doc.setTextColor(lost>0?29:239, lost>0?158:100, lost>0?117:39);
         doc.setFontSize(11); doc.setFont("helvetica","bold");
