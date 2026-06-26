@@ -9,7 +9,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useRole, ROLES } from '../lib/useRole';
 
-const ROLE_HOME = {
+export const ROLE_HOME = {
   [ROLES.SUPER_ADMIN]: '/admin/orgs',
   [ROLES.ORG_ADMIN]:   '/clinic/patients',
   [ROLES.DIETITIAN]:   '/clinic/patients',
