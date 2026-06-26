@@ -1,6 +1,7 @@
 // pages/auth/forgot-password.js — NEW FILE
 import { useState } from 'react';
-import { supabase } from '../../lib/supabase';
+import { getSupabase } from '../../lib/supabase';
+const supabase = getSupabase();
 import Link from 'next/link';
 
 export default function ForgotPasswordPage() {
