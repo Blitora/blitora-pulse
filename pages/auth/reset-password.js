@@ -2,7 +2,8 @@
 // Supabase sends user here after clicking reset link in email
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { supabase } from '../../lib/supabase';
+import { getSupabase } from '../../lib/supabase';
+const supabase = getSupabase();
 import PasswordInput from '../../components/PasswordInput';
 
 export default function ResetPasswordPage() {
