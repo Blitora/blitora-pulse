@@ -6,7 +6,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '../../components/Layout';
 import RoleGuard from '../../components/RoleGuard';
-import { supabase } from '../../lib/supabase';
+import { getSupabase } from '../../lib/supabase';
+const supabase = getSupabase();
 import { useRole } from '../../lib/useRole';
 
 export default function PatientsPage() {
