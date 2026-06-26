@@ -1,7 +1,8 @@
 // pages/profile/security.js — NEW FILE
 // Change password while logged in
 import { useState } from 'react';
-import { supabase } from '../../lib/supabase';
+import { getSupabase } from '../../lib/supabase';
+const supabase = getSupabase();
 import Layout from '../../components/Layout';
 import PasswordInput from '../../components/PasswordInput';
 
