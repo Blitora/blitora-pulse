@@ -3,7 +3,8 @@
 // Step 3 health profile (individual) or clinic details (clinic)
 import { useState } from 'react';
 import { useRouter } from 'next/router';
-import { supabase } from '../lib/supabase';
+import { getSupabase } from '../lib/supabase';
+const supabase = getSupabase();
 import PasswordInput from '../components/PasswordInput';
 import Link from 'next/link';
 
