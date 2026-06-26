@@ -4,7 +4,8 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { supabase } from '../../lib/supabase';
+import { getSupabase } from '../../lib/supabase';
+const supabase = getSupabase();
 import { useRole, ROLES } from '../../lib/useRole';
 
 export default function OrgSetupPage() {
