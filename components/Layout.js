@@ -5,7 +5,8 @@
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { useRole, ROLES, isClinicRole } from '../lib/useRole';
-import { supabase } from '../lib/supabase';
+import { getSupabase } from '../lib/supabase';
+const supabase = getSupabase();
 
 // ── NAV CONFIGS ───────────────────────────────────────────────
 const PATIENT_NAV = [
