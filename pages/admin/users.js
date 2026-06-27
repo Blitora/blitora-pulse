@@ -17,49 +17,45 @@ export default function AdminUsersPage() {
 
 function AdminUsersView() {
   const router = useRouter();
-  const [users,   setUsers]   = useState([]);
-  const [members, setMembers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [search,  setSearch]  = useState('');
-  const [filter,  setFilter]  = useState('all');
-  const [action,  setAction]  = useState(null);
+  const [users,      setUsers]      = useState([]);
+  const [members,    setMembers]    = useState([]);
+  const [templates,  setTemplates]  = useState([]);
+  const [orgs,       setOrgs]       = useState([]);
+  const [loading,    setLoading]    = useState(true);
+  const [search,     setSearch]     = useState('');
+  const [filter,     setFilter]     = useState('all');
+  const [action,     setAction]     = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState('');
 
-  useEffect(() => { loadUsers(); }, [router.query.org]);
+  useEffect(() => { loadAll(); }, [router.query.org]);
 
-  async function loadUsers() {
+  async function loadAll() {
     setLoading(true);
     const supabase = getSupabase();
     const orgId = router.query.org;
 
-    // Load profiles
-    let profileQuery = supabase
-      .from('profiles')
-      .select('id, full_name, email, role, status, status_reason, created_at')
-      .order('created_at', { ascending: false });
-
-    // Load org memberships separately
-    let memberQuery = supabase
-      .from('organisation_members')
-      .select('user_id, role, org_id, organisations(id, name)')
-      .eq('is_active', true);
-
-    if (orgId) memberQuery = memberQuery.eq('org_id', orgId);
-
-    const [{ data: profileData }, { data: memberData }] = await Promise.all([
-      profileQuery,
-      memberQuery,
+    const [
+      { data: profileData },
+      { data: memberData },
+      { data: templateData },
+      { data: orgData },
+    ] = await Promise.all([
+      supabase.from('profiles').select('*').order('created_at', { ascending: false }),
+      supabase.from('organisation_members').select('user_id, role, org_id, organisations(id, name)').eq('is_active', true),
+      supabase.from('meal_templates').select('id, name').order('name'),
+      supabase.from('organisations').select('id, name').order('name'),
     ]);
 
-    // If filtering by org, only show users in that org
+    let filteredProfiles = profileData || [];
     if (orgId) {
-      const orgUserIds = new Set((memberData || []).map(m => m.user_id));
-      setUsers((profileData || []).filter(p => orgUserIds.has(p.id)));
-    } else {
-      setUsers(profileData || []);
+      const orgUserIds = new Set((memberData || []).filter(m => m.org_id === orgId).map(m => m.user_id));
+      filteredProfiles = filteredProfiles.filter(p => orgUserIds.has(p.id));
     }
 
+    setUsers(filteredProfiles);
     setMembers(memberData || []);
+    setTemplates(templateData || []);
+    setOrgs(orgData || []);
     setLoading(false);
   }
 
@@ -67,51 +63,74 @@ function AdminUsersView() {
     return members.find(m => m.user_id === userId);
   }
 
+  async function saveUserEdit(user, form) {
+    const supabase = getSupabase();
+    // Update profile
+    await supabase.from('profiles').update({
+      full_name:          form.full_name,
+      active_template_id: form.active_template_id || null,
+    }).eq('id', user.id);
+
+    // Update org membership role if changed
+    const mem = getMember(user.id);
+    if (mem && form.member_role && form.member_role !== mem.role) {
+      await supabase.from('organisation_members')
+        .update({ role: form.member_role })
+        .eq('user_id', user.id)
+        .eq('org_id', mem.org_id);
+    }
+
+    await supabase.from('audit_log').insert({
+      action: 'edit_user', target_type: 'user', target_id: user.id,
+      metadata: { changes: form },
+    }).catch(() => {});
+
+    setAction(null);
+    loadAll();
+  }
+
   async function suspendUser(user, reason) {
     const supabase = getSupabase();
     await supabase.from('profiles').update({ status: 'suspended', status_reason: reason }).eq('id', user.id);
-    await supabase.from('user_status_log').insert({ user_id: user.id, status: 'suspended', reason }).catch(()=>{});
-    await supabase.from('audit_log').insert({ action: 'suspend_user', target_type: 'user', target_id: user.id, metadata: { reason } }).catch(()=>{});
+    await supabase.from('user_status_log').insert({ user_id: user.id, status: 'suspended', reason }).catch(() => {});
+    await supabase.from('audit_log').insert({ action: 'suspend_user', target_type: 'user', target_id: user.id, metadata: { reason } }).catch(() => {});
     setAction(null);
-    loadUsers();
+    loadAll();
   }
 
   async function reinstateUser(user) {
     const supabase = getSupabase();
     await supabase.from('profiles').update({ status: 'active', status_reason: null }).eq('id', user.id);
-    await supabase.from('user_status_log').insert({ user_id: user.id, status: 'active', reason: 'Reinstated by super admin' }).catch(()=>{});
-    await supabase.from('audit_log').insert({ action: 'reinstate_user', target_type: 'user', target_id: user.id }).catch(()=>{});
-    loadUsers();
+    await supabase.from('user_status_log').insert({ user_id: user.id, status: 'active', reason: 'Reinstated by super admin' }).catch(() => {});
+    await supabase.from('audit_log').insert({ action: 'reinstate_user', target_type: 'user', target_id: user.id }).catch(() => {});
+    loadAll();
   }
 
   async function softDeleteUser(user) {
     const supabase = getSupabase();
     await supabase.from('profiles').update({ status: 'soft_deleted', deleted_at: new Date().toISOString() }).eq('id', user.id);
-    await supabase.from('user_status_log').insert({ user_id: user.id, status: 'soft_deleted', reason: 'Deleted by super admin' }).catch(()=>{});
-    await supabase.from('audit_log').insert({ action: 'soft_delete_user', target_type: 'user', target_id: user.id }).catch(()=>{});
+    await supabase.from('user_status_log').insert({ user_id: user.id, status: 'soft_deleted', reason: 'Deleted by super admin' }).catch(() => {});
+    await supabase.from('audit_log').insert({ action: 'soft_delete_user', target_type: 'user', target_id: user.id }).catch(() => {});
     await supabase.from('organisation_members').update({ is_active: false }).eq('user_id', user.id);
     setAction(null);
-    loadUsers();
+    loadAll();
   }
 
   async function exportUserData(user) {
     const supabase = getSupabase();
-    const [{ data: logs }] = await Promise.all([
-      supabase.from('health_logs').select('*').eq('user_id', user.id).order('log_date'),
-    ]);
+    const { data: logs } = await supabase.from('health_logs').select('*').eq('user_id', user.id).order('log_date');
     const logHeaders = 'date,calories,protein,carbs,fat,water,weight';
     const logRows = (logs || []).map(l =>
       `${l.log_date||l.date||''},${l.total_calories||0},${l.total_protein||0},${l.total_carbs||0},${l.total_fat||0},${l.water||0},${l.weight||''}`
     );
-    const csvContent = logHeaders + '\n' + logRows.join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const blob = new Blob([logHeaders + '\n' + logRows.join('\n')], { type: 'text/csv' });
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
     a.href = url;
     a.download = `vitalog-export-${user.email}-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-    await supabase.from('audit_log').insert({ action: 'export_user_data', target_type: 'user', target_id: user.id }).catch(()=>{});
+    await supabase.from('audit_log').insert({ action: 'export_user_data', target_type: 'user', target_id: user.id }).catch(() => {});
     setAction(null);
   }
 
@@ -138,12 +157,7 @@ function AdminUsersView() {
       </div>
 
       <div style={s.filterRow}>
-        <input
-          style={s.search}
-          placeholder="Search name or email..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-        />
+        <input style={s.search} placeholder="Search name or email..." value={search} onChange={e => setSearch(e.target.value)} />
         <div style={s.chips}>
           {['all','active','suspended','soft_deleted'].map(f => (
             <button key={f} style={{ ...s.chip, ...(filter===f ? s.chipOn : {}) }} onClick={() => setFilter(f)}>
@@ -161,17 +175,18 @@ function AdminUsersView() {
             <div style={{ ...s.th, flex:2 }}>User</div>
             <div style={s.th}>Role</div>
             <div style={s.th}>Organisation</div>
-            <div style={s.th}>Joined</div>
+            <div style={s.th}>Template</div>
             <div style={s.th}>Status</div>
             <div style={s.th}>Actions</div>
           </div>
           {filtered.length === 0 ? (
             <div style={{ padding:'40px', textAlign:'center', color:'#6B7280', fontSize:'0.8rem' }}>No users found</div>
           ) : filtered.map((u, i) => {
-            const mem     = getMember(u.id);
-            const orgName = mem?.organisations?.name || '—';
-            const role    = mem?.role || u.role || '—';
-            const status  = u.status || 'active';
+            const mem      = getMember(u.id);
+            const orgName  = mem?.organisations?.name || '—';
+            const role     = mem?.role || u.role || '—';
+            const status   = u.status || 'active';
+            const tmpl     = templates.find(t => t.id === u.active_template_id);
             const initials = (u.full_name || u.email || '?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
 
             return (
@@ -185,19 +200,25 @@ function AdminUsersView() {
                 </div>
                 <div style={s.td}><RoleBadge role={role} /></div>
                 <div style={s.td}><span style={{ fontSize:'0.72rem', color:'#374151' }}>{orgName}</span></div>
-                <div style={s.td}><span style={{ fontSize:'0.68rem', color:'#6B7280' }}>{new Date(u.created_at).toLocaleDateString()}</span></div>
+                <div style={s.td}><span style={{ fontSize:'0.68rem', color: tmpl ? '#714B67' : '#9CA3AF' }}>{tmpl?.name || 'Not assigned'}</span></div>
                 <div style={s.td}><StatusBadge status={status} /></div>
                 <div style={s.td}>
                   <div style={s.actionBtns}>
-                    <button style={s.actBtn} onClick={() => setAction({ type:'export', user: u })}>Export</button>
+                    <button style={{ ...s.actBtn, color:'#6366F1', borderColor:'#C7D2FE' }}
+                      onClick={() => setAction({ type:'edit', user: u, mem })}>Edit</button>
+                    <button style={s.actBtn}
+                      onClick={() => setAction({ type:'export', user: u })}>Export</button>
                     {status === 'active' && (
-                      <button style={{ ...s.actBtn, color:'#F59E0B' }} onClick={() => setAction({ type:'suspend', user: u })}>Suspend</button>
+                      <button style={{ ...s.actBtn, color:'#F59E0B' }}
+                        onClick={() => setAction({ type:'suspend', user: u })}>Suspend</button>
                     )}
                     {status === 'suspended' && (
-                      <button style={{ ...s.actBtn, color:'#10B981' }} onClick={() => reinstateUser(u)}>Reinstate</button>
+                      <button style={{ ...s.actBtn, color:'#10B981' }}
+                        onClick={() => reinstateUser(u)}>Reinstate</button>
                     )}
                     {status !== 'soft_deleted' && (
-                      <button style={{ ...s.actBtn, color:'#EF4444' }} onClick={() => setAction({ type:'delete', user: u })}>Delete</button>
+                      <button style={{ ...s.actBtn, color:'#EF4444' }}
+                        onClick={() => setAction({ type:'delete', user: u })}>Delete</button>
                     )}
                   </div>
                 </div>
@@ -207,6 +228,19 @@ function AdminUsersView() {
         </div>
       )}
 
+      {/* EDIT MODAL */}
+      {action?.type === 'edit' && (
+        <EditUserModal
+          user={action.user}
+          mem={action.mem}
+          templates={templates}
+          orgs={orgs}
+          onClose={() => setAction(null)}
+          onSave={form => saveUserEdit(action.user, form)}
+        />
+      )}
+
+      {/* SUSPEND MODAL */}
       {action?.type === 'suspend' && (
         <SuspendModal
           title={`Suspend — ${action.user.full_name || action.user.email}`}
@@ -216,6 +250,7 @@ function AdminUsersView() {
         />
       )}
 
+      {/* EXPORT MODAL */}
       {action?.type === 'export' && (
         <Modal title={`Export Data — ${action.user.full_name || action.user.email}`} onClose={() => setAction(null)}>
           <p style={s.modalSub}>This will download a CSV of all health logs for this user.</p>
@@ -223,28 +258,100 @@ function AdminUsersView() {
         </Modal>
       )}
 
+      {/* DELETE MODAL */}
       {action?.type === 'delete' && (
         <Modal title={`Delete — ${action.user.full_name || action.user.email}`} onClose={() => { setAction(null); setDeleteConfirm(''); }}>
           <p style={s.modalSub}>Soft-delete: data retained 90 days then purged. User cannot log in.</p>
           <div style={{ background:'#FEF2F2', border:'1px solid #FECACA', borderRadius:10, padding:'10px 12px', fontSize:'0.72rem', color:'#991B1B', marginBottom:14 }}>
             ⚠️ Type <strong>DELETE</strong> below to confirm
           </div>
-          <input
-            style={s.confirmInput}
-            value={deleteConfirm}
-            onChange={e => setDeleteConfirm(e.target.value)}
-            placeholder="Type DELETE to confirm"
-          />
+          <input style={s.confirmInput} value={deleteConfirm} onChange={e => setDeleteConfirm(e.target.value)} placeholder="Type DELETE to confirm" />
           <div style={{ display:'flex', gap:8, marginTop:8 }}>
             <button style={s.cancelBtn} onClick={() => { setAction(null); setDeleteConfirm(''); }}>Cancel</button>
-            <button
-              style={{ ...s.dangerBtn, opacity: deleteConfirm === 'DELETE' ? 1 : 0.4 }}
-              disabled={deleteConfirm !== 'DELETE'}
-              onClick={() => softDeleteUser(action.user)}
-            >Confirm Delete</button>
+            <button style={{ ...s.dangerBtn, opacity: deleteConfirm === 'DELETE' ? 1 : 0.4 }}
+              disabled={deleteConfirm !== 'DELETE'} onClick={() => softDeleteUser(action.user)}>
+              Confirm Delete
+            </button>
           </div>
         </Modal>
       )}
+    </div>
+  );
+}
+
+function EditUserModal({ user, mem, templates, orgs, onClose, onSave }) {
+  const [form, setForm] = useState({
+    full_name:          user.full_name || '',
+    active_template_id: user.active_template_id || '',
+    member_role:        mem?.role || 'patient',
+  });
+  const [saving, setSaving] = useState(false);
+
+  async function handleSave() {
+    setSaving(true);
+    await onSave(form);
+    setSaving(false);
+  }
+
+  const fieldStyle = {
+    width:'100%', padding:'9px 12px', border:'1.5px solid #E5E7EB',
+    borderRadius:10, fontSize:'0.8rem', fontFamily:'Inter,sans-serif',
+    outline:'none', color:'#111827', boxSizing:'border-box', background:'#fff',
+  };
+  const lblStyle = {
+    display:'block', fontSize:'0.7rem', fontWeight:600, color:'#374151', marginBottom:5,
+  };
+
+  return (
+    <div style={s.overlay}>
+      <div style={{ ...s.modal, maxWidth:480 }}>
+        <div style={s.modalHeader}>
+          <span style={s.modalTitle}>Edit User</span>
+          <button style={s.modalClose} onClick={onClose}>✕</button>
+        </div>
+
+        {/* Read-only info */}
+        <div style={{ background:'#F9FAFB', borderRadius:10, padding:'10px 12px', marginBottom:16, fontSize:'0.72rem', color:'#6B7280' }}>
+          <div style={{ fontWeight:600, color:'#111827', marginBottom:2 }}>{user.email}</div>
+          <div>Org: {mem?.organisations?.name || '—'} · Joined: {new Date(user.created_at).toLocaleDateString()}</div>
+        </div>
+
+        {/* Full name */}
+        <div style={{ marginBottom:14 }}>
+          <label style={lblStyle}>Full Name</label>
+          <input style={fieldStyle} value={form.full_name}
+            onChange={e => setForm(f => ({ ...f, full_name: e.target.value }))} />
+        </div>
+
+        {/* Meal template */}
+        <div style={{ marginBottom:14 }}>
+          <label style={lblStyle}>Meal Template</label>
+          <select style={fieldStyle} value={form.active_template_id}
+            onChange={e => setForm(f => ({ ...f, active_template_id: e.target.value }))}>
+            <option value="">— No template assigned —</option>
+            {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+        </div>
+
+        {/* Role in org */}
+        <div style={{ marginBottom:20 }}>
+          <label style={lblStyle}>Role in Organisation</label>
+          <select style={fieldStyle} value={form.member_role}
+            onChange={e => setForm(f => ({ ...f, member_role: e.target.value }))}>
+            <option value="patient">Patient</option>
+            <option value="dietitian">Dietitian</option>
+            <option value="org_admin">Org Admin</option>
+          </select>
+        </div>
+
+        <div style={{ display:'flex', gap:8 }}>
+          <button style={s.cancelBtn} onClick={onClose}>Cancel</button>
+          <button style={{ ...s.primaryBtn, opacity: saving ? 0.6 : 1 }}
+            disabled={saving} onClick={handleSave}>
+            {saving ? 'Saving…' : 'Save Changes'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
