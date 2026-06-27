@@ -31,9 +31,9 @@ export default function Profile(){
     async function load(){
       const sb=getSupabase();
       const{data:{session}}=await sb.auth.getSession();
-      if(!session){router.push("/login");return;}
+      if(!session){router.push("/");return;}
       const{data:p}=await sb.from("profiles").select("*").eq("id",session.user.id).single();
-      if(!p){router.push("/login");return;}
+      if(!p){router.push("/");return;}
       setProfile(p);setForm(p);
     }
     load();
@@ -73,7 +73,7 @@ export default function Profile(){
 
   async function signOut(){
     await getSupabase().auth.signOut();
-    router.push("/login");
+    router.push("/");
   }
 
   const bmi=profile?.weight_current&&profile?.height_cm?(profile.weight_current/((profile.height_cm/100)**2)).toFixed(1):null;
