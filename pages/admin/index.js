@@ -1,215 +1,140 @@
-import { useState, useEffect } from "react";
-import Head from "next/head";
-import { useRouter } from "next/router";
-import { getSupabase } from "../../lib/supabase";
-import Layout from "../../components/Layout";
+// pages/index.js — Login page with show/hide password + forgot password link
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/router';
+import { getSupabase } from '../lib/supabase';
+const supabase = getSupabase();
+import { useRole, ROLES } from '../lib/useRole';
+import { ROLE_HOME } from '../components/RoleGuard';
+import PasswordInput from '../components/PasswordInput';
 
-const P="#714B67",PL="#f3eef1",G="#1D9E75",GL="#e1f5ee",A="#EF9F27",AL="#faeeda",R="#E24B4A",RL="#fcebeb";
-const BORDER="#e5e3ee",TXT="#2c1a3a",TXT2="#888",TXT3="#bbb",BG="#f0f0f7";
-
-export default function Admin() {
+export default function IndexPage() {
   const router = useRouter();
-  const [me, setMe] = useState(null);
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [toast, setToast] = useState(null);
+  const { role, loading } = useRole();
+  const [email,      setEmail]      = useState('');
+  const [password,   setPassword]   = useState('');
+  const [error,      setError]      = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    async function init() {
-      const sb = getSupabase();
-      const { data: { session } } = await sb.auth.getSession();
-      if (!session) { router.push("/login"); return; }
-      const { data: profile } = await sb.from("profiles").select("*").eq("id", session.user.id).single();
-      if (!profile || profile.role !== "admin") { router.push("/dashboard"); return; }
-      setMe(profile);
-      loadUsers(sb);
+    if (!loading && role && role !== ROLES.UNASSIGNED) {
+      router.replace(ROLE_HOME[role] || '/dashboard');
     }
-    init();
-  }, []);
+    if (!loading && role === ROLES.UNASSIGNED) {
+      router.replace('/org/setup');
+    }
+  }, [role, loading, router]);
 
-  async function loadUsers(sb) {
-    const s = sb || getSupabase();
-    const { data } = await s.from("profiles").select("*").order("created_at", { ascending: false });
-    setUsers(data || []);
-    setLoading(false);
+  async function handleLogin(e) {
+    e.preventDefault();
+    setError('');
+    setSubmitting(true);
+    const { error: err } = await supabase.auth.signInWithPassword({ email, password });
+    if (err) { setError(err.message); setSubmitting(false); }
   }
 
-  function showToast(m) { setToast(m); setTimeout(() => setToast(null), 2000); }
-
-  async function approve(id) {
-    await getSupabase().from("profiles").update({ status: "approved" }).eq("id", id);
-    showToast("User approved ✓");
-    loadUsers();
+  async function handleGoogle() {
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: `${window.location.origin}/auth/callback` }
+    });
   }
 
-  async function block(id) {
-    await getSupabase().from("profiles").update({ status: "blocked" }).eq("id", id);
-    showToast("User blocked");
-    loadUsers();
+  if (loading || (role && role !== ROLES.UNASSIGNED)) {
+    return <div style={st.center}><Spinner /></div>;
   }
-
-  async function restore(id) {
-    await getSupabase().from("profiles").update({ status: "approved" }).eq("id", id);
-    showToast("User restored ✓");
-    loadUsers();
-  }
-
-  const pending  = users.filter(u => u.status === "pending"  && u.role !== "admin");
-  const approved = users.filter(u => u.status === "approved" && u.role !== "admin");
-  const blocked  = users.filter(u => u.status === "blocked");
-  const admins   = users.filter(u => u.role === "admin");
-
-  if (!me) return (
-    <div style={{ background: BG, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ width: 36, height: 36, border: `3px solid ${BORDER}`, borderTopColor: P, borderRadius: "50%", animation: "spin .7s linear infinite" }}/>
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-    </div>
-  );
 
   return (
-    <>
-      <Head><title>Admin — Health Tracker</title></Head>
-      <style>{`
-        .usr-card{background:#fff;border-radius:12px;border:1px solid ${BORDER};padding:14px;margin-bottom:8px}
-        .usr-hdr{display:flex;align-items:center;gap:10px;margin-bottom:10px}
-        .usr-av{width:40px;height:40px;border-radius:10px;background:${PL};display:flex;align-items:center;justify-content:center;font-weight:700;color:${P};font-size:16px;flex-shrink:0}
-        .usr-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
-        .usr-stat{background:${BG};border-radius:8px;padding:7px 8px;text-align:center}
-        .sec-title{font-size:11px;font-weight:700;color:${TXT2};text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;display:flex;align-items:center;gap:6px}
-        .dot{width:7px;height:7px;border-radius:50%;display:inline-block}
-        .btn-approve{padding:7px 0;background:${P};color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;width:100%;font-family:inherit}
-        .btn-block{padding:7px 0;background:#fff;color:${R};border:1.5px solid ${RL};border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;width:100%;font-family:inherit}
-        .btn-restore{padding:7px 0;background:${GL};color:${G};border:1.5px solid ${G};border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;width:100%;font-family:inherit}
-        @media(max-width:480px){.usr-stats{grid-template-columns:1fr 1fr}}
-      `}</style>
-
-      {toast && <div className="ht-toast">{toast}</div>}
-
-      <Layout title="Admin panel" profile={me}>
-
-        <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 4 }}>Admin panel</div>
-        <div style={{ fontSize: 12, color: TXT2, marginBottom: 20 }}>Manage users and approvals</div>
-
-        {/* KPI ROW */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginBottom: 20 }}>
-          {[
-            { l: "Total users", v: users.filter(u => u.role !== "admin").length, c: TXT },
-            { l: "Active",      v: approved.length, c: G },
-            { l: "Pending",     v: pending.length,  c: A },
-            { l: "Blocked",     v: blocked.length,  c: R },
-          ].map((k, i) => (
-            <div key={i} style={{ background: "#fff", borderRadius: 11, border: `1px solid ${BORDER}`, padding: "12px 8px", textAlign: "center" }}>
-              <div style={{ fontSize: 22, fontWeight: 700, color: k.c }}>{k.v}</div>
-              <div style={{ fontSize: 10, color: TXT2 }}>{k.l}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* PENDING */}
-        {pending.length > 0 && (
-          <div style={{ marginBottom: 20 }}>
-            <div className="sec-title"><span className="dot" style={{ background: A }}/> Pending approval ({pending.length})</div>
-            {pending.map(u => (
-              <div key={u.id} className="usr-card" style={{ borderColor: AL }}>
-                <div className="usr-hdr">
-                  <div className="usr-av" style={{ background: AL, color: A }}>{u.full_name?.[0] || "?"}</div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>{u.full_name || "Unknown"}</div>
-                    <div style={{ fontSize: 11, color: TXT2 }}>{u.email}</div>
-                    <div style={{ fontSize: 10, color: TXT3 }}>Registered {new Date(u.created_at).toLocaleDateString("en-IN")}</div>
-                  </div>
-                  <span className="ht-badge" style={{ background: AL, color: A }}>Pending</span>
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                  <button className="btn-approve" onClick={() => approve(u.id)}>✓ Approve</button>
-                  <button className="btn-block"   onClick={() => block(u.id)}>✕ Block</button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* ACTIVE USERS */}
-        <div style={{ marginBottom: 20 }}>
-          <div className="sec-title"><span className="dot" style={{ background: G }}/> Active users ({approved.length})</div>
-          {approved.length === 0 && (
-            <div style={{ background: "#fff", borderRadius: 12, border: `1px dashed ${BORDER}`, padding: "28px", textAlign: "center", color: TXT2, fontSize: 13 }}>
-              No active users yet. Approve pending users above.
-            </div>
-          )}
-          {approved.map(u => (
-            <div key={u.id} className="usr-card">
-              <div className="usr-hdr">
-                <div className="usr-av" style={{ background: GL, color: G }}>{u.full_name?.[0] || "?"}</div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>{u.full_name || "Unknown"}</div>
-                  <div style={{ fontSize: 11, color: TXT2 }}>{u.email}</div>
-                  {u.conditions && Object.keys(u.conditions).filter(k=>k!=="none").length > 0 && (
-                    <div style={{ fontSize: 10, color: TXT3, marginTop: 2 }}>
-                      {Object.keys(u.conditions).filter(k=>k!=="none").join(" · ")}
-                    </div>
-                  )}
-                </div>
-                <div style={{ display: "flex", gap: 6 }}>
-                  <button onClick={() => router.push(`/admin/users/${u.id}`)} style={{ padding: "5px 12px", border: `1px solid ${BORDER}`, borderRadius: 7, background: "#fff", color: TXT2, fontSize: 11, cursor: "pointer", fontFamily: "inherit" }}>View</button>
-                  <button className="btn-block" style={{ width: "auto", padding: "5px 12px" }} onClick={() => block(u.id)}>Block</button>
-                </div>
-              </div>
-              <div className="usr-stats">
-                {[
-                  { l: "Weight", v: u.weight_current ? `${u.weight_current}kg` : "—" },
-                  { l: "Target",  v: u.weight_target  ? `${u.weight_target}kg`  : "—" },
-                  { l: "Template",v: u.active_template_id ? "Assigned" : "None" },
-                ].map((s, i) => (
-                  <div key={i} className="usr-stat">
-                    <div style={{ fontSize: 12, fontWeight: 600 }}>{s.v}</div>
-                    <div style={{ fontSize: 9, color: TXT2 }}>{s.l}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* ADMIN ACCOUNTS */}
-        {admins.length > 0 && (
-          <div style={{ marginBottom: 20 }}>
-            <div className="sec-title"><span className="dot" style={{ background: P }}/> Admin accounts ({admins.length})</div>
-            {admins.map(u => (
-              <div key={u.id} className="usr-card">
-                <div className="usr-hdr">
-                  <div className="usr-av">{u.full_name?.[0] || "A"}</div>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>{u.full_name || "Admin"}</div>
-                    <div style={{ fontSize: 11, color: TXT2 }}>{u.email}</div>
-                  </div>
-                  <span className="ht-badge" style={{ background: PL, color: P, marginLeft: "auto" }}>Admin</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* BLOCKED */}
-        {blocked.length > 0 && (
+    <div style={st.page}>
+      <div style={st.card}>
+        <div style={st.logoRow}>
+          <div style={st.logoIcon}>🌿</div>
           <div>
-            <div className="sec-title"><span className="dot" style={{ background: R }}/> Blocked ({blocked.length})</div>
-            {blocked.map(u => (
-              <div key={u.id} className="usr-card" style={{ opacity: .7 }}>
-                <div className="usr-hdr">
-                  <div className="usr-av" style={{ background: "#fcebeb", color: R }}>{u.full_name?.[0] || "?"}</div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>{u.full_name || "Unknown"}</div>
-                    <div style={{ fontSize: 11, color: TXT2 }}>{u.email}</div>
-                  </div>
-                </div>
-                <button className="btn-restore" onClick={() => restore(u.id)}>Restore access</button>
-              </div>
-            ))}
+            <div style={st.logoName}>VitaLog</div>
+            <div style={st.logoTag}>Health Platform</div>
           </div>
-        )}
+        </div>
 
-      </Layout>
+        <h1 style={st.h1}>Welcome back</h1>
+        <p style={st.sub}>Sign in to your account</p>
+
+        {error && <div style={st.err}>{error}</div>}
+
+        <form onSubmit={handleLogin}>
+          <label style={st.lbl}>Email</label>
+          <input
+            style={st.inp}
+            type="email"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            placeholder="you@example.com"
+            required
+            autoComplete="email"
+          />
+
+          <PasswordInput
+            value={password}
+            onChange={setPassword}
+            label="Password"
+            placeholder="••••••••"
+            autoComplete="current-password"
+          />
+
+          <div style={{ textAlign:'right', marginTop:-8, marginBottom:14 }}>
+            <a href="/auth/forgot-password" style={{ fontSize:'0.7rem', color:'#10B981', textDecoration:'none', fontWeight:600 }}>
+              Forgot password?
+            </a>
+          </div>
+
+          <button style={{ ...st.btn, opacity: submitting ? 0.7 : 1 }} type="submit" disabled={submitting}>
+            {submitting ? 'Signing in…' : 'Sign in'}
+          </button>
+        </form>
+
+        <div style={st.divider}><span>or</span></div>
+
+        <button style={st.googleBtn} onClick={handleGoogle}>
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" style={{marginRight:8}}>
+            <path d="M17.64 9.2a10.34 10.34 0 0 0-.164-1.84H9v3.48h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908C16.658 14.252 17.64 11.946 17.64 9.2Z" fill="#4285F4"/>
+            <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18Z" fill="#34A853"/>
+            <path d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332Z" fill="#FBBC05"/>
+            <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58Z" fill="#EA4335"/>
+          </svg>
+          Continue with Google
+        </button>
+
+        <p style={st.signupLink}>
+          New to VitaLog?{' '}
+          <a href="/signup" style={{ color:'#10B981', fontWeight:600, textDecoration:'none' }}>Create account</a>
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function Spinner() {
+  return (
+    <>
+      <div style={{ width:32, height:32, border:'3px solid #10B981', borderTopColor:'transparent', borderRadius:'50%', animation:'spin 0.8s linear infinite' }}></div>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </>
   );
 }
+
+const st = {
+  page:      { minHeight:'100vh', background:'#F7F8FA', display:'flex', alignItems:'center', justifyContent:'center', padding:'24px' },
+  center:    { minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center' },
+  card:      { background:'#fff', borderRadius:20, padding:'36px 32px', width:'100%', maxWidth:400, boxShadow:'0 4px 24px rgba(0,0,0,0.08)', border:'1px solid #E5E7EB' },
+  logoRow:   { display:'flex', alignItems:'center', gap:10, marginBottom:28 },
+  logoIcon:  { width:38, height:38, background:'linear-gradient(135deg,#10B981,#059669)', borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', fontSize:18 },
+  logoName:  { fontFamily:'Sora,sans-serif', fontSize:'1.1rem', fontWeight:800, color:'#111827', letterSpacing:'-0.02em' },
+  logoTag:   { fontSize:'0.58rem', color:'#6B7280', letterSpacing:'0.07em', textTransform:'uppercase', marginTop:1 },
+  h1:        { fontFamily:'Sora,sans-serif', fontSize:'1.4rem', fontWeight:800, color:'#111827', marginBottom:4 },
+  sub:       { fontSize:'0.8rem', color:'#6B7280', marginBottom:24 },
+  err:       { background:'#FEF2F2', border:'1px solid #FECACA', color:'#DC2626', borderRadius:10, padding:'10px 14px', fontSize:'0.76rem', marginBottom:16 },
+  lbl:       { display:'block', fontSize:'0.72rem', fontWeight:600, color:'#374151', marginBottom:5 },
+  inp:       { width:'100%', padding:'10px 13px', border:'1.5px solid #E5E7EB', borderRadius:10, fontSize:'0.85rem', fontFamily:'Inter,sans-serif', outline:'none', marginBottom:14, boxSizing:'border-box', color:'#111827', background:'#fff' },
+  btn:       { width:'100%', padding:'12px', background:'linear-gradient(135deg,#10B981,#059669)', color:'#fff', borderRadius:12, fontWeight:700, fontSize:'0.88rem', border:'none', cursor:'pointer', fontFamily:'Inter,sans-serif', marginTop:4 },
+  divider:   { textAlign:'center', margin:'20px 0', color:'#9CA3AF', fontSize:'0.75rem' },
+  googleBtn: { width:'100%', padding:'11px', border:'1.5px solid #E5E7EB', borderRadius:12, background:'#fff', fontSize:'0.82rem', fontWeight:600, color:'#374151', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Inter,sans-serif' },
+  signupLink:{ textAlign:'center', fontSize:'0.76rem', color:'#6B7280', marginTop:20 },
+};
