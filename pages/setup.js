@@ -49,7 +49,7 @@ export default function Setup() {
 
   useEffect(() => {
     getSupabase().auth.getSession().then(({ data: { session } }) => {
-      if (!session) { router.push("/login"); return; }
+      if (!session) { router.push("/"); return; }
       setUserId(session.user.id);
       getSupabase().from("profiles").select("full_name,setup_complete").eq("id", session.user.id).single()
         .then(({ data }) => {
