@@ -1,78 +1,92 @@
-// components/PasswordInput.js — NEW FILE
-// Reusable password field with eye icon + live strength meter
-// Usage: <PasswordInput value={pw} onChange={setPw} label="Password" showStrength />
-
+// components/PasswordInput.js
 import { useState } from 'react';
 
-export default function PasswordInput({ value, onChange, label='Password', placeholder='••••••••', showStrength=false, name='password', required=true, autoComplete='current-password' }) {
-  const [show, setShow] = useState(false);
+function getStrength(pw) {
+  let score = 0;
+  if (pw.length >= 8)           score++;
+  if (/[A-Z]/.test(pw))        score++;
+  if (/[a-z]/.test(pw))        score++;
+  if (/[0-9]/.test(pw))        score++;
+  if (/[^A-Za-z0-9]/.test(pw)) score++;
+  return score;
+}
 
-  const strength = getStrength(value);
+export default function PasswordInput({ value, onChange, label, placeholder, autoComplete, showStrength }) {
+  const [show, setShow] = useState(false);
+  const strength = showStrength ? getStrength(value) : 0;
+  const strengthLabel = ['', 'Weak', 'Weak', 'Fair', 'Strong', 'Very strong'][strength] || '';
+  const strengthColor = ['', '#EF4444', '#EF4444', '#F59E0B', '#10B981', '#059669'][strength] || '#E5E7EB';
 
   return (
     <div style={{ marginBottom: 14 }}>
-      {label && <label style={s.lbl}>{label}</label>}
-      <div style={s.wrap}>
+      {label && (
+        <label style={{ display:'block', fontSize:'0.72rem', fontWeight:600, color:'#374151', marginBottom:5 }}>
+          {label}
+        </label>
+      )}
+      <div style={{ position:'relative' }}>
         <input
-          name={name}
           type={show ? 'text' : 'password'}
           value={value}
           onChange={e => onChange(e.target.value)}
-          placeholder={placeholder}
-          required={required}
-          autoComplete={autoComplete}
-          style={s.inp}
+          placeholder={placeholder || '••••••••'}
+          autoComplete={autoComplete || 'current-password'}
+          style={{
+            width:'100%', padding:'10px 42px 10px 13px',
+            border:'1.5px solid #E5E7EB', borderRadius:10,
+            fontSize:'0.85rem', fontFamily:'Inter,sans-serif',
+            outline:'none', boxSizing:'border-box',
+            color:'#111827', background:'#fff',
+          }}
         />
-        <button type="button" style={s.eye} onClick={() => setShow(v => !v)} tabIndex={-1} aria-label={show ? 'Hide password' : 'Show password'}>
+        <button
+          type="button"
+          onClick={() => setShow(v => !v)}
+          style={{
+            position:'absolute', right:12, top:'50%', transform:'translateY(-50%)',
+            background:'none', border:'none', cursor:'pointer', padding:0,
+            color:'#9CA3AF', fontSize:16, lineHeight:1,
+          }}
+          tabIndex={-1}
+        >
           {show ? '🙈' : '👁️'}
         </button>
       </div>
+
       {showStrength && value.length > 0 && (
-        <div style={{ marginTop: 6 }}>
-          <div style={s.barRow}>
-            {[0,1,2,3].map(i => (
-              <div key={i} style={{ ...s.barSeg, background: i < strength.score ? strength.color : '#E5E7EB' }} />
+        <>
+          {/* Strength bar */}
+          <div style={{ display:'flex', gap:3, marginTop:6 }}>
+            {[1,2,3,4,5].map(i => (
+              <div key={i} style={{
+                flex:1, height:3, borderRadius:2,
+                background: i <= strength ? strengthColor : '#E5E7EB',
+                transition:'background .2s',
+              }}/>
             ))}
           </div>
-          <div style={{ ...s.strengthLbl, color: strength.color }}>{strength.label}</div>
-          {strength.hint && <div style={s.hint}>{strength.hint}</div>}
-        </div>
+          <div style={{ fontSize:'0.65rem', color: strengthColor, marginTop:3, fontWeight:600 }}>
+            {strengthLabel}
+          </div>
+          {/* Requirements checklist */}
+          <div style={{ marginTop:8, display:'flex', flexDirection:'column', gap:3 }}>
+            {[
+              [/.{8,}/, '8+ characters'],
+              [/[A-Z]/, 'Uppercase letter'],
+              [/[a-z]/, 'Lowercase letter'],
+              [/[0-9]/, 'Number'],
+            ].map(([regex, text]) => {
+              const ok = regex.test(value);
+              return (
+                <div key={text} style={{ display:'flex', alignItems:'center', gap:5, fontSize:'0.65rem', color: ok ? '#10B981' : '#9CA3AF' }}>
+                  <span style={{ fontSize:10 }}>{ok ? '✓' : '○'}</span>
+                  {text}
+                </div>
+              );
+            })}
+          </div>
+        </>
       )}
     </div>
   );
 }
-
-function getStrength(pw) {
-  if (!pw) return { score: 0, label: '', color: '#E5E7EB', hint: '' };
-  let score = 0;
-  const hints = [];
-  if (pw.length >= 8)                    score++; else hints.push('at least 8 characters');
-  if (/[A-Z]/.test(pw))                  score++; else hints.push('one uppercase letter');
-  if (/[a-z]/.test(pw))                  score++; else hints.push('one lowercase letter');
-  if (/[0-9]/.test(pw))                  score++; else hints.push('one number');
-
-  const levels = [
-    { label: 'Too weak',  color: '#EF4444' },
-    { label: 'Weak',      color: '#F59E0B' },
-    { label: 'Fair',      color: '#3B82F6' },
-    { label: 'Strong',    color: '#10B981' },
-    { label: 'Very strong', color: '#059669' },
-  ];
-  return {
-    score,
-    label: levels[score]?.label || '',
-    color: levels[score]?.color || '#E5E7EB',
-    hint:  hints.length > 0 ? `Add ${hints.join(', ')}` : '',
-  };
-}
-
-const s = {
-  lbl:        { display:'block', fontSize:'0.72rem', fontWeight:600, color:'#374151', marginBottom:5, fontFamily:'Inter,sans-serif' },
-  wrap:       { position:'relative', display:'flex', alignItems:'center' },
-  inp:        { width:'100%', padding:'10px 40px 10px 13px', border:'1.5px solid #E5E7EB', borderRadius:10, fontSize:'0.85rem', fontFamily:'Inter,sans-serif', outline:'none', color:'#111827', background:'#fff', boxSizing:'border-box' },
-  eye:        { position:'absolute', right:10, background:'none', border:'none', cursor:'pointer', fontSize:'1rem', padding:'4px', lineHeight:1 },
-  barRow:     { display:'flex', gap:4 },
-  barSeg:     { flex:1, height:4, borderRadius:99, transition:'background 0.2s' },
-  strengthLbl:{ fontSize:'0.65rem', fontWeight:700, marginTop:3 },
-  hint:       { fontSize:'0.62rem', color:'#6B7280', marginTop:2 },
-};
