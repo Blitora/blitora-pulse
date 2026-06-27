@@ -7,7 +7,6 @@ import { useRouter } from 'next/router';
 import Layout from '../../components/Layout';
 import RoleGuard from '../../components/RoleGuard';
 import { getSupabase } from '../../lib/supabase';
-const supabase = getSupabase();
 import { useRole } from '../../lib/useRole';
 
 export default function PatientsPage() {
@@ -33,6 +32,7 @@ function PatientsView() {
   }, [orgId]);
 
   async function loadPatients() {
+    const supabase = getSupabase();
     setLoading(true);
     // Get all patients in this org
     const { data: members } = await supabase
