@@ -10,7 +10,6 @@ const BORDER="#e5e3ee",TXT="#2c1a3a",TXT2="#888",TXT3="#bbb",BG="#f0f0f7",CARD="
 const HABITS=["4 almonds + 2 walnuts","No sugar / jaggery / honey","No fried food today","Dinner before 8 PM","Sleep by 10:30 PM"];
 const WALKS=[{k:"morning_walk",l:"Morning walk",t:40,max:60},{k:"post_lunch_walk",l:"Post-lunch walk",t:15,max:30},{k:"post_dinner_walk",l:"Post-dinner walk",t:20,max:30}];
 
-// Category config — maps food.category string to icon + display order
 const CAT_CONFIG = [
   {key:"Grains",   icon:"🌾"}, {key:"Protein",  icon:"🥚"},
   {key:"Dairy",    icon:"🥛"}, {key:"Fruits",   icon:"🍎"},
@@ -74,7 +73,6 @@ function MBar({label,val,max,color,unit}){
   );
 }
 
-// ─── ADD FOOD MODAL ───────────────────────────────────────────────────────────
 function AddFoodModal({profile,onSave,onClose}){
   const [form,setForm]=useState({name:"",calories:"",protein:"",carbs:"",fat:"",category:""});
   const [saving,setSaving]=useState(false);
@@ -148,7 +146,6 @@ function AddFoodModal({profile,onSave,onClose}){
   );
 }
 
-// ─── APK DOWNLOAD BANNER ──────────────────────────────────────────────────────
 function AppDownloadBanner(){
   const [visible,setVisible]=useState(false);
   useEffect(()=>{
@@ -161,7 +158,7 @@ function AppDownloadBanner(){
     <div style={{background:`linear-gradient(90deg,${P},#9b6e8e)`,borderRadius:12,padding:"11px 14px",marginBottom:12,display:"flex",alignItems:"center",gap:12}}>
       <div style={{fontSize:26,flexShrink:0}}>📱</div>
       <div style={{flex:1}}>
-        <div style={{fontSize:13,fontWeight:700,color:"#fff"}}>Get the MyHealth App</div>
+        <div style={{fontSize:13,fontWeight:700,color:"#fff"}}>Get the VitaLog App</div>
         <div style={{fontSize:11,color:"rgba(255,255,255,0.8)"}}>Install directly — no Play Store needed</div>
       </div>
       <a href="/MyHealthTracker.apk" download="MyHealthTracker.apk"
@@ -174,9 +171,6 @@ function AppDownloadBanner(){
   );
 }
 
-// ─── FOOD CARD (2-column) ────────────────────────────────────────────────────
-
-// ─── FOOD CARD (CSS grid cell — no fixed width) ──────────────────────────────
 function FoodCard({food,checked,onToggle}){
   return(
     <div onClick={onToggle} style={{
@@ -184,9 +178,8 @@ function FoodCard({food,checked,onToggle}){
       border:`1.5px solid ${checked?G:BORDER}`,
       padding:"9px 9px 8px", cursor:"pointer",
       background:checked?GL:CARD, position:"relative",
-      transition:"all .15s", minWidth:0,  // prevents grid blowout
+      transition:"all .15s", minWidth:0,
     }}>
-      {/* Checkmark */}
       <div style={{
         position:"absolute",top:6,right:6,width:17,height:17,
         borderRadius:"50%",border:`1.5px solid ${checked?G:BORDER}`,
@@ -204,11 +197,9 @@ function FoodCard({food,checked,onToggle}){
   );
 }
 
-// ─── MEAL FOOD PANEL (new UI) ────────────────────────────────────────────────
 function MealFoodPanel({meal,foods,sel,onToggle,onAddFood}){
   const [search,setSearch]=useState("");
 
-  // Group foods by category
   const catKeys=CAT_CONFIG.map(c=>c.key);
   const grouped=[];
   catKeys.forEach(key=>{
@@ -225,7 +216,6 @@ function MealFoodPanel({meal,foods,sel,onToggle,onAddFood}){
   const q=search.toLowerCase();
   const searchResults=q?foods.filter(f=>f.name.toLowerCase().includes(q)):null;
 
-  // CSS grid: 2 cols on mobile, 3 on tablet, 4 on desktop
   const foodGrid={
     display:"grid",
     gridTemplateColumns:"repeat(auto-fill, minmax(140px, 1fr))",
@@ -235,8 +225,6 @@ function MealFoodPanel({meal,foods,sel,onToggle,onAddFood}){
 
   return(
     <div style={{borderTop:`1px solid ${BORDER}`,paddingTop:10,paddingBottom:4}}>
-
-      {/* Search bar */}
       <div style={{display:"flex",alignItems:"center",gap:7,background:BG,borderRadius:9,padding:"7px 11px",margin:"0 12px 10px"}}>
         <span style={{fontSize:13,flexShrink:0}}>🔍</span>
         <input
@@ -248,14 +236,12 @@ function MealFoodPanel({meal,foods,sel,onToggle,onAddFood}){
         {search&&<button onClick={()=>setSearch("")} style={{border:"none",background:"transparent",color:TXT3,cursor:"pointer",fontSize:14,lineHeight:1,padding:0,flexShrink:0}}>×</button>}
       </div>
 
-      {/* No foods message */}
       {foods.length===0&&(
         <div style={{textAlign:"center",color:TXT2,fontSize:12,padding:"12px 0 8px"}}>
           No food items assigned yet — ask admin to assign a plan.
         </div>
       )}
 
-      {/* Search results — responsive grid */}
       {searchResults&&(
         <div style={{padding:"0 12px",marginBottom:8}}>
           {searchResults.length===0
@@ -269,10 +255,8 @@ function MealFoodPanel({meal,foods,sel,onToggle,onAddFood}){
         </div>
       )}
 
-      {/* Category groups — responsive grid per category */}
       {!searchResults&&grouped.map(grp=>(
         <div key={grp.key} style={{marginBottom:12}}>
-          {/* Category label */}
           <div style={{
             fontSize:9,fontWeight:800,color:TXT2,
             textTransform:"uppercase",letterSpacing:".07em",
@@ -283,7 +267,6 @@ function MealFoodPanel({meal,foods,sel,onToggle,onAddFood}){
             {grp.key}
             <span style={{flex:1,height:1,background:BORDER,display:"block",marginLeft:4}}/>
           </div>
-          {/* Responsive grid — no horizontal scroll */}
           <div style={{padding:"0 12px"}}>
             <div style={foodGrid}>
               {grp.items.map(f=>(
@@ -294,7 +277,6 @@ function MealFoodPanel({meal,foods,sel,onToggle,onAddFood}){
         </div>
       ))}
 
-      {/* Selected summary bar */}
       {Object.keys(sel).length>0&&(
         <div style={{margin:"4px 12px 8px",padding:"8px 10px",background:GL,borderRadius:9,border:`1px solid #5DCAA5`}}>
           <div style={{fontSize:9,fontWeight:800,color:G,textTransform:"uppercase",letterSpacing:".05em",marginBottom:5}}>
@@ -315,7 +297,6 @@ function MealFoodPanel({meal,foods,sel,onToggle,onAddFood}){
         </div>
       )}
 
-      {/* Add food button */}
       <button onClick={onAddFood} style={{
         display:"flex",alignItems:"center",justifyContent:"center",gap:6,
         margin:"4px 12px 4px",padding:"8px",width:"calc(100% - 24px)",
@@ -327,7 +308,7 @@ function MealFoodPanel({meal,foods,sel,onToggle,onAddFood}){
     </div>
   );
 }
-// ─── MAIN DASHBOARD ───────────────────────────────────────────────────────────
+
 export default function Dashboard(){
   const router=useRouter();
   const [profile,setProfile]=useState(null);
@@ -344,26 +325,22 @@ export default function Dashboard(){
     async function init(){
       const sb=getSupabase();
       const{data:{session}}=await sb.auth.getSession();
-      if(!session){router.push("/login");return;}
+      if(!session){router.push("/");return;}
       const{data:p}=await sb.from("profiles").select("*").eq("id",session.user.id).single();
-      if(!p){router.push("/login");return;}
+      if(!p){router.push("/");return;}
       if(p.status==="pending"){router.push("/pending");return;}
       if(!p.setup_complete){router.push("/setup");return;}
       setProfile(p);
       if(p.active_template_id){
-        // Fetch foods via junction table (multi-template) + user's own custom foods
         const[{data:linked},{data:custom}]=await Promise.all([
-          // Foods linked to user's template via junction table
           sb.from("food_template_links")
             .select("template_food_items(*)")
             .eq("template_id",p.active_template_id),
-          // User's own custom-added foods
           sb.from("template_food_items")
             .select("*")
             .eq("added_by_user",true)
             .eq("added_by_user_id",p.id),
         ]);
-        // Extract food items from junction results, deduplicate by id
         const junctionFoods=(linked||[]).map(l=>l.template_food_items).filter(Boolean);
         const allFoodItems=[...junctionFoods,...(custom||[])];
         const unique=Array.from(new Map(allFoodItems.map(f=>[f.id,f])).values());
@@ -420,10 +397,7 @@ export default function Dashboard(){
   },{cal:0,pro:0,carb:0,fat:0});
 
   const BMR=calcBMR(profile);
-  // Walk calories: ~5 kcal/min for brisk morning walk, ~4 kcal/min for post-meal walks
   const burnAct=WALKS.reduce((s,w)=>s+(log.activity[w.k]||0)*(w.k==="morning_walk"?5:4),0);
-  // totalBurn = BMR (base metabolism) + calories burned from logged walks
-  // We do NOT multiply BMR by activity level since users are logging actual activity
   const totalBurn=BMR+burnAct;
   const burnRingPct=profile?.calorie_target?Math.round((totalBurn/profile.calorie_target)*100):Math.round((totalBurn/2000)*100);
   const waterL=(log.water||0)*0.5;
@@ -441,7 +415,7 @@ export default function Dashboard(){
 
   return(
     <>
-      <Head><title>Dashboard — MyHealth</title></Head>
+      <Head><title>Dashboard — VitaLog</title></Head>
       <style>{`
         .card{background:${CARD};border-radius:13px;border:1px solid ${BORDER};padding:14px;margin-bottom:12px}
         .ctitle{font-size:11px;font-weight:700;color:${TXT2};text-transform:uppercase;letter-spacing:.05em;margin-bottom:11px}
@@ -474,7 +448,6 @@ export default function Dashboard(){
 
         <AppDownloadBanner/>
 
-        {/* DATE NAV */}
         <div className="date-nav">
           <button className="dbtn" onClick={()=>{const d=new Date(dateKey);d.setDate(d.getDate()-1);setDateKey(fmt(d));}}>‹</button>
           <div style={{flex:1,textAlign:"center"}}>
@@ -486,11 +459,9 @@ export default function Dashboard(){
           <button className="dbtn" onClick={()=>{const d=new Date(dateKey);d.setDate(d.getDate()+1);if(fmt(d)<=today())setDateKey(fmt(d));}} disabled={dateKey>=today()}>›</button>
         </div>
 
-        {/* RINGS */}
         <div className="card">
           <div style={{display:"flex",justifyContent:"space-around",marginBottom:10}}>
             <Ring pct={Math.round((mac.cal/calTarget)*100)} color="#7F77DD" label={`${mac.cal}`} sub="kcal in"/>
-            {/* Burned ring: grey when no food logged yet — avoids confusing large green surplus */}
             <Ring
               pct={mac.cal>0?burnRingPct:0}
               color={mac.cal>0?G:BORDER}
@@ -515,7 +486,6 @@ export default function Dashboard(){
           </div>
         </div>
 
-        {/* KPI GRID */}
         <div className="kgrid">
           {[
             {l:"Calories in",v:mac.cal,c:"#7F77DD"},
@@ -530,7 +500,6 @@ export default function Dashboard(){
           ))}
         </div>
 
-        {/* MACROS */}
         <div className="card">
           <div className="ctitle">Macros today</div>
           <MBar label="Calories" val={mac.cal} max={calTarget} color="#7F77DD" unit=" kcal"/>
@@ -539,7 +508,6 @@ export default function Dashboard(){
           <MBar label="Fat"      val={mac.fat}  max={profile?.fat_target||55}  color="#D85A30" unit="g"/>
         </div>
 
-        {/* ── MEALS — NEW UI ── */}
         <div className="ctitle" style={{padding:"0 2px",marginBottom:8}}>Meals — tap to log food</div>
         {MEAL_DEFS.map(meal=>{
           const mSel=log.foods[meal.id]||{};
@@ -549,7 +517,6 @@ export default function Dashboard(){
           const isOpen=openMeal===meal.id;
           return(
             <div key={meal.id} className={`mcard${selKeys.length>0?" done":""}`}>
-              {/* Meal header */}
               <div className="mhdr" style={{background:selKeys.length>0&&!isOpen?GL:CARD}}
                 onClick={()=>setOpenMeal(isOpen?null:meal.id)}>
                 <div style={{width:34,height:34,borderRadius:8,background:meal.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,flexShrink:0}}>{meal.icon}</div>
@@ -565,7 +532,6 @@ export default function Dashboard(){
                 <span style={{fontSize:12,color:TXT3,display:"inline-block",transform:isOpen?"rotate(180deg)":"none",transition:"transform .2s"}}>▾</span>
               </div>
 
-              {/* Collapsed selected pills */}
               {selKeys.length>0&&!isOpen&&(
                 <div style={{padding:"0 13px 9px",display:"flex",flexWrap:"wrap",gap:4}}>
                   {selKeys.map(id=>{
@@ -581,7 +547,6 @@ export default function Dashboard(){
                 </div>
               )}
 
-              {/* ── NEW FOOD PANEL ── */}
               {isOpen&&(
                 <MealFoodPanel
                   meal={meal}
@@ -595,7 +560,6 @@ export default function Dashboard(){
           );
         })}
 
-        {/* WATER */}
         <div className="card">
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
             <div className="ctitle" style={{margin:0}}>💧 Water</div>
@@ -609,7 +573,6 @@ export default function Dashboard(){
           </div>
         </div>
 
-        {/* ACTIVITY */}
         <div className="card">
           <div className="ctitle">🏃 Activity</div>
           {WALKS.map(w=>(
@@ -627,7 +590,6 @@ export default function Dashboard(){
           ))}
         </div>
 
-        {/* HABITS */}
         <div className="card">
           <div className="ctitle">✅ Daily habits — {habDone}/5</div>
           {HABITS.map(h=>(
@@ -638,7 +600,6 @@ export default function Dashboard(){
           ))}
         </div>
 
-        {/* WEIGHT */}
         <div className="card">
           <div className="ctitle">⚖️ Weight — {dayLabel(dateKey)}</div>
           <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:8}}>
