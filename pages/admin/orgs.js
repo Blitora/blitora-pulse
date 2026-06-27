@@ -1,12 +1,9 @@
-// pages/admin/orgs.js — NEW FILE
-// Super admin only — view all organisations, extend trial, suspend, delete
-
+// pages/admin/orgs.js
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '../../components/Layout';
 import RoleGuard from '../../components/RoleGuard';
 import { getSupabase } from '../../lib/supabase';
-const supabase = getSupabase();
 
 export default function AdminOrgsPage() {
   return (
@@ -23,13 +20,14 @@ function AdminOrgsView() {
   const [orgs,    setOrgs]    = useState([]);
   const [loading, setLoading] = useState(true);
   const [search,  setSearch]  = useState('');
-  const [filter,  setFilter]  = useState('all'); // all | trial | active | suspended | expired
-  const [action,  setAction]  = useState(null);  // { type, org }
+  const [filter,  setFilter]  = useState('all');
+  const [action,  setAction]  = useState(null);
 
   useEffect(() => { loadOrgs(); }, []);
 
   async function loadOrgs() {
     setLoading(true);
+    const supabase = getSupabase();
     const { data } = await supabase
       .from('organisations')
       .select('*')
@@ -37,7 +35,6 @@ function AdminOrgsView() {
 
     if (!data) { setLoading(false); return; }
 
-    // Get member counts per org
     const { data: members } = await supabase
       .from('organisation_members')
       .select('org_id, role')
@@ -45,7 +42,7 @@ function AdminOrgsView() {
 
     const counts = {};
     (members || []).forEach(m => {
-      if (!counts[m.org_id]) counts[m.org_id] = { patients: 0, dietitians: 0, admins: 0 };
+      if (!counts[m.org_id]) counts[m.org_id] = { patients:0, dietitians:0, admins:0 };
       if (m.role === 'patient')   counts[m.org_id].patients++;
       if (m.role === 'dietitian') counts[m.org_id].dietitians++;
       if (m.role === 'org_admin') counts[m.org_id].admins++;
@@ -56,24 +53,27 @@ function AdminOrgsView() {
   }
 
   async function extendTrial(org, days) {
+    const supabase = getSupabase();
     const current = new Date(org.trial_ends_at) > new Date() ? new Date(org.trial_ends_at) : new Date();
     const newDate = new Date(current.getTime() + days * 86400000).toISOString();
     await supabase.from('organisations').update({ trial_ends_at: newDate, plan: 'trial' }).eq('id', org.id);
-    await supabase.from('audit_log').insert({ action: 'extend_trial', target_type: 'organisation', target_id: org.id, metadata: { days, new_date: newDate } });
+    await supabase.from('audit_log').insert({ action: 'extend_trial', target_type: 'organisation', target_id: org.id, metadata: { days, new_date: newDate } }).catch(()=>{});
     setAction(null);
     loadOrgs();
   }
 
   async function suspendOrg(org, reason) {
-    await supabase.from('organisations').update({ is_active: false, suspended_at: new Date().toISOString(), suspended_reason: reason }).eq('id', org.id);
-    await supabase.from('audit_log').insert({ action: 'suspend_org', target_type: 'organisation', target_id: org.id, metadata: { reason } });
+    const supabase = getSupabase();
+    await supabase.from('organisations').update({ is_active: false, suspended_reason: reason }).eq('id', org.id);
+    await supabase.from('audit_log').insert({ action: 'suspend_org', target_type: 'organisation', target_id: org.id, metadata: { reason } }).catch(()=>{});
     setAction(null);
     loadOrgs();
   }
 
   async function reinstateOrg(org) {
-    await supabase.from('organisations').update({ is_active: true, suspended_at: null, suspended_reason: null }).eq('id', org.id);
-    await supabase.from('audit_log').insert({ action: 'reinstate_org', target_type: 'organisation', target_id: org.id });
+    const supabase = getSupabase();
+    await supabase.from('organisations').update({ is_active: true, suspended_reason: null }).eq('id', org.id);
+    await supabase.from('audit_log').insert({ action: 'reinstate_org', target_type: 'organisation', target_id: org.id }).catch(()=>{});
     loadOrgs();
   }
 
@@ -104,7 +104,6 @@ function AdminOrgsView() {
 
   return (
     <div style={s.page}>
-      {/* Header */}
       <div style={s.header}>
         <div>
           <h1 style={s.h1}>Organisations</h1>
@@ -112,7 +111,6 @@ function AdminOrgsView() {
         </div>
       </div>
 
-      {/* Stats */}
       <div style={s.statsRow}>
         {[
           { label:'Total',     value: stats.total,     color:'#111827' },
@@ -128,7 +126,6 @@ function AdminOrgsView() {
         ))}
       </div>
 
-      {/* Search + filter */}
       <div style={s.filterRow}>
         <input style={s.search} placeholder="Search organisation name..." value={search} onChange={e => setSearch(e.target.value)} />
         <div style={s.chips}>
@@ -140,8 +137,9 @@ function AdminOrgsView() {
         </div>
       </div>
 
-      {/* Table */}
-      {loading ? <LoadingRows /> : (
+      {loading ? (
+        <div style={{ padding:'40px', textAlign:'center', color:'#6B7280', fontSize:'0.8rem' }}>Loading organisations…</div>
+      ) : (
         <div style={s.table}>
           <div style={s.thead}>
             <div style={{ ...s.th, flex:2 }}>Organisation</div>
@@ -188,7 +186,6 @@ function AdminOrgsView() {
         </div>
       )}
 
-      {/* MODAL: Extend Trial */}
       {action?.type === 'extend' && (
         <Modal title={`Extend Trial — ${action.org.name}`} onClose={() => setAction(null)}>
           <p style={s.modalSub}>Current trial ends: {new Date(action.org.trial_ends_at).toLocaleDateString()}</p>
@@ -200,7 +197,6 @@ function AdminOrgsView() {
         </Modal>
       )}
 
-      {/* MODAL: Suspend */}
       {action?.type === 'suspend' && (
         <SuspendModal
           title={`Suspend — ${action.org.name}`}
@@ -243,17 +239,13 @@ function SuspendModal({ title, onClose, onConfirm }) {
     <Modal title={title} onClose={onClose}>
       <p style={s.modalSub}>This will block all logins for this organisation. Data is preserved.</p>
       <label style={s.lbl}>Reason for suspension</label>
-      <textarea style={s.textarea} rows={3} value={reason} onChange={e => setReason(e.target.value)} placeholder="e.g. Non-payment, violation of terms..." />
+      <textarea style={s.textarea} rows={3} value={reason} onChange={e => setReason(e.target.value)} placeholder="e.g. Non-payment..." />
       <div style={{ display:'flex', gap:8, marginTop:8 }}>
         <button style={s.cancelBtn} onClick={onClose}>Cancel</button>
         <button style={s.dangerBtn} onClick={() => reason.trim() && onConfirm(reason)}>Confirm Suspend</button>
       </div>
     </Modal>
   );
-}
-
-function LoadingRows() {
-  return <div style={{ padding:'40px', textAlign:'center', color:'#6B7280', fontSize:'0.8rem' }}>Loading organisations…</div>;
 }
 
 const s = {
