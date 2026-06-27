@@ -68,6 +68,7 @@ export default function SignupPage() {
     setLoading(true);
     try {
       // 1. Sign up with Supabase Auth
+      const supabase = getSupabase();
       const { data: authData, error: authErr } = await supabase.auth.signUp({
         email: email.trim().toLowerCase(),
         password,
