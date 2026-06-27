@@ -80,9 +80,9 @@ export default function Reports(){
     async function init(){
       const sb=getSupabase();
       const{data:{session}}=await sb.auth.getSession();
-      if(!session){router.push("/login");return;}
+      if(!session){router.push("/");return;}
       const{data:p}=await sb.from("profiles").select("*").eq("id",session.user.id).single();
-      if(!p||p.status==="pending"){router.push("/pending");return;}
+      if(!p){router.push("/");return;}
       if(!p.setup_complete){router.push("/setup");return;}
       setProfile(p);
       // Load food master for macro calculation
