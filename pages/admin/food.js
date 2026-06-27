@@ -3,6 +3,7 @@ import Head from "next/head";
 import { useRouter } from "next/router";
 import { getSupabase } from "../../lib/supabase";
 import Layout from "../../components/Layout";
+import RoleGuard from "../../components/RoleGuard";
 
 const P="#714B67",PL="#f3eef1",G="#1D9E75",GL="#e1f5ee",A="#EF9F27",AL="#faeeda",R="#E24B4A",RL="#fcebeb";
 const BORDER="#e5e3ee",TXT="#2c1a3a",TXT2="#888",TXT3="#bbb",BG="#f0f0f7",CARD="#fff";
@@ -153,12 +154,20 @@ function DataGrid({gridKey,colsDef,rows,onRowClick,onDeleteRow,renderCell,userId
 
 // ── MAIN PAGE ─────────────────────────────────────────────────
 export default function AdminFood(){
+  return(
+    <RoleGuard allow={['super_admin','org_admin']}>
+      <AdminFoodInner/>
+    </RoleGuard>
+  );
+}
+
+function AdminFoodInner(){
   const router=useRouter();
   const [me,setMe]=useState(null);
   const [templates,setTemplates]=useState([]);
   const [users,setUsers]=useState([]);
   const [allFoods,setAllFoods]=useState([]);
-  const [foodLinks,setFoodLinks]=useState([]); // junction: food_item_id -> [template_id]
+  const [foodLinks,setFoodLinks]=useState([]);
   const [tab,setTab]=useState("users");
   const [toast,setToast]=useState(null);
   const [detail,setDetail]=useState(null);
@@ -166,8 +175,7 @@ export default function AdminFood(){
   const [saving,setSaving]=useState(false);
   const [selTemplateId,setSelTemplateId]=useState("");
 
-  // ── Template management state ────────────────────────────────
-  const [tmplView,setTmplView]=useState("list");       // list | create | edit | foods
+  const [tmplView,setTmplView]=useState("list");
   const [activeTmpl,setActiveTmpl]=useState(null);
   const [tmplForm,setTmplForm]=useState({name:"",conditions:[]});
   const [tmplSaving,setTmplSaving]=useState(false);
@@ -185,9 +193,9 @@ export default function AdminFood(){
     async function init(){
       const sb=getSupabase();
       const{data:{session}}=await sb.auth.getSession();
-      if(!session){router.push("/login");return;}
+      if(!session){router.push("/");return;}
       const{data:p}=await sb.from("profiles").select("*").eq("id",session.user.id).single();
-      if(!p||p.role!=="admin"){router.push("/dashboard");return;}
+      if(!p){router.push("/");return;}
       setMe(p);
       await loadAll(sb);
     }
@@ -198,7 +206,7 @@ export default function AdminFood(){
     const s=sb||getSupabase();
     const[{data:t},{data:u},{data:f},{data:links}]=await Promise.all([
       s.from("meal_templates").select("*").order("name"),
-      s.from("profiles").select("*").neq("role","admin").order("created_at",{ascending:false}),
+      s.from("profiles").select("*").order("created_at",{ascending:false}),
       s.from("template_food_items").select("*,meal_templates(name)").order("category"),
       s.from("food_template_links").select("food_item_id,template_id"),
     ]);
@@ -221,7 +229,6 @@ export default function AdminFood(){
     if(!addFoodForm.name||!addFoodForm.calories||!addFoodForm.selectedTemplates?.length)return;
     setSaving(true);
     const sb=getSupabase();
-    // Insert master food item (template_id = first selected for backward compat)
     const{data:newFood,error}=await sb.from("template_food_items").insert({
       template_id:addFoodForm.selectedTemplates[0],
       name:addFoodForm.name,calories:+addFoodForm.calories,
@@ -230,7 +237,6 @@ export default function AdminFood(){
       is_master:true,
     }).select().single();
     if(!error&&newFood){
-      // Insert junction links for all selected templates
       const links=addFoodForm.selectedTemplates.map(tid=>({food_item_id:newFood.id,template_id:tid}));
       await sb.from("food_template_links").insert(links);
       showToast(`Food added to ${links.length} template(s) ✓`);
@@ -259,7 +265,6 @@ export default function AdminFood(){
     setForm(f=>({...f,meal_slots:f.meal_slots?.includes(s)?f.meal_slots.filter(x=>x!==s):[...(f.meal_slots||[]),s]}));
   }
 
-  // ── Template CRUD ────────────────────────────────────────────
   async function loadTmplFoods(tmplId){
     setTmplFoodsLoading(true);
     const{data}=await getSupabase().from("template_food_items").select("*").eq("template_id",tmplId).order("category").order("name");
@@ -284,7 +289,7 @@ export default function AdminFood(){
   }
 
   async function deleteTmpl(t){
-    if(!confirm(`Delete "${t.name}" and all ${(foodLinks.filter(l=>l.template_id===t.id).length||allFoods.filter(f=>f.template_id===t.id).length)} food items? Cannot be undone.`))return;
+    if(!confirm(`Delete "${t.name}" and all its food items? Cannot be undone.`))return;
     await getSupabase().from("template_food_items").delete().eq("template_id",t.id);
     await getSupabase().from("meal_templates").delete().eq("id",t.id);
     showToast("Template deleted");await loadAll();
@@ -311,14 +316,13 @@ export default function AdminFood(){
     showToast("Food removed");await loadTmplFoods(activeTmpl.id);await loadAll();
   }
 
-  // ── Render cells ─────────────────────────────────────────────
   function renderUserCell(row,key,raw){
     const tmpl=templates.find(t=>t.id===row.active_template_id);
     switch(key){
       case"full_name":return raw?row.full_name:<b>{row.full_name||"—"}</b>;
       case"email":return row.email||"—";
       case"status":if(raw)return row.status;
-        return<span style={{padding:"2px 8px",borderRadius:20,fontSize:10,fontWeight:600,background:row.status==="approved"?GL:row.status==="pending"?AL:RL,color:row.status==="approved"?G:row.status==="pending"?A:R}}>{row.status}</span>;
+        return<span style={{padding:"2px 8px",borderRadius:20,fontSize:10,fontWeight:600,background:row.status==="approved"||row.status==="active"?GL:row.status==="pending"?AL:RL,color:row.status==="approved"||row.status==="active"?G:row.status==="pending"?A:R}}>{row.status}</span>;
       case"template":return raw?tmpl?.name||"":<span style={{fontSize:11,color:tmpl?P:TXT3}}>{tmpl?.name||"Not assigned"}</span>;
       case"conditions":if(raw)return Object.keys(row.conditions||{}).filter(k=>k!=="none").join(", ");
         return<span style={{fontSize:11,color:TXT2}}>{Object.keys(row.conditions||{}).filter(k=>k!=="none").join(", ")||"—"}</span>;
@@ -346,375 +350,339 @@ export default function AdminFood(){
     }
   }
 
-  // ── Detail panels ─────────────────────────────────────────────
-
-function UserDetail({u,onClose,templates,users,allFoods,approveUser,blockUser}){
-  const tmpl=templates.find(t=>t.id===u.active_template_id);
-  const conds=Object.keys(u.conditions||{}).filter(k=>k!=="none");
-  const tmplUsers=u.active_template_id?users.filter(x=>x.active_template_id===u.active_template_id&&x.id!==u.id):[];
-  const tmplFoodsForUser=u.active_template_id?allFoods.filter(f=>f.template_id===u.active_template_id):[];
-  return(
-    <div>
-      <button onClick={onClose} style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:TXT2,cursor:"pointer",border:"none",background:"none",fontFamily:"inherit",marginBottom:16,padding:0}}>← Back to users</button>
-      <div style={{background:CARD,borderRadius:13,border:`1px solid ${BORDER}`,padding:16,marginBottom:12}}>
-        <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16,flexWrap:"wrap"}}>
-          <div style={{width:48,height:48,borderRadius:12,background:PL,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,color:P,fontSize:20,flexShrink:0}}>{u.full_name?.[0]||"?"}</div>
-          <div style={{flex:1}}>
-            <div style={{fontSize:16,fontWeight:700}}>{u.full_name}</div>
-            <div style={{fontSize:12,color:TXT2}}>{u.email}</div>
-            {conds.length>0&&<div style={{fontSize:11,color:TXT3,marginTop:2}}>{conds.join(" · ")}</div>}
+  function UserDetail({u,onClose}){
+    const tmpl=templates.find(t=>t.id===u.active_template_id);
+    const conds=Object.keys(u.conditions||{}).filter(k=>k!=="none");
+    const tmplUsers=u.active_template_id?users.filter(x=>x.active_template_id===u.active_template_id&&x.id!==u.id):[];
+    const tmplFoodsForUser=u.active_template_id?allFoods.filter(f=>f.template_id===u.active_template_id):[];
+    return(
+      <div>
+        <button onClick={onClose} style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:TXT2,cursor:"pointer",border:"none",background:"none",fontFamily:"inherit",marginBottom:16,padding:0}}>← Back to users</button>
+        <div style={{background:CARD,borderRadius:13,border:`1px solid ${BORDER}`,padding:16,marginBottom:12}}>
+          <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16,flexWrap:"wrap"}}>
+            <div style={{width:48,height:48,borderRadius:12,background:PL,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,color:P,fontSize:20,flexShrink:0}}>{u.full_name?.[0]||"?"}</div>
+            <div style={{flex:1}}>
+              <div style={{fontSize:16,fontWeight:700}}>{u.full_name}</div>
+              <div style={{fontSize:12,color:TXT2}}>{u.email}</div>
+              {conds.length>0&&<div style={{fontSize:11,color:TXT3,marginTop:2}}>{conds.join(" · ")}</div>}
+            </div>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+              {u.status==="pending"&&<button onClick={()=>approveUser(u.id)} style={{padding:"6px 14px",background:P,color:"#fff",border:"none",borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>✓ Approve</button>}
+              {(u.status==="approved"||u.status==="active")&&<button onClick={()=>blockUser(u.id)} style={{padding:"6px 14px",background:CARD,color:R,border:`1px solid ${RL}`,borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>Block</button>}
+              {u.status==="blocked"&&<button onClick={()=>approveUser(u.id)} style={{padding:"6px 14px",background:GL,color:G,border:`1px solid ${G}`,borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>Restore</button>}
+            </div>
           </div>
-          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-            {u.status==="pending"&&<button onClick={()=>approveUser(u.id)} style={{padding:"6px 14px",background:P,color:"#fff",border:"none",borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>✓ Approve</button>}
-            {u.status==="approved"&&<button onClick={()=>blockUser(u.id)} style={{padding:"6px 14px",background:CARD,color:R,border:`1px solid ${RL}`,borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>Block</button>}
-            {u.status==="blocked"&&<button onClick={()=>approveUser(u.id)} style={{padding:"6px 14px",background:GL,color:G,border:`1px solid ${G}`,borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>Restore</button>}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:8,marginBottom:16}}>
+            {[{l:"Status",v:u.status},{l:"Weight",v:u.weight_current?`${u.weight_current}kg`:"—"},{l:"Target",v:u.weight_target?`${u.weight_target}kg`:"—"},{l:"Diet",v:u.diet_type||"—"},{l:"Activity",v:u.activity_level||"—"},{l:"Meals/day",v:u.meals_per_day||"—"}].map((s,i)=>(
+              <div key={i} style={{background:BG,borderRadius:8,padding:"8px 10px"}}><div style={{fontSize:10,color:TXT2}}>{s.l}</div><div style={{fontSize:13,fontWeight:600}}>{s.v}</div></div>
+            ))}
           </div>
+          <div style={{marginBottom:12}}>
+            <div style={{fontSize:11,fontWeight:700,color:TXT2,textTransform:"uppercase",letterSpacing:".04em",marginBottom:6}}>Assign meal template</div>
+            <select value={u.active_template_id||""} onChange={e=>assignTemplate(u.id,e.target.value)}
+              style={{width:"100%",padding:"9px 12px",border:`1.5px solid ${BORDER}`,borderRadius:9,fontSize:13,color:TXT,outline:"none",background:CARD,cursor:"pointer",fontFamily:"inherit"}}>
+              <option value="">— Select template —</option>
+              {templates.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          </div>
+          {tmpl&&<div style={{background:GL,border:`1px solid ${G}`,borderRadius:9,padding:"10px 13px",fontSize:12,color:G,marginBottom:12}}>
+            ✓ On <b>{tmpl.name}</b> · {tmplFoodsForUser.length} food items · {tmplUsers.length} other user{tmplUsers.length!==1?"s":""} on this template
+          </div>}
         </div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:8,marginBottom:16}}>
-          {[{l:"Status",v:u.status},{l:"Weight",v:u.weight_current?`${u.weight_current}kg`:"—"},{l:"Target",v:u.weight_target?`${u.weight_target}kg`:"—"},{l:"Diet",v:u.diet_type||"—"},{l:"Activity",v:u.activity_level||"—"},{l:"Meals/day",v:u.meals_per_day||"—"}].map((s,i)=>(
-            <div key={i} style={{background:BG,borderRadius:8,padding:"8px 10px"}}><div style={{fontSize:10,color:TXT2}}>{s.l}</div><div style={{fontSize:13,fontWeight:600}}>{s.v}</div></div>
-          ))}
-        </div>
-        <div style={{marginBottom:12}}>
-          <div style={{fontSize:11,fontWeight:700,color:TXT2,textTransform:"uppercase",letterSpacing:".04em",marginBottom:6}}>Assign meal template</div>
-          <select value={u.active_template_id||""} onChange={e=>assignTemplate(u.id,e.target.value)}
-            style={{width:"100%",padding:"9px 12px",border:`1.5px solid ${BORDER}`,borderRadius:9,fontSize:13,color:TXT,outline:"none",background:CARD,cursor:"pointer",fontFamily:"inherit"}}>
-            <option value="">— Select template —</option>
-            {templates.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
-        </div>
-        {tmpl&&<div style={{background:GL,border:`1px solid ${G}`,borderRadius:9,padding:"10px 13px",fontSize:12,color:G,marginBottom:12}}>
-          ✓ On <b>{tmpl.name}</b> · {tmplFoodsForUser.length} food items · {tmplUsers.length} other user{tmplUsers.length!==1?"s":""} on this template
-        </div>}
+        {tmplFoodsForUser.length>0&&(
+          <div style={{background:CARD,borderRadius:13,border:`1px solid ${BORDER}`,padding:14}}>
+            <div style={{fontSize:11,fontWeight:700,color:TXT2,textTransform:"uppercase",letterSpacing:".04em",marginBottom:10}}>Food items in {tmpl?.name} ({tmplFoodsForUser.length})</div>
+            <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>{tmplFoodsForUser.map(f=><span key={f.id} style={{padding:"3px 10px",borderRadius:20,background:BG,border:`1px solid ${BORDER}`,fontSize:11,color:TXT2}}>{f.name}</span>)}</div>
+          </div>
+        )}
       </div>
-      {tmplFoodsForUser.length>0&&(
-        <div style={{background:CARD,borderRadius:13,border:`1px solid ${BORDER}`,padding:14}}>
-          <div style={{fontSize:11,fontWeight:700,color:TXT2,textTransform:"uppercase",letterSpacing:".04em",marginBottom:10}}>Food items in {tmpl?.name} ({tmplFoodsForUser.length})</div>
-          <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>{tmplFoodsForUser.map(f=><span key={f.id} style={{padding:"3px 10px",borderRadius:20,background:BG,border:`1px solid ${BORDER}`,fontSize:11,color:TXT2}}>{f.name}</span>)}</div>
-        </div>
-      )}
-    </div>
-  );
-}
+    );
+  }
 
-function FoodDetail({f,onClose,templates,users,saveFood,deleteFood,saving,toggleSlot,foodLinks,loadAll}){
-  const [form,setForm]=useState({...f});
-  const tmpl=templates.find(t=>t.id===f.template_id);
-  const tmplUsers=users.filter(u=>u.active_template_id===f.template_id);
-  return(
-    <div>
-      <button onClick={onClose} style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:TXT2,cursor:"pointer",border:"none",background:"none",fontFamily:"inherit",marginBottom:16,padding:0}}>← Back to food items</button>
-      <div style={{background:CARD,borderRadius:13,border:`1px solid ${BORDER}`,padding:16,marginBottom:12}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16,flexWrap:"wrap",gap:8}}>
-          <div><div style={{fontSize:16,fontWeight:700}}>{f.name}</div><div style={{fontSize:12,color:TXT2,marginTop:2}}>In: {tmpl?.name||"Unknown"} · {tmplUsers.length} user{tmplUsers.length!==1?"s":""} on this template</div></div>
-          <button onClick={()=>deleteFood(f)} style={{padding:"6px 14px",background:CARD,color:R,border:`1px solid ${RL}`,borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>Remove item</button>
+  function FoodDetail({f,onClose}){
+    const [form,setForm]=useState({...f});
+    const tmpl=templates.find(t=>t.id===f.template_id);
+    const tmplUsers=users.filter(u=>u.active_template_id===f.template_id);
+    return(
+      <div>
+        <button onClick={onClose} style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:TXT2,cursor:"pointer",border:"none",background:"none",fontFamily:"inherit",marginBottom:16,padding:0}}>← Back to food items</button>
+        <div style={{background:CARD,borderRadius:13,border:`1px solid ${BORDER}`,padding:16,marginBottom:12}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16,flexWrap:"wrap",gap:8}}>
+            <div><div style={{fontSize:16,fontWeight:700}}>{f.name}</div><div style={{fontSize:12,color:TXT2,marginTop:2}}>In: {tmpl?.name||"Unknown"} · {tmplUsers.length} user{tmplUsers.length!==1?"s":""} on this template</div></div>
+            <button onClick={()=>deleteFood(f)} style={{padding:"6px 14px",background:CARD,color:R,border:`1px solid ${RL}`,borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>Remove item</button>
+          </div>
+          {tmplUsers.length>0&&<div style={{background:PL,border:`1px solid ${P}`,borderRadius:9,padding:"9px 13px",fontSize:12,color:P,marginBottom:14}}>Affects: {tmplUsers.map(u=>u.full_name).join(", ")}</div>}
+          <div style={{display:"grid",gridTemplateColumns:"1fr",gap:10}}>
+            <div>
+              <div style={{fontSize:11,color:TXT2,fontWeight:700,textTransform:"uppercase",letterSpacing:".04em",marginBottom:6}}>Food name</div>
+              <input value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))}
+                style={{width:"100%",padding:"9px 12px",border:`1.5px solid ${BORDER}`,borderRadius:9,fontSize:13,color:TXT,outline:"none",fontFamily:"inherit"}}
+                onFocus={e=>e.target.style.borderColor=P} onBlur={e=>e.target.style.borderColor=BORDER}/>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8}}>
+              {[["calories","Calories","#7F77DD"],["protein","Protein g",G],["carbs","Carbs g",A],["fat","Fat g","#D85A30"]].map(([k,l,c])=>(
+                <div key={k}><div style={{fontSize:10,color:TXT2,marginBottom:4}}>{l}</div>
+                  <input type="number" value={form[k]||""} onChange={e=>setForm(f=>({...f,[k]:e.target.value}))}
+                    style={{width:"100%",padding:"8px",border:`1.5px solid ${BORDER}`,borderRadius:8,fontSize:13,color:c,fontWeight:600,outline:"none",textAlign:"center",fontFamily:"inherit"}}
+                    onFocus={e=>e.target.style.borderColor=P} onBlur={e=>e.target.style.borderColor=BORDER}/></div>
+              ))}
+            </div>
+            <div><div style={{fontSize:11,color:TXT2,fontWeight:700,textTransform:"uppercase",letterSpacing:".04em",marginBottom:6}}>Category</div>
+              <select value={form.category||""} onChange={e=>setForm(f=>({...f,category:e.target.value}))}
+                style={{width:"100%",padding:"9px 12px",border:`1.5px solid ${BORDER}`,borderRadius:9,fontSize:13,color:TXT,outline:"none",background:CARD,fontFamily:"inherit"}}>
+                {CATEGORIES.map(c=><option key={c}>{c}</option>)}
+              </select></div>
+            <div><div style={{fontSize:11,color:TXT2,fontWeight:700,textTransform:"uppercase",letterSpacing:".04em",marginBottom:6}}>Meal slots</div>
+              <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+                {MEAL_SLOTS.map(s=>(
+                  <button key={s} onClick={()=>setForm(f=>({...f,meal_slots:f.meal_slots?.includes(s)?f.meal_slots.filter(x=>x!==s):[...(f.meal_slots||[]),s]}))}
+                    style={{padding:"4px 10px",borderRadius:20,border:`1px solid ${form.meal_slots?.includes(s)?P:BORDER}`,fontSize:11,cursor:"pointer",background:form.meal_slots?.includes(s)?PL:CARD,color:form.meal_slots?.includes(s)?P:TXT2,fontFamily:"inherit",fontWeight:form.meal_slots?.includes(s)?600:400}}>
+                    {s}
+                  </button>
+                ))}
+              </div></div>
+            <div>
+              <div style={{fontSize:11,color:TXT2,fontWeight:700,textTransform:"uppercase",letterSpacing:".04em",marginBottom:6}}>
+                Assign to templates <span style={{fontWeight:400,marginLeft:6,textTransform:"none",fontSize:10}}>— changes save immediately</span>
+              </div>
+              <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                {templates.map(t=>{
+                  const linked=(foodLinks||[]).some(l=>l.food_item_id===f.id&&l.template_id===t.id);
+                  return(
+                    <button key={t.id} type="button"
+                      onClick={async()=>{
+                        const sb=getSupabase();
+                        if(linked){await sb.from("food_template_links").delete().eq("food_item_id",f.id).eq("template_id",t.id);}
+                        else{await sb.from("food_template_links").insert({food_item_id:f.id,template_id:t.id});}
+                        await loadAll();
+                      }}
+                      style={{padding:"5px 12px",borderRadius:20,border:`1.5px solid ${linked?P:BORDER}`,fontSize:12,cursor:"pointer",background:linked?PL:CARD,color:linked?P:TXT2,fontFamily:"inherit",fontWeight:linked?700:400,transition:"all .15s",display:"flex",alignItems:"center",gap:5}}>
+                      {linked&&<span style={{fontSize:10}}>✓</span>}
+                      {t.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+          <div style={{display:"flex",gap:10,marginTop:16}}>
+            <button disabled={saving} onClick={()=>saveFood(form)} style={{padding:"10px 20px",background:P,color:"#fff",border:"none",borderRadius:9,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit",opacity:saving?.6:1}}>{saving?"Saving…":"Save changes"}</button>
+            <button onClick={onClose} style={{padding:"10px 16px",background:CARD,color:TXT2,border:`1px solid ${BORDER}`,borderRadius:9,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>Cancel</button>
+          </div>
         </div>
-        {tmplUsers.length>0&&<div style={{background:PL,border:`1px solid ${P}`,borderRadius:9,padding:"9px 13px",fontSize:12,color:P,marginBottom:14}}>Affects: {tmplUsers.map(u=>u.full_name).join(", ")}</div>}
-        <div style={{display:"grid",gridTemplateColumns:"1fr",gap:10}}>
+      </div>
+    );
+  }
+
+  function TemplatesView(){
+    const tmplStats=templates.map(t=>({
+      ...t,
+      foodCount:allFoods.filter(f=>f.template_id===t.id).length,
+      userCount:users.filter(u=>u.active_template_id===t.id).length,
+    }));
+    const filteredTmplFoods=tmplFoods.filter(f=>
+      !tmplSearch||f.name.toLowerCase().includes(tmplSearch.toLowerCase())||f.category?.toLowerCase().includes(tmplSearch.toLowerCase())
+    );
+    const FOOD_CATS=[...new Set(CATEGORIES)];
+    const groupedTmplFoods=FOOD_CATS.reduce((acc,cat)=>{
+      const items=filteredTmplFoods.filter(f=>(f.category||"Custom")===cat);
+      if(items.length) acc.push({cat,items});
+      return acc;
+    },[]);
+    const knownCats=new Set(FOOD_CATS);
+    const otherCats=[...new Set(filteredTmplFoods.map(f=>f.category||"Custom").filter(c=>!knownCats.has(c)))];
+    otherCats.forEach(cat=>{
+      const items=filteredTmplFoods.filter(f=>(f.category||"Custom")===cat);
+      if(items.length) groupedTmplFoods.push({cat,items});
+    });
+
+    if(tmplView==="list") return(
+      <div>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:10}}>
           <div>
-            <div style={{fontSize:11,color:TXT2,fontWeight:700,textTransform:"uppercase",letterSpacing:".04em",marginBottom:6}}>Food name</div>
-            <input value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))}
+            <div style={{fontSize:15,fontWeight:700}}>Meal Templates</div>
+            <div style={{fontSize:12,color:TXT2}}>Create diet plan templates and assign to users</div>
+          </div>
+          <button onClick={()=>{setTmplForm({name:"",conditions:[]});setTmplErr("");setTmplView("create");}}
+            style={{padding:"9px 18px",background:P,color:"#fff",border:"none",borderRadius:9,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>
+            ＋ New Template
+          </button>
+        </div>
+        {tmplStats.length===0&&(
+          <div style={{textAlign:"center",padding:"48px 20px",background:CARD,borderRadius:13,border:`1px solid ${BORDER}`}}>
+            <div style={{fontSize:36,marginBottom:12}}>🥗</div>
+            <div style={{fontWeight:600,fontSize:15,marginBottom:8}}>No templates yet</div>
+            <div style={{fontSize:12,color:TXT2,marginBottom:20}}>Create your first template to assign to users</div>
+            <button onClick={()=>{setTmplForm({name:"",conditions:[]});setTmplView("create");}} style={{padding:"9px 20px",background:P,color:"#fff",border:"none",borderRadius:9,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>＋ Create First Template</button>
+          </div>
+        )}
+        {tmplStats.map(t=>(
+          <div key={t.id} style={{background:CARD,borderRadius:12,border:`1.5px solid ${BORDER}`,padding:"14px 16px",marginBottom:10,display:"flex",alignItems:"center",gap:14,flexWrap:"wrap",cursor:"pointer",transition:"border-color .15s"}}
+            onClick={()=>{setActiveTmpl(t);loadTmplFoods(t.id);setTmplSearch("");setShowFoodForm(false);setTmplView("foods");}}
+            onMouseEnter={e=>e.currentTarget.style.borderColor=P}
+            onMouseLeave={e=>e.currentTarget.style.borderColor=BORDER}>
+            <div style={{width:44,height:44,borderRadius:12,background:PL,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>🥗</div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:14,fontWeight:700,color:TXT}}>{t.name}</div>
+              <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:5}}>
+                {(t.conditions||[]).map(c=><span key={c} style={{padding:"2px 8px",borderRadius:20,fontSize:10,fontWeight:600,background:PL,color:P}}>{c}</span>)}
+                {(!t.conditions||t.conditions.length===0)&&<span style={{fontSize:11,color:TXT3}}>No conditions tagged</span>}
+              </div>
+            </div>
+            <div style={{display:"flex",gap:16,flexShrink:0}}>
+              <div style={{textAlign:"center"}}><div style={{fontSize:18,fontWeight:700,color:G}}>{t.foodCount}</div><div style={{fontSize:10,color:TXT2}}>foods</div></div>
+              <div style={{textAlign:"center"}}><div style={{fontSize:18,fontWeight:700,color:P}}>{t.userCount}</div><div style={{fontSize:10,color:TXT2}}>users</div></div>
+            </div>
+            <div style={{display:"flex",gap:6,flexShrink:0}} onClick={e=>e.stopPropagation()}>
+              <button onClick={()=>{setActiveTmpl(t);setTmplForm({name:t.name,conditions:t.conditions||[]});setTmplErr("");setTmplView("edit");}}
+                style={{padding:"6px 12px",borderRadius:8,border:`1px solid ${BORDER}`,background:CARD,color:TXT2,fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>Edit</button>
+              <button onClick={()=>deleteTmpl(t)}
+                style={{padding:"6px 12px",borderRadius:8,border:`1px solid ${RL}`,background:CARD,color:R,fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>Delete</button>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+
+    if(tmplView==="create"||tmplView==="edit") return(
+      <div>
+        <button onClick={()=>setTmplView("list")} style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:TXT2,cursor:"pointer",border:"none",background:"none",fontFamily:"inherit",marginBottom:16,padding:0}}>← Back to templates</button>
+        <div style={{background:CARD,borderRadius:13,border:`1px solid ${BORDER}`,padding:18}}>
+          <div style={{fontSize:15,fontWeight:700,marginBottom:16}}>{tmplView==="edit"?"Edit Template":"New Template"}</div>
+          <div style={{marginBottom:14}}>
+            <label style={{fontSize:11,fontWeight:700,color:TXT2,textTransform:"uppercase",letterSpacing:".04em",display:"block",marginBottom:5}}>Template Name *</label>
+            <input value={tmplForm.name} onChange={e=>setTmplForm(f=>({...f,name:e.target.value}))}
+              placeholder="e.g. Diabetic + High BP Plan"
               style={{width:"100%",padding:"9px 12px",border:`1.5px solid ${BORDER}`,borderRadius:9,fontSize:13,color:TXT,outline:"none",fontFamily:"inherit"}}
               onFocus={e=>e.target.style.borderColor=P} onBlur={e=>e.target.style.borderColor=BORDER}/>
           </div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8}}>
-            {[["calories","Calories","#7F77DD"],["protein","Protein g",G],["carbs","Carbs g",A],["fat","Fat g","#D85A30"]].map(([k,l,c])=>(
-              <div key={k}><div style={{fontSize:10,color:TXT2,marginBottom:4}}>{l}</div>
-                <input type="number" value={form[k]||""} onChange={e=>setForm(f=>({...f,[k]:e.target.value}))}
-                  style={{width:"100%",padding:"8px",border:`1.5px solid ${BORDER}`,borderRadius:8,fontSize:13,color:c,fontWeight:600,outline:"none",textAlign:"center",fontFamily:"inherit"}}
-                  onFocus={e=>e.target.style.borderColor=P} onBlur={e=>e.target.style.borderColor=BORDER}/></div>
-            ))}
-          </div>
-          <div><div style={{fontSize:11,color:TXT2,fontWeight:700,textTransform:"uppercase",letterSpacing:".04em",marginBottom:6}}>Category</div>
-            <select value={form.category||""} onChange={e=>setForm(f=>({...f,category:e.target.value}))}
-              style={{width:"100%",padding:"9px 12px",border:`1.5px solid ${BORDER}`,borderRadius:9,fontSize:13,color:TXT,outline:"none",background:CARD,fontFamily:"inherit"}}>
-              {CATEGORIES.map(c=><option key={c}>{c}</option>)}
-            </select></div>
-          <div><div style={{fontSize:11,color:TXT2,fontWeight:700,textTransform:"uppercase",letterSpacing:".04em",marginBottom:6}}>Meal slots</div>
-            <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
-              {MEAL_SLOTS.map(s=>(
-                <button key={s} onClick={()=>toggleSlot(s,form,setForm)}
-                  style={{padding:"4px 10px",borderRadius:20,border:`1px solid ${form.meal_slots?.includes(s)?P:BORDER}`,fontSize:11,cursor:"pointer",background:form.meal_slots?.includes(s)?PL:CARD,color:form.meal_slots?.includes(s)?P:TXT2,fontFamily:"inherit",fontWeight:form.meal_slots?.includes(s)?600:400}}>
-                  {s}
+          <div style={{marginBottom:16}}>
+            <label style={{fontSize:11,fontWeight:700,color:TXT2,textTransform:"uppercase",letterSpacing:".04em",display:"block",marginBottom:8}}>Conditions / Tags</label>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+              {CONDITION_OPTIONS.map(c=>(
+                <button key={c} onClick={()=>setTmplForm(f=>({...f,conditions:f.conditions.includes(c)?f.conditions.filter(x=>x!==c):[...f.conditions,c]}))}
+                  style={{padding:"5px 12px",borderRadius:20,border:`1.5px solid ${tmplForm.conditions.includes(c)?P:BORDER}`,fontSize:12,cursor:"pointer",background:tmplForm.conditions.includes(c)?PL:CARD,color:tmplForm.conditions.includes(c)?P:TXT2,fontFamily:"inherit",fontWeight:tmplForm.conditions.includes(c)?600:400,transition:"all .15s"}}>
+                  {c}
                 </button>
               ))}
-            </div></div>
-          <div>
-            <div style={{fontSize:11,color:TXT2,fontWeight:700,textTransform:"uppercase",letterSpacing:".04em",marginBottom:6}}>
-              Assign to templates
-              <span style={{fontWeight:400,marginLeft:6,textTransform:"none",fontSize:10}}>— changes save immediately</span>
-            </div>
-            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-              {templates.map(t=>{
-                const linked=(foodLinks||[]).some(l=>l.food_item_id===f.id&&l.template_id===t.id);
-                return(
-                  <button key={t.id} type="button"
-                    onClick={async()=>{
-                      const sb=getSupabase();
-                      if(linked){await sb.from("food_template_links").delete().eq("food_item_id",f.id).eq("template_id",t.id);}
-                      else{await sb.from("food_template_links").insert({food_item_id:f.id,template_id:t.id});}
-                      if(loadAll) await loadAll();
-                    }}
-                    style={{padding:"5px 12px",borderRadius:20,border:`1.5px solid ${linked?P:BORDER}`,fontSize:12,cursor:"pointer",background:linked?PL:CARD,color:linked?P:TXT2,fontFamily:"inherit",fontWeight:linked?700:400,transition:"all .15s",display:"flex",alignItems:"center",gap:5}}>
-                    {linked&&<span style={{fontSize:10}}>✓</span>}
-                    {t.name}
-                  </button>
-                );
-              })}
             </div>
           </div>
-        </div>
-        <div style={{display:"flex",gap:10,marginTop:16}}>
-          <button disabled={saving} onClick={()=>saveFood(form)} style={{padding:"10px 20px",background:P,color:"#fff",border:"none",borderRadius:9,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit",opacity:saving?.6:1}}>{saving?"Saving…":"Save changes"}</button>
-          <button onClick={onClose} style={{padding:"10px 16px",background:CARD,color:TXT2,border:`1px solid ${BORDER}`,borderRadius:9,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>Cancel</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function TemplatesView({
-  tmplView,setTmplView,activeTmpl,setActiveTmpl,
-  tmplForm,setTmplForm,tmplSaving,tmplErr,
-  tmplFoods,tmplFoodsLoading,
-  showFoodForm,setShowFoodForm,editFoodItem,setEditFoodItem,
-  fForm,setFForm,fSaving,fErr,tmplSearch,setTmplSearch,
-  templates,allFoods,users,
-  saveTmpl,deleteTmpl,saveFoodItem,deleteFoodItem,
-}){
-  // Stats per template
-  const tmplStats=templates.map(t=>({
-    ...t,
-    foodCount:allFoods.filter(f=>f.template_id===t.id).length,
-    userCount:users.filter(u=>u.active_template_id===t.id).length,
-  }));
-
-  // Filter foods for selected template in foods sub-view
-  const filteredTmplFoods=tmplFoods.filter(f=>
-    !tmplSearch||f.name.toLowerCase().includes(tmplSearch.toLowerCase())||f.category?.toLowerCase().includes(tmplSearch.toLowerCase())
-  );
-  const FOOD_CATS=[...new Set(CATEGORIES)];
-  const groupedTmplFoods=FOOD_CATS.reduce((acc,cat)=>{
-    const items=filteredTmplFoods.filter(f=>(f.category||"Custom")===cat);
-    if(items.length) acc.push({cat,items});
-    return acc;
-  },[]);
-  const knownCats=new Set(FOOD_CATS);
-  const otherCats=[...new Set(filteredTmplFoods.map(f=>f.category||"Custom").filter(c=>!knownCats.has(c)))];
-  otherCats.forEach(cat=>{
-    const items=filteredTmplFoods.filter(f=>(f.category||"Custom")===cat);
-    if(items.length) groupedTmplFoods.push({cat,items});
-  });
-
-  // ── List all templates ──────────────────────────────────────
-  if(tmplView==="list") return(
-    <div>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:10}}>
-        <div>
-          <div style={{fontSize:15,fontWeight:700}}>Meal Templates</div>
-          <div style={{fontSize:12,color:TXT2}}>Create diet plan templates and assign to users</div>
-        </div>
-        <button onClick={()=>{setTmplForm({name:"",conditions:[]});setTmplErr("");setTmplView("create");}}
-          style={{padding:"9px 18px",background:P,color:"#fff",border:"none",borderRadius:9,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>
-          ＋ New Template
-        </button>
-      </div>
-
-      {tmplStats.length===0&&(
-        <div style={{textAlign:"center",padding:"48px 20px",background:CARD,borderRadius:13,border:`1px solid ${BORDER}`}}>
-          <div style={{fontSize:36,marginBottom:12}}>🥗</div>
-          <div style={{fontWeight:600,fontSize:15,marginBottom:8}}>No templates yet</div>
-          <div style={{fontSize:12,color:TXT2,marginBottom:20}}>Create your first template to assign to users</div>
-          <button onClick={()=>{setTmplForm({name:"",conditions:[]});setTmplView("create");}} style={{padding:"9px 20px",background:P,color:"#fff",border:"none",borderRadius:9,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>＋ Create First Template</button>
-        </div>
-      )}
-
-      {tmplStats.map(t=>(
-        <div key={t.id} style={{background:CARD,borderRadius:12,border:`1.5px solid ${BORDER}`,padding:"14px 16px",marginBottom:10,display:"flex",alignItems:"center",gap:14,flexWrap:"wrap",cursor:"pointer",transition:"border-color .15s"}}
-          onClick={()=>{setActiveTmpl(t);loadTmplFoods(t.id);setTmplSearch("");setShowFoodForm(false);setTmplView("foods");}}
-          onMouseEnter={e=>e.currentTarget.style.borderColor=P}
-          onMouseLeave={e=>e.currentTarget.style.borderColor=BORDER}>
-          <div style={{width:44,height:44,borderRadius:12,background:PL,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>🥗</div>
-          <div style={{flex:1,minWidth:0}}>
-            <div style={{fontSize:14,fontWeight:700,color:TXT}}>{t.name}</div>
-            <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:5}}>
-              {(t.conditions||[]).map(c=><span key={c} style={{padding:"2px 8px",borderRadius:20,fontSize:10,fontWeight:600,background:PL,color:P}}>{c}</span>)}
-              {(!t.conditions||t.conditions.length===0)&&<span style={{fontSize:11,color:TXT3}}>No conditions tagged</span>}
-            </div>
-          </div>
-          <div style={{display:"flex",gap:16,flexShrink:0}}>
-            <div style={{textAlign:"center"}}>
-              <div style={{fontSize:18,fontWeight:700,color:G}}>{t.foodCount}</div>
-              <div style={{fontSize:10,color:TXT2}}>foods</div>
-            </div>
-            <div style={{textAlign:"center"}}>
-              <div style={{fontSize:18,fontWeight:700,color:P}}>{t.userCount}</div>
-              <div style={{fontSize:10,color:TXT2}}>users</div>
-            </div>
-          </div>
-          <div style={{display:"flex",gap:6,flexShrink:0}} onClick={e=>e.stopPropagation()}>
-            <button onClick={()=>{setActiveTmpl(t);setTmplForm({name:t.name,conditions:t.conditions||[]});setTmplErr("");setTmplView("edit");}}
-              style={{padding:"6px 12px",borderRadius:8,border:`1px solid ${BORDER}`,background:CARD,color:TXT2,fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>Edit</button>
-            <button onClick={()=>deleteTmpl(t)}
-              style={{padding:"6px 12px",borderRadius:8,border:`1px solid ${RL}`,background:CARD,color:R,fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>Delete</button>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-
-  // ── Create / Edit template form ─────────────────────────────
-  if(tmplView==="create"||tmplView==="edit") return(
-    <div>
-      <button onClick={()=>setTmplView("list")} style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:TXT2,cursor:"pointer",border:"none",background:"none",fontFamily:"inherit",marginBottom:16,padding:0}}>← Back to templates</button>
-      <div style={{background:CARD,borderRadius:13,border:`1px solid ${BORDER}`,padding:18}}>
-        <div style={{fontSize:15,fontWeight:700,marginBottom:16}}>{tmplView==="edit"?"Edit Template":"New Template"}</div>
-        <div style={{marginBottom:14}}>
-          <label style={{fontSize:11,fontWeight:700,color:TXT2,textTransform:"uppercase",letterSpacing:".04em",display:"block",marginBottom:5}}>Template Name *</label>
-          <input value={tmplForm.name} onChange={e=>setTmplForm(f=>({...f,name:e.target.value}))}
-            placeholder="e.g. Diabetic + High BP Plan"
-            style={{width:"100%",padding:"9px 12px",border:`1.5px solid ${BORDER}`,borderRadius:9,fontSize:13,color:TXT,outline:"none",fontFamily:"inherit"}}
-            onFocus={e=>e.target.style.borderColor=P} onBlur={e=>e.target.style.borderColor=BORDER}/>
-        </div>
-        <div style={{marginBottom:16}}>
-          <label style={{fontSize:11,fontWeight:700,color:TXT2,textTransform:"uppercase",letterSpacing:".04em",display:"block",marginBottom:8}}>Conditions / Tags</label>
-          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-            {CONDITION_OPTIONS.map(c=>(
-              <button key={c} onClick={()=>setTmplForm(f=>({...f,conditions:f.conditions.includes(c)?f.conditions.filter(x=>x!==c):[...f.conditions,c]}))}
-                style={{padding:"5px 12px",borderRadius:20,border:`1.5px solid ${tmplForm.conditions.includes(c)?P:BORDER}`,fontSize:12,cursor:"pointer",background:tmplForm.conditions.includes(c)?PL:CARD,color:tmplForm.conditions.includes(c)?P:TXT2,fontFamily:"inherit",fontWeight:tmplForm.conditions.includes(c)?600:400,transition:"all .15s"}}>
-                {c}
-              </button>
-            ))}
-          </div>
-        </div>
-        {tmplErr&&<div style={{color:R,fontSize:12,padding:"6px 10px",background:"#fff5f5",borderRadius:8,marginBottom:12}}>{tmplErr}</div>}
-        <div style={{display:"flex",gap:10}}>
-          <button disabled={tmplSaving} onClick={saveTmpl}
-            style={{padding:"10px 22px",background:P,color:"#fff",border:"none",borderRadius:9,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit",opacity:tmplSaving?.6:1}}>
-            {tmplSaving?"Saving…":tmplView==="edit"?"Save Changes":"Create Template"}
-          </button>
-          <button onClick={()=>setTmplView("list")} style={{padding:"10px 16px",background:CARD,color:TXT2,border:`1px solid ${BORDER}`,borderRadius:9,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>Cancel</button>
-        </div>
-      </div>
-    </div>
-  );
-
-  // ── Foods inside a template ─────────────────────────────────
-  if(tmplView==="foods"&&activeTmpl) return(
-    <div>
-      <button onClick={()=>{setTmplView("list");setShowFoodForm(false);}} style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:TXT2,cursor:"pointer",border:"none",background:"none",fontFamily:"inherit",marginBottom:14,padding:0}}>← All templates</button>
-      <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:14,gap:10,flexWrap:"wrap"}}>
-        <div>
-          <div style={{fontSize:16,fontWeight:700}}>{activeTmpl.name}</div>
-          <div style={{display:"flex",gap:4,flexWrap:"wrap",marginTop:4}}>
-            {(activeTmpl.conditions||[]).map(c=><span key={c} style={{padding:"2px 8px",borderRadius:20,fontSize:10,fontWeight:600,background:PL,color:P}}>{c}</span>)}
-          </div>
-        </div>
-        <button onClick={()=>{setFForm({name:"",calories:"",protein:"",carbs:"",fat:"",category:"Protein"});setEditFoodItem(null);setFErr("");setShowFoodForm(true);}}
-          style={{padding:"9px 18px",background:G,color:"#fff",border:"none",borderRadius:9,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit",flexShrink:0}}>
-          ＋ Add Food
-        </button>
-      </div>
-
-      {/* Stats row */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(110px,1fr))",gap:8,marginBottom:14}}>
-        {[{l:"Total foods",v:tmplFoods.length,c:P},{l:"Avg calories",v:tmplFoods.length?Math.round(tmplFoods.reduce((s,f)=>s+(f.calories||0),0)/tmplFoods.length):0,c:"#7F77DD"},{l:"Categories",v:[...new Set(tmplFoods.map(f=>f.category))].length,c:G},{l:"Users on plan",v:users.filter(u=>u.active_template_id===activeTmpl.id).length,c:A}].map((s,i)=>(
-          <div key={i} style={{background:BG,borderRadius:10,padding:"10px 12px",textAlign:"center"}}><div style={{fontSize:18,fontWeight:700,color:s.c}}>{s.v}</div><div style={{fontSize:10,color:TXT2,marginTop:2}}>{s.l}</div></div>
-        ))}
-      </div>
-
-      {/* Add/Edit food inline form */}
-      {showFoodForm&&(
-        <div style={{background:CARD,borderRadius:12,border:`1.5px solid ${editFoodItem?A:G}`,padding:16,marginBottom:14}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-            <div style={{fontWeight:700,fontSize:13,color:editFoodItem?A:G}}>{editFoodItem?"Edit Food":"Add New Food"}</div>
-            <button onClick={()=>{setShowFoodForm(false);setEditFoodItem(null);setFForm({name:"",calories:"",protein:"",carbs:"",fat:"",category:"Protein"});}}
-              style={{width:26,height:26,borderRadius:"50%",border:`1px solid ${BORDER}`,background:"transparent",cursor:"pointer",fontSize:15,color:TXT2,display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
-          </div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
-            <div><label style={{fontSize:10,color:TXT2,fontWeight:700,textTransform:"uppercase",display:"block",marginBottom:4}}>Food Name *</label>
-              <input value={fForm.name} onChange={e=>setFForm(f=>({...f,name:e.target.value}))} placeholder="e.g. Boiled Egg 1 whole"
-                style={{width:"100%",padding:"8px 11px",border:`1.5px solid ${BORDER}`,borderRadius:8,fontSize:13,color:TXT,outline:"none",fontFamily:"inherit"}}
-                onFocus={e=>e.target.style.borderColor=G} onBlur={e=>e.target.style.borderColor=BORDER}/></div>
-            <div><label style={{fontSize:10,color:TXT2,fontWeight:700,textTransform:"uppercase",display:"block",marginBottom:4}}>Category</label>
-              <select value={fForm.category} onChange={e=>setFForm(f=>({...f,category:e.target.value}))}
-                style={{width:"100%",padding:"8px 11px",border:`1.5px solid ${BORDER}`,borderRadius:8,fontSize:13,color:TXT,outline:"none",background:CARD,fontFamily:"inherit"}}>
-                {CATEGORIES.map(c=><option key={c}>{c}</option>)}
-              </select></div>
-          </div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:10}}>
-            {[["Calories *","calories","#7F77DD"],["Protein g","protein",G],["Carbs g","carbs",A],["Fat g","fat","#D85A30"]].map(([l,k,c])=>(
-              <div key={k}><label style={{fontSize:10,color:TXT2,fontWeight:700,textTransform:"uppercase",display:"block",marginBottom:4}}>{l}</label>
-                <input type="number" placeholder="0" value={fForm[k]} onChange={e=>setFForm(f=>({...f,[k]:e.target.value}))}
-                  style={{width:"100%",padding:"8px",border:`1.5px solid ${BORDER}`,borderRadius:8,fontSize:13,color:c,fontWeight:600,outline:"none",textAlign:"center",fontFamily:"inherit"}}
-                  onFocus={e=>e.target.style.borderColor=G} onBlur={e=>e.target.style.borderColor=BORDER}/></div>
-            ))}
-          </div>
-          {fErr&&<div style={{color:R,fontSize:12,padding:"5px 9px",background:"#fff5f5",borderRadius:7,marginBottom:8}}>{fErr}</div>}
-          <div style={{display:"flex",gap:8}}>
-            <button disabled={fSaving} onClick={saveFoodItem}
-              style={{padding:"8px 18px",background:G,color:"#fff",border:"none",borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit",opacity:fSaving?.6:1}}>
-              {fSaving?"Saving…":editFoodItem?"Update":"Add Food"}
+          {tmplErr&&<div style={{color:R,fontSize:12,padding:"6px 10px",background:"#fff5f5",borderRadius:8,marginBottom:12}}>{tmplErr}</div>}
+          <div style={{display:"flex",gap:10}}>
+            <button disabled={tmplSaving} onClick={saveTmpl}
+              style={{padding:"10px 22px",background:P,color:"#fff",border:"none",borderRadius:9,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit",opacity:tmplSaving?.6:1}}>
+              {tmplSaving?"Saving…":tmplView==="edit"?"Save Changes":"Create Template"}
             </button>
-            <button onClick={()=>{setShowFoodForm(false);setEditFoodItem(null);}} style={{padding:"8px 14px",border:`1px solid ${BORDER}`,borderRadius:8,background:CARD,color:TXT2,fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>Cancel</button>
+            <button onClick={()=>setTmplView("list")} style={{padding:"10px 16px",background:CARD,color:TXT2,border:`1px solid ${BORDER}`,borderRadius:9,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>Cancel</button>
           </div>
         </div>
-      )}
-
-      {/* Search */}
-      <div style={{display:"flex",alignItems:"center",gap:8,background:CARD,borderRadius:10,padding:"8px 12px",border:`1px solid ${BORDER}`,marginBottom:12}}>
-        <span style={{color:TXT3}}>🔍</span>
-        <input placeholder="Search foods or category…" value={tmplSearch} onChange={e=>setTmplSearch(e.target.value)}
-          style={{flex:1,border:"none",background:"transparent",fontSize:12,color:TXT,outline:"none",fontFamily:"inherit"}}/>
-        {tmplSearch&&<button onClick={()=>setTmplSearch("")} style={{border:"none",background:"transparent",color:TXT3,cursor:"pointer",fontSize:14}}>×</button>}
-        <span style={{fontSize:11,color:TXT3,flexShrink:0}}>{filteredTmplFoods.length} items</span>
       </div>
+    );
 
-      {tmplFoodsLoading&&<div style={{textAlign:"center",padding:"30px",color:TXT2}}>Loading…</div>}
-
-      {!tmplFoodsLoading&&tmplFoods.length===0&&(
-        <div style={{textAlign:"center",padding:"40px",background:CARD,borderRadius:12,border:`1px solid ${BORDER}`}}>
-          <div style={{fontSize:30,marginBottom:10}}>🍽️</div>
-          <div style={{fontWeight:600,marginBottom:6}}>No food items yet</div>
-          <div style={{fontSize:12,color:TXT2,marginBottom:14}}>Add food items to this template</div>
-          <button onClick={()=>{setFForm({name:"",calories:"",protein:"",carbs:"",fat:"",category:"Protein"});setFErr("");setShowFoodForm(true);}}
-            style={{padding:"9px 18px",background:G,color:"#fff",border:"none",borderRadius:9,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>＋ Add First Food</button>
-        </div>
-      )}
-
-      {!tmplFoodsLoading&&groupedTmplFoods.map(({cat,items})=>(
-        <div key={cat} style={{marginBottom:14}}>
-          <div style={{fontSize:9,fontWeight:800,color:TXT2,textTransform:"uppercase",letterSpacing:".07em",marginBottom:7,display:"flex",alignItems:"center",gap:6}}>
-            {cat}<span style={{flex:1,height:1,background:BORDER}}/><span style={{fontWeight:400}}>{items.length}</span>
-          </div>
-          {items.map(food=>(
-            <div key={food.id} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",borderRadius:9,border:`1px solid ${BORDER}`,marginBottom:5,background:CARD,transition:"border-color .15s"}}
-              onMouseEnter={e=>e.currentTarget.style.borderColor=P} onMouseLeave={e=>e.currentTarget.style.borderColor=BORDER}>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:12,fontWeight:600,color:TXT}}>{food.name}{food.added_by_user&&<span style={{fontSize:9,color:TXT3,marginLeft:4}}>· user-added</span>}</div>
-                <div style={{display:"flex",gap:8,marginTop:2,fontSize:11}}>
-                  <span style={{color:"#7F77DD",fontWeight:700}}>{food.calories||0} kcal</span>
-                  <span style={{color:G}}>{food.protein||0}g P</span>
-                  <span style={{color:A}}>{food.carbs||0}g C</span>
-                  <span style={{color:"#D85A30"}}>{food.fat||0}g F</span>
-                </div>
-              </div>
-              <div style={{display:"flex",gap:5,flexShrink:0}}>
-                <button onClick={()=>{setEditFoodItem(food);setFForm({name:food.name,calories:food.calories||"",protein:food.protein||"",carbs:food.carbs||"",fat:food.fat||"",category:food.category||"Protein"});setFErr("");setShowFoodForm(true);}}
-                  style={{padding:"5px 10px",border:`1px solid ${BORDER}`,borderRadius:7,background:CARD,color:TXT2,fontSize:11,cursor:"pointer",fontFamily:"inherit"}}>Edit</button>
-                <button onClick={()=>deleteFoodItem(food)}
-                  style={{padding:"5px 10px",border:`1px solid ${RL}`,borderRadius:7,background:CARD,color:R,fontSize:11,cursor:"pointer",fontFamily:"inherit"}}>✕</button>
-              </div>
+    if(tmplView==="foods"&&activeTmpl) return(
+      <div>
+        <button onClick={()=>{setTmplView("list");setShowFoodForm(false);}} style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:TXT2,cursor:"pointer",border:"none",background:"none",fontFamily:"inherit",marginBottom:14,padding:0}}>← All templates</button>
+        <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:14,gap:10,flexWrap:"wrap"}}>
+          <div>
+            <div style={{fontSize:16,fontWeight:700}}>{activeTmpl.name}</div>
+            <div style={{display:"flex",gap:4,flexWrap:"wrap",marginTop:4}}>
+              {(activeTmpl.conditions||[]).map(c=><span key={c} style={{padding:"2px 8px",borderRadius:20,fontSize:10,fontWeight:600,background:PL,color:P}}>{c}</span>)}
             </div>
+          </div>
+          <button onClick={()=>{setFForm({name:"",calories:"",protein:"",carbs:"",fat:"",category:"Protein"});setEditFoodItem(null);setFErr("");setShowFoodForm(true);}}
+            style={{padding:"9px 18px",background:G,color:"#fff",border:"none",borderRadius:9,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit",flexShrink:0}}>
+            ＋ Add Food
+          </button>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(110px,1fr))",gap:8,marginBottom:14}}>
+          {[{l:"Total foods",v:tmplFoods.length,c:P},{l:"Avg calories",v:tmplFoods.length?Math.round(tmplFoods.reduce((s,f)=>s+(f.calories||0),0)/tmplFoods.length):0,c:"#7F77DD"},{l:"Categories",v:[...new Set(tmplFoods.map(f=>f.category))].length,c:G},{l:"Users on plan",v:users.filter(u=>u.active_template_id===activeTmpl.id).length,c:A}].map((s,i)=>(
+            <div key={i} style={{background:BG,borderRadius:10,padding:"10px 12px",textAlign:"center"}}><div style={{fontSize:18,fontWeight:700,color:s.c}}>{s.v}</div><div style={{fontSize:10,color:TXT2,marginTop:2}}>{s.l}</div></div>
           ))}
         </div>
-      ))}
-    </div>
-  );
-
-  return null;
-}
-
+        {showFoodForm&&(
+          <div style={{background:CARD,borderRadius:12,border:`1.5px solid ${editFoodItem?A:G}`,padding:16,marginBottom:14}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+              <div style={{fontWeight:700,fontSize:13,color:editFoodItem?A:G}}>{editFoodItem?"Edit Food":"Add New Food"}</div>
+              <button onClick={()=>{setShowFoodForm(false);setEditFoodItem(null);setFForm({name:"",calories:"",protein:"",carbs:"",fat:"",category:"Protein"});}}
+                style={{width:26,height:26,borderRadius:"50%",border:`1px solid ${BORDER}`,background:"transparent",cursor:"pointer",fontSize:15,color:TXT2,display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+              <div><label style={{fontSize:10,color:TXT2,fontWeight:700,textTransform:"uppercase",display:"block",marginBottom:4}}>Food Name *</label>
+                <input value={fForm.name} onChange={e=>setFForm(f=>({...f,name:e.target.value}))} placeholder="e.g. Boiled Egg 1 whole"
+                  style={{width:"100%",padding:"8px 11px",border:`1.5px solid ${BORDER}`,borderRadius:8,fontSize:13,color:TXT,outline:"none",fontFamily:"inherit"}}
+                  onFocus={e=>e.target.style.borderColor=G} onBlur={e=>e.target.style.borderColor=BORDER}/></div>
+              <div><label style={{fontSize:10,color:TXT2,fontWeight:700,textTransform:"uppercase",display:"block",marginBottom:4}}>Category</label>
+                <select value={fForm.category} onChange={e=>setFForm(f=>({...f,category:e.target.value}))}
+                  style={{width:"100%",padding:"8px 11px",border:`1.5px solid ${BORDER}`,borderRadius:8,fontSize:13,color:TXT,outline:"none",background:CARD,fontFamily:"inherit"}}>
+                  {CATEGORIES.map(c=><option key={c}>{c}</option>)}
+                </select></div>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:10}}>
+              {[["Calories *","calories","#7F77DD"],["Protein g","protein",G],["Carbs g","carbs",A],["Fat g","fat","#D85A30"]].map(([l,k,c])=>(
+                <div key={k}><label style={{fontSize:10,color:TXT2,fontWeight:700,textTransform:"uppercase",display:"block",marginBottom:4}}>{l}</label>
+                  <input type="number" placeholder="0" value={fForm[k]} onChange={e=>setFForm(f=>({...f,[k]:e.target.value}))}
+                    style={{width:"100%",padding:"8px",border:`1.5px solid ${BORDER}`,borderRadius:8,fontSize:13,color:c,fontWeight:600,outline:"none",textAlign:"center",fontFamily:"inherit"}}
+                    onFocus={e=>e.target.style.borderColor=G} onBlur={e=>e.target.style.borderColor=BORDER}/></div>
+              ))}
+            </div>
+            {fErr&&<div style={{color:R,fontSize:12,padding:"5px 9px",background:"#fff5f5",borderRadius:7,marginBottom:8}}>{fErr}</div>}
+            <div style={{display:"flex",gap:8}}>
+              <button disabled={fSaving} onClick={saveFoodItem}
+                style={{padding:"8px 18px",background:G,color:"#fff",border:"none",borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit",opacity:fSaving?.6:1}}>
+                {fSaving?"Saving…":editFoodItem?"Update":"Add Food"}
+              </button>
+              <button onClick={()=>{setShowFoodForm(false);setEditFoodItem(null);}} style={{padding:"8px 14px",border:`1px solid ${BORDER}`,borderRadius:8,background:CARD,color:TXT2,fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>Cancel</button>
+            </div>
+          </div>
+        )}
+        <div style={{display:"flex",alignItems:"center",gap:8,background:CARD,borderRadius:10,padding:"8px 12px",border:`1px solid ${BORDER}`,marginBottom:12}}>
+          <span style={{color:TXT3}}>🔍</span>
+          <input placeholder="Search foods or category…" value={tmplSearch} onChange={e=>setTmplSearch(e.target.value)}
+            style={{flex:1,border:"none",background:"transparent",fontSize:12,color:TXT,outline:"none",fontFamily:"inherit"}}/>
+          {tmplSearch&&<button onClick={()=>setTmplSearch("")} style={{border:"none",background:"transparent",color:TXT3,cursor:"pointer",fontSize:14}}>×</button>}
+          <span style={{fontSize:11,color:TXT3,flexShrink:0}}>{filteredTmplFoods.length} items</span>
+        </div>
+        {tmplFoodsLoading&&<div style={{textAlign:"center",padding:"30px",color:TXT2}}>Loading…</div>}
+        {!tmplFoodsLoading&&tmplFoods.length===0&&(
+          <div style={{textAlign:"center",padding:"40px",background:CARD,borderRadius:12,border:`1px solid ${BORDER}`}}>
+            <div style={{fontSize:30,marginBottom:10}}>🍽️</div>
+            <div style={{fontWeight:600,marginBottom:6}}>No food items yet</div>
+            <div style={{fontSize:12,color:TXT2,marginBottom:14}}>Add food items to this template</div>
+            <button onClick={()=>{setFForm({name:"",calories:"",protein:"",carbs:"",fat:"",category:"Protein"});setFErr("");setShowFoodForm(true);}}
+              style={{padding:"9px 18px",background:G,color:"#fff",border:"none",borderRadius:9,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>＋ Add First Food</button>
+          </div>
+        )}
+        {!tmplFoodsLoading&&groupedTmplFoods.map(({cat,items})=>(
+          <div key={cat} style={{marginBottom:14}}>
+            <div style={{fontSize:9,fontWeight:800,color:TXT2,textTransform:"uppercase",letterSpacing:".07em",marginBottom:7,display:"flex",alignItems:"center",gap:6}}>
+              {cat}<span style={{flex:1,height:1,background:BORDER}}/><span style={{fontWeight:400}}>{items.length}</span>
+            </div>
+            {items.map(food=>(
+              <div key={food.id} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",borderRadius:9,border:`1px solid ${BORDER}`,marginBottom:5,background:CARD,transition:"border-color .15s"}}
+                onMouseEnter={e=>e.currentTarget.style.borderColor=P} onMouseLeave={e=>e.currentTarget.style.borderColor=BORDER}>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:12,fontWeight:600,color:TXT}}>{food.name}{food.added_by_user&&<span style={{fontSize:9,color:TXT3,marginLeft:4}}>· user-added</span>}</div>
+                  <div style={{display:"flex",gap:8,marginTop:2,fontSize:11}}>
+                    <span style={{color:"#7F77DD",fontWeight:700}}>{food.calories||0} kcal</span>
+                    <span style={{color:G}}>{food.protein||0}g P</span>
+                    <span style={{color:A}}>{food.carbs||0}g C</span>
+                    <span style={{color:"#D85A30"}}>{food.fat||0}g F</span>
+                  </div>
+                </div>
+                <div style={{display:"flex",gap:5,flexShrink:0}}>
+                  <button onClick={()=>{setEditFoodItem(food);setFForm({name:food.name,calories:food.calories||"",protein:food.protein||"",carbs:food.carbs||"",fat:food.fat||"",category:food.category||"Protein"});setFErr("");setShowFoodForm(true);}}
+                    style={{padding:"5px 10px",border:`1px solid ${BORDER}`,borderRadius:7,background:CARD,color:TXT2,fontSize:11,cursor:"pointer",fontFamily:"inherit"}}>Edit</button>
+                  <button onClick={()=>deleteFoodItem(food)}
+                    style={{padding:"5px 10px",border:`1px solid ${RL}`,borderRadius:7,background:CARD,color:R,fontSize:11,cursor:"pointer",fontFamily:"inherit"}}>✕</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    );
+    return null;
+  }
 
   if(!me)return(
     <div style={{background:BG,minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}>
@@ -727,7 +695,7 @@ function TemplatesView({
 
   return(
     <>
-      <Head><title>Food plans — MyHealth</title></Head>
+      <Head><title>Food plans — VitaLog</title></Head>
       <style>{`
         .tabs{display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap}
         .tab{padding:8px 18px;border-radius:20px;border:1px solid ${BORDER};font-size:12px;font-weight:600;cursor:pointer;background:transparent;color:${TXT2};font-family:inherit;transition:all .15s}
@@ -749,9 +717,8 @@ function TemplatesView({
 
       <Layout title="Food plans" profile={me}>
         <div style={{fontSize:20,fontWeight:700,marginBottom:4}}>Food plans</div>
-        <div style={{fontSize:12,color:TXT2,marginBottom:20}}>Configurable data tables — customise columns, drag to reorder, click any row to open detail</div>
+        <div style={{fontSize:12,color:TXT2,marginBottom:20}}>Manage templates, food items, and assign plans to users</div>
 
-        {/* ── TABS ── */}
         <div className="tabs">
           {[["users",`👥 Users (${users.length})`],["foods",`🥗 Food items (${allFoods.length})`],["templates",`📋 Templates (${templates.length})`],["add","➕ Add food"]].map(([id,lbl])=>(
             <button key={id} className={`tab${tab===id?" on":""}`} onClick={()=>{setTab(id);setDetail(null);if(id==="templates"){setTmplView("list");}}}>
@@ -760,23 +727,21 @@ function TemplatesView({
           ))}
         </div>
 
-        {/* ── USERS TAB ── */}
         {tab==="users"&&(detail?.type==="user"
-          ?<UserDetail u={detail.data} onClose={()=>setDetail(null)} templates={templates} users={users} allFoods={allFoods} approveUser={approveUser} blockUser={blockUser}/>
+          ?<UserDetail u={detail.data} onClose={()=>setDetail(null)}/>
           :<DataGrid gridKey="admin_users" colsDef={USER_COLS_DEFAULT} rows={users} userId={me.id}
               onRowClick={row=>setDetail({type:"user",data:row})} renderCell={renderUserCell}
               extraActions={<span style={{fontSize:11,color:TXT2}}>Click row to open · Sort by clicking column header</span>}/>
         )}
 
-        {/* ── FOODS TAB ── */}
         {tab==="foods"&&(detail?.type==="food"
-          ?<FoodDetail f={detail.data} onClose={()=>setDetail(null)} templates={templates} users={users} saveFood={saveFood} deleteFood={deleteFood} saving={saving} toggleSlot={toggleSlot} foodLinks={foodLinks} loadAll={loadAll}/>
+          ?<FoodDetail f={detail.data} onClose={()=>setDetail(null)}/>
           :<>
             <div className="tmpl-btns">
               <button className={`tbtn${!selTemplateId?" on":""}`} onClick={()=>setSelTemplateId("")}>All templates</button>
               {templates.map(t=>(
                 <button key={t.id} className={`tbtn${selTemplateId===t.id?" on":""}`} onClick={()=>setSelTemplateId(t.id)}>
-                  {t.name} ({(foodLinks.filter(l=>l.template_id===t.id).length||allFoods.filter(f=>f.template_id===t.id).length)})
+                  {t.name} ({allFoods.filter(f=>f.template_id===t.id).length})
                 </button>
               ))}
             </div>
@@ -788,30 +753,12 @@ function TemplatesView({
           </>
         )}
 
-        {/* ── TEMPLATES TAB ── */}
-        {tab==="templates"&&<TemplatesView
-          tmplView={tmplView} setTmplView={setTmplView}
-          activeTmpl={activeTmpl} setActiveTmpl={setActiveTmpl}
-          tmplForm={tmplForm} setTmplForm={setTmplForm}
-          tmplSaving={tmplSaving} tmplErr={tmplErr}
-          tmplFoods={tmplFoods} tmplFoodsLoading={tmplFoodsLoading}
-          showFoodForm={showFoodForm} setShowFoodForm={setShowFoodForm}
-          editFoodItem={editFoodItem} setEditFoodItem={setEditFoodItem}
-          fForm={fForm} setFForm={setFForm}
-          fSaving={fSaving} fErr={fErr}
-          tmplSearch={tmplSearch} setTmplSearch={setTmplSearch}
-          templates={templates} allFoods={allFoods} users={users}
-          saveTmpl={saveTmpl} deleteTmpl={deleteTmpl}
-          saveFoodItem={saveFoodItem} deleteFoodItem={deleteFoodItem}
-        />}
+        {tab==="templates"&&<TemplatesView/>}
 
-        {/* ── ADD FOOD TAB ── */}
         {tab==="add"&&(
           <div className="card">
             <div style={{fontSize:15,fontWeight:700,marginBottom:14}}>Add new food item</div>
-            <label className="label" style={{marginTop:0}}>
-              Templates * <span style={{fontSize:10,fontWeight:400,color:TXT2}}>— select one or more</span>
-            </label>
+            <label className="label" style={{marginTop:0}}>Templates * <span style={{fontSize:10,fontWeight:400,color:TXT2}}>— select one or more</span></label>
             <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>
               {templates.map(t=>{
                 const checked=(addFoodForm.selectedTemplates||[]).includes(t.id);
