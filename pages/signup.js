@@ -4,7 +4,6 @@
 import { useState } from 'react';
 import { useRouter } from 'next/router';
 import { getSupabase } from '../lib/supabase';
-const supabase = getSupabase();
 import PasswordInput from '../components/PasswordInput';
 import Link from 'next/link';
 
@@ -64,6 +63,7 @@ export default function SignupPage() {
   }
 
   async function handleFinalSubmit() {
+    const supabase = getSupabase();
     setError('');
     setLoading(true);
     try {
