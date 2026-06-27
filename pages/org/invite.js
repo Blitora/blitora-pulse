@@ -1,7 +1,5 @@
-// pages/org/invite.js  — NEW FILE
-// Org admin / dietitian can invite patients or other dietitians
-
-import { useState } from 'react';
+// pages/org/invite.js
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '../../components/Layout';
 import RoleGuard from '../../components/RoleGuard';
@@ -21,16 +19,16 @@ export default function InvitePage() {
 function InviteView() {
   const router = useRouter();
   const { orgId, role } = useRole();
-  const [email,    setEmail]   = useState('');
-  const [invRole,  setInvRole] = useState('patient');
-  const [sending,  setSending] = useState(false);
-  const [sent,     setSent]    = useState(false);
-  const [error,    setError]   = useState('');
-  const [recent,   setRecent]  = useState([]);
+  const [email,   setEmail]   = useState('');
+  const [invRole, setInvRole] = useState('patient');
+  const [sending, setSending] = useState(false);
+  const [sent,    setSent]    = useState(false);
+  const [error,   setError]   = useState('');
+  const [recent,  setRecent]  = useState([]);
 
-  // Load recent invites on mount
-  useState(() => {
+  useEffect(() => {
     if (!orgId) return;
+    const supabase = getSupabase();
     supabase.from('invitations')
       .select('email, role, accepted, created_at, expires_at')
       .eq('org_id', orgId)
@@ -41,33 +39,23 @@ function InviteView() {
 
   async function sendInvite(e) {
     e.preventDefault();
-    setError('');
-    setSending(true);
-
+    setError(''); setSending(true);
     try {
+      const supabase = getSupabase();
       const { data: { user } } = await supabase.auth.getUser();
 
-      // Check if already a member
-      const { data: existing } = await supabase
-        .from('organisation_members')
-        .select('user_id')
-        .eq('org_id', orgId)
-        .eq('is_active', true);
-      // (simplified — in production query by email via auth.users)
-
-      // Create invitation record
       const { data: inv, error: invErr } = await supabase
         .from('invitations')
-        .insert({ org_id: orgId, email: email.trim().toLowerCase(), role: invRole, invited_by: user.id })
+        .insert({
+          org_id: orgId,
+          email: email.trim().toLowerCase(),
+          role: invRole,
+          invited_by: user.id,
+        })
         .select()
         .single();
       if (invErr) throw invErr;
 
-      // In production: call a Supabase Edge Function here to send email
-      // Edge function would call Resend/SendGrid with the invite link:
-      // https://yourdomain.com/auth/accept-invite?token=<inv.token>
-      //
-      // For now we show the invite link in the UI:
       setSent(true);
       setRecent(prev => [inv, ...prev]);
       setEmail('');
@@ -87,7 +75,7 @@ function InviteView() {
       <div style={s.card}>
         {sent && (
           <div style={s.success}>
-            ✅ Invitation created! Share the link below with the recipient, or set up email sending via Supabase Edge Functions.
+            ✅ Invitation created! The patient can now sign up via the invite link.
           </div>
         )}
         {error && <div style={s.err}>{error}</div>}
@@ -105,14 +93,19 @@ function InviteView() {
 
           <label style={s.lbl}>Invite as</label>
           <div style={s.roleRow}>
-            <RoleOption value="patient"   label="Patient"   icon="👤" desc="Can log their own health data" selected={invRole==='patient'}   onClick={() => setInvRole('patient')} />
+            <RoleOption value="patient" label="Patient" icon="👤"
+              desc="Can log their own health data"
+              selected={invRole==='patient'} onClick={() => setInvRole('patient')} />
             {role === 'org_admin' && (
-              <RoleOption value="dietitian" label="Dietitian" icon="👨‍⚕️" desc="Can view and manage patients" selected={invRole==='dietitian'} onClick={() => setInvRole('dietitian')} />
+              <RoleOption value="dietitian" label="Dietitian" icon="👨‍⚕️"
+                desc="Can view and manage patients"
+                selected={invRole==='dietitian'} onClick={() => setInvRole('dietitian')} />
             )}
           </div>
 
           <div style={s.noteBox}>
-            <strong>How it works:</strong> The recipient gets a link to join your clinic. They sign up (or log in) and are automatically added to your organisation as a {invRole}.
+            <strong>How it works:</strong> The recipient gets a link to join your clinic.
+            They sign up (or log in) and are automatically added to your organisation as a {invRole}.
           </div>
 
           <button style={{ ...s.btn, opacity: sending ? 0.7 : 1 }} type="submit" disabled={sending}>
@@ -121,7 +114,6 @@ function InviteView() {
         </form>
       </div>
 
-      {/* Recent invites */}
       {recent.length > 0 && (
         <div style={{ marginTop:20 }}>
           <div style={s.recentTitle}>Recent Invitations</div>
@@ -130,7 +122,7 @@ function InviteView() {
               <div key={i} style={s.invCard}>
                 <div>
                   <div style={s.invEmail}>{inv.email}</div>
-                  <div style={s.invMeta}>{inv.role} · Invited {new Date(inv.created_at).toLocaleDateString()}</div>
+                  <div style={s.invMeta}>{inv.role} · {new Date(inv.created_at).toLocaleDateString()}</div>
                 </div>
                 <span style={{ ...s.invStatus, background: inv.accepted ? '#D1FAE5' : '#FEF3C7', color: inv.accepted ? '#065F46' : '#92400E' }}>
                   {inv.accepted ? '✅ Joined' : '⏳ Pending'}
@@ -144,12 +136,9 @@ function InviteView() {
   );
 }
 
-function RoleOption({ value, label, icon, desc, selected, onClick }) {
+function RoleOption({ label, icon, desc, selected, onClick }) {
   return (
-    <div
-      style={{ ...s.roleOpt, ...(selected ? s.roleOptOn : {}) }}
-      onClick={onClick}
-    >
+    <div style={{ ...s.roleOpt, ...(selected ? s.roleOptOn : {}) }} onClick={onClick}>
       <span style={{ fontSize:'1.3rem' }}>{icon}</span>
       <div>
         <div style={{ fontSize:'0.76rem', fontWeight:700, color:'#111827' }}>{label}</div>
