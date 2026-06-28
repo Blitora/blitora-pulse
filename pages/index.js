@@ -28,8 +28,34 @@ export default function IndexPage() {
     setError('');
     setSubmitting(true);
     const supabase = getSupabase();
+
     const { error: err } = await supabase.auth.signInWithPassword({ email, password });
-    if (err) { setError(err.message); setSubmitting(false); }
+
+    if (err) {
+      const msg = err.message?.toLowerCase() || '';
+
+      if (msg.includes('invalid login credentials') || msg.includes('invalid credentials')) {
+        // Check if the email exists in profiles (public table, anon readable)
+        const { data: profileMatch } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('email', email.trim().toLowerCase())
+          .maybeSingle();
+
+        if (!profileMatch) {
+          setError('no_account');
+        } else {
+          setError('wrong_password');
+        }
+      } else if (msg.includes('email not confirmed')) {
+        setError('unverified');
+      } else if (msg.includes('too many') || msg.includes('rate limit')) {
+        setError('rate_limit');
+      } else {
+        setError('generic');
+      }
+      setSubmitting(false);
+    }
   }
 
   async function handleGoogle() {
@@ -58,7 +84,42 @@ export default function IndexPage() {
         <h1 style={st.h1}>Welcome back</h1>
         <p style={st.sub}>Sign in to your account</p>
 
-        {error && <div style={st.err}>{error}</div>}
+        {error && (
+          <div style={st.err}>
+            {error === 'no_account' && (
+              <div>
+                <div style={{fontWeight:700,marginBottom:4}}>👋 Looks like you're new here</div>
+                <div style={{marginBottom:8}}>No account found for <b>{email}</b>.</div>
+                <a href="/signup" style={{color:'#DC2626',fontWeight:700,textDecoration:'underline'}}>Create a free account →</a>
+              </div>
+            )}
+            {error === 'wrong_password' && (
+              <div>
+                <div style={{fontWeight:700,marginBottom:4}}>🔐 Password doesn't match</div>
+                <div style={{marginBottom:8}}>The password for <b>{email}</b> is incorrect.</div>
+                <a href="/auth/forgot-password" style={{color:'#DC2626',fontWeight:700,textDecoration:'underline'}}>Reset your password →</a>
+              </div>
+            )}
+            {error === 'unverified' && (
+              <div>
+                <div style={{fontWeight:700,marginBottom:4}}>📬 Email not verified yet</div>
+                <div>Please check your inbox and click the verification link we sent you before signing in.</div>
+              </div>
+            )}
+            {error === 'rate_limit' && (
+              <div>
+                <div style={{fontWeight:700,marginBottom:4}}>⏳ Too many attempts</div>
+                <div>For your security, sign-in has been temporarily paused. Please wait a few minutes and try again.</div>
+              </div>
+            )}
+            {error === 'generic' && (
+              <div>
+                <div style={{fontWeight:700,marginBottom:4}}>Something went wrong</div>
+                <div>Please check your email and password and try again.</div>
+              </div>
+            )}
+          </div>
+        )}
 
         <form onSubmit={handleLogin}>
           <label style={st.lbl}>Email</label>
