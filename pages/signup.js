@@ -160,15 +160,15 @@ export default function SignupPage() {
         {step === 2 && (
           <>
             <button style={s.back} onClick={() => setStep(1)}>← Back</button>
-            <h1 style={s.h1}>{type === 'clinic' ? 'Clinic account' : 'Personal account'}</h1>
+            <h1 style={s.h1}>{type === 'clinic' ? 'Clinic account' : 'Your account'}</h1>
             <p style={s.sub}>Step 1 of {type === 'clinic' ? 2 : 2} — Your details</p>
             {error && <div style={s.err}>{error}</div>}
 
             <label style={s.lbl}>Full name *</label>
-            <input style={s.inp} value={name} onChange={e => setName(e.target.value)} placeholder="Dr. Priya Sharma" required />
+            <input style={s.inp} value={name} onChange={e => setName(e.target.value)} placeholder={type === 'clinic' ? 'Dr. Priya Sharma' : 'Your full name'} required />
 
             <label style={s.lbl}>Email address *</label>
-            <input style={s.inp} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@clinic.com" required />
+            <input style={s.inp} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder={type === 'clinic' ? 'you@clinic.com' : 'your@email.com'} required />
 
             <PasswordInput value={password} onChange={setPassword} label="Password *" autoComplete="new-password" showStrength />
 
