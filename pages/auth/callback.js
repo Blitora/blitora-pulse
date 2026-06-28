@@ -49,20 +49,22 @@ export default function AuthCallback() {
       await new Promise(r => setTimeout(r, 600));
 
       if (!member) {
-        // No org — send to setup
-        router.replace('/setup');
+        // No org at all — edge case, send to signup
+        router.replace('/signup');
         return;
       }
 
       const role = member.role;
 
       if (role === 'org_admin' || role === 'dietitian') {
+        // Clinic staff → patient management
         router.replace('/clinic/patients');
-      } else if (!profile?.setup_complete) {
-        // Patient who hasn't done setup yet
-        router.replace('/setup');
-      } else {
+      } else if (profile?.setup_complete) {
+        // Patient with complete profile → dashboard
         router.replace('/dashboard');
+      } else {
+        // Invited patient who hasn't filled profile yet → setup
+        router.replace('/setup');
       }
     }
 
