@@ -69,7 +69,7 @@ export default function SignupPage() {
   const [conditions, setConditions] = useState([]);
   const [diets,      setDiets]      = useState([]);
   const [goals,      setGoals]      = useState([]);
-  const [mealPlan,   setMealPlan]   = useState('');
+  const [mealPlan,   setMealPlan]   = useState('5 meals'); // default
 
   function getHeightCm() {
     if (heightUnit === 'cm') return height ? parseFloat(height) : null;
@@ -97,11 +97,16 @@ export default function SignupPage() {
     setError('');
     // Validate required fields before submitting
     if (type === 'individual') {
-      if (!dob)      { setError('Please enter your date of birth.'); return; }
-      if (!gender)   { setError('Please select your gender.'); return; }
-      if (!activity) { setError('Please select your activity level.'); return; }
-      if (diets.length === 0) { setError('Please select at least one dietary preference.'); return; }
-      if (goals.length === 0) { setError('Please select at least one primary goal.'); return; }
+      const fail = (msg) => {
+        setError(msg);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return true;
+      };
+      if (!dob      && fail('Please enter your date of birth.')) return;
+      if (!gender   && fail('Please select your gender.')) return;
+      if (!activity && fail('Please select your activity level.')) return;
+      if (diets.length === 0 && fail('Please select at least one dietary preference.')) return;
+      if (goals.length === 0 && fail('Please select at least one primary goal.')) return;
     }
     setLoading(true);
     const supabase = getSupabase();
@@ -410,17 +415,20 @@ export default function SignupPage() {
               {GOALS.map(g => <Chip key={g} label={g} selected={goals.includes(g)} onClick={() => toggleArr(goals, setGoals, g)} />)}
             </div>
 
+            <div style={{height:1,background:'#E0E3ED',margin:'8px 0 16px'}}/>
             <label style={s.lbl}>Meal plan preference</label>
             <div style={s.chipRow}>
               {MEALS.map(m => <Chip key={m} label={m} selected={mealPlan===m} onClick={() => setMealPlan(m)} />)}
             </div>
 
-            <div style={{height:8}} />
-            <div style={s.trialNote}>✓ 3-day free trial · We'll send a verification email next</div>
-            <button style={{ ...s.btn, opacity: loading ? 0.7 : 1 }} disabled={loading}
-              onClick={handleFinalSubmit}>
-              {loading ? 'Creating account…' : 'Create account & verify email →'}
-            </button>
+            <div style={{height:20}} />
+            <div style={{background:'#F5F6FA',borderRadius:12,padding:'14px',border:'1px solid #E0E3ED'}}>
+              <div style={s.trialNote}>✓ 3-day free trial · We'll send a verification email next</div>
+              <button style={{ ...s.btn, opacity: loading ? 0.7 : 1 }} disabled={loading}
+                onClick={handleFinalSubmit}>
+                {loading ? 'Creating account…' : 'Create account & verify email →'}
+              </button>
+            </div>
           </>
         )}
       </div>
