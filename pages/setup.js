@@ -21,14 +21,21 @@ const CONDITIONS = [
   { key: "none", label: "No medical conditions", sub: "Generally healthy" },
 ];
 
-const CUISINES = ["Indian (North)", "Indian (South)", "Continental", "Mixed / No preference"];
+const CUISINES = [
+  "Indian (North)", "Indian (South)",
+  "Mediterranean", "Middle Eastern / Arabic",
+  "Italian", "Continental / European",
+  "Asian (Chinese / Thai / Japanese)",
+  "Mexican / Latin American",
+  "American", "Mixed / No preference",
+];
 const ACTIVITY_LEVELS = [
   { val: "sedentary", label: "Sedentary", sub: "Desk job, little movement" },
   { val: "light", label: "Lightly active", sub: "Light walks, some activity" },
   { val: "moderate", label: "Moderately active", sub: "Regular exercise 3-4x/week" },
   { val: "active", label: "Very active", sub: "Daily intense exercise" },
 ];
-const DIET_TYPES = ["Non-vegetarian", "Vegetarian", "Vegan", "Eggetarian"];
+const DIET_TYPES = ["Vegetarian", "Eggetarian", "Non-Vegetarian", "Vegan", "Jain", "Keto", "Gluten-Free", "Dairy-Free"];
 const MEALS_OPTIONS = [3, 4, 5, 6];
 
 export default function Setup() {
@@ -125,21 +132,21 @@ export default function Setup() {
     }).eq("id", userId);
 
     if (err) { setError(err.message); setSaving(false); return; }
-    router.push("/dashboard");
+    router.replace("/dashboard");
   }
 
   const bmi = getBMI();
 
   return (
     <>
-      <Head><title>Profile setup — Health Tracker</title></Head>
+      <Head><title>Profile setup — VitaLog</title></Head>
       <style>{`
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { background: ${BG}; font-family: 'Inter', system-ui, sans-serif; color: ${TXT}; min-height: 100vh; }
         .wrap { max-width: 560px; margin: 0 auto; padding: 24px 16px 48px; }
         .logo { display: flex; align-items: center; gap: 10px; margin-bottom: 28px; }
-        .logo-mark { width: 36px; height: 36px; background: ${P}; border-radius: 9px; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 16px; }
-        .logo-text { font-size: 16px; font-weight: 700; color: ${P}; }
+        .logo-mark { width: 36px; height: 36px; background: #1D9E75; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+        .logo-text { font-size: 16px; font-weight: 700; color: #0D1B3E; }
         .progress-bar { display: flex; gap: 6px; margin-bottom: 28px; }
         .progress-step { flex: 1; height: 4px; border-radius: 2px; transition: background .3s; }
         .step-label { font-size: 12px; color: ${TXT2}; margin-bottom: 4px; }
@@ -186,8 +193,8 @@ export default function Setup() {
 
       <div className="wrap">
         <div className="logo">
-          <div className="logo-mark">H</div>
-          <div className="logo-text">Health Tracker</div>
+          <div className="logo-mark">🌿</div>
+          <div><div className="logo-text">VitaLog</div><div style={{fontSize:9,color:"#9CA3AF",letterSpacing:"0.07em",textTransform:"uppercase",marginTop:1}}>Health Platform</div></div>
         </div>
 
         <div className="progress-bar">
