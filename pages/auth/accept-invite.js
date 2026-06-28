@@ -167,7 +167,7 @@ export default function AcceptInvitePage() {
 
           <PasswordInput
             value={password}
-            onChange={e => setPassword(e.target.value)}
+            onChange={setPassword}
             label="Password *"
             placeholder={mode === 'signup' ? 'Min 8 chars, uppercase, number' : 'Your password'}
             autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
