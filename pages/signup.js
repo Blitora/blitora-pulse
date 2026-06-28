@@ -59,7 +59,10 @@ export default function SignupPage() {
   // Health profile fields
   const [dob,        setDob]        = useState('');
   const [gender,     setGender]     = useState('');
+  const [heightUnit, setHeightUnit] = useState('cm');
   const [height,     setHeight]     = useState('');
+  const [heightFt,   setHeightFt]   = useState('');
+  const [heightIn,   setHeightIn]   = useState('');
   const [weight,     setWeight]     = useState('');
   const [goalWeight, setGoalWeight] = useState('');
   const [activity,   setActivity]   = useState('');
@@ -67,6 +70,14 @@ export default function SignupPage() {
   const [diets,      setDiets]      = useState([]);
   const [goals,      setGoals]      = useState([]);
   const [mealPlan,   setMealPlan]   = useState('');
+
+  function getHeightCm() {
+    if (heightUnit === 'cm') return height ? parseFloat(height) : null;
+    const ft = parseFloat(heightFt) || 0;
+    const inches = parseFloat(heightIn) || 0;
+    const total = (ft * 30.48) + (inches * 2.54);
+    return total > 0 ? Math.round(total) : null;
+  }
 
   function toggleArr(arr, setArr, val) {
     setArr(prev => prev.includes(val) ? prev.filter(x => x !== val) : [...prev, val]);
@@ -126,7 +137,7 @@ export default function SignupPage() {
           email: email.trim().toLowerCase(),
           dob: dob || null,
           gender: gender || null,
-          height_cm: height ? parseFloat(height) : null,
+          height_cm: getHeightCm(),
           weight_start: weight ? parseFloat(weight) : null,
           weight_current: weight ? parseFloat(weight) : null,
           weight_target: goalWeight ? parseFloat(goalWeight) : null,
@@ -137,7 +148,7 @@ export default function SignupPage() {
           goal: goals.length ? goals.join(', ') : null,
           role: 'patient',
           status: 'active',
-          setup_complete: false, // they complete setup after email confirm
+          setup_complete: true, // all data collected during signup
         }, { onConflict: 'id' });
       } else {
         await supabase.from('profiles').upsert({
@@ -176,7 +187,7 @@ export default function SignupPage() {
             </div>
             <p style={{ fontSize:'0.76rem', color:'#6B7280', lineHeight:1.6, marginBottom:20 }}>
               Click the link in the email to verify your account.<br/>
-              After verification you'll be taken to complete your profile setup.
+              After verification you'll be taken straight to your dashboard.
             </p>
             <div style={{ background:'#FFFBEB', border:'1px solid #FDE68A', borderRadius:10, padding:'10px 14px', fontSize:'0.72rem', color:'#92400E', marginBottom:20, textAlign:'left' }}>
               <strong>Didn't get it?</strong> Check your spam folder. The link expires in 1 hour.
@@ -320,8 +331,50 @@ export default function SignupPage() {
             </div>
 
             <div style={s.row3}>
-              <div><label style={s.lbl}>Height (cm)</label>
-                <input style={s.inp} type="number" value={height} onChange={e => setHeight(e.target.value)} placeholder="170" /></div>
+              <div style={{gridColumn:'1/-1'}}>
+                <label style={s.lbl}>Height</label>
+                {/* Unit toggle */}
+                <div style={{display:'flex',gap:6,marginBottom:8}}>
+                  {['cm','ft / in'].map(u => (
+                    <button key={u} type="button"
+                      onClick={() => setHeightUnit(u === 'cm' ? 'cm' : 'ft')}
+                      style={{
+                        padding:'5px 14px', borderRadius:20, border:'1.5px solid',
+                        borderColor: (u === 'cm' ? heightUnit === 'cm' : heightUnit === 'ft') ? G : BORDER,
+                        background: (u === 'cm' ? heightUnit === 'cm' : heightUnit === 'ft') ? G : '#fff',
+                        color: (u === 'cm' ? heightUnit === 'cm' : heightUnit === 'ft') ? '#fff' : '#374151',
+                        fontSize:'0.72rem', fontWeight:600, cursor:'pointer',
+                        fontFamily:"'Poppins',Arial,sans-serif",
+                      }}>
+                      {u}
+                    </button>
+                  ))}
+                </div>
+                {heightUnit === 'cm' ? (
+                  <input style={s.inp} type="number" value={height}
+                    onChange={e => setHeight(e.target.value)} placeholder="e.g. 170 cm" />
+                ) : (
+                  <div style={{display:'flex',gap:8}}>
+                    <div style={{flex:1}}>
+                      <input style={s.inp} type="number" value={heightFt}
+                        onChange={e => setHeightFt(e.target.value)} placeholder="ft  e.g. 5" />
+                      <div style={{fontSize:'0.65rem',color:'#9CA3AF',marginTop:-10,marginBottom:12,paddingLeft:2}}>feet</div>
+                    </div>
+                    <div style={{flex:1}}>
+                      <input style={s.inp} type="number" value={heightIn}
+                        onChange={e => setHeightIn(e.target.value)} placeholder="in  e.g. 7" />
+                      <div style={{fontSize:'0.65rem',color:'#9CA3AF',marginTop:-10,marginBottom:12,paddingLeft:2}}>inches</div>
+                    </div>
+                    {(heightFt || heightIn) && (
+                      <div style={{display:'flex',alignItems:'center',paddingBottom:12}}>
+                        <span style={{fontSize:'0.72rem',color:G,fontWeight:600,whiteSpace:'nowrap'}}>
+                          = {Math.round((parseFloat(heightFt||0)*30.48)+(parseFloat(heightIn||0)*2.54))} cm
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
               <div><label style={s.lbl}>Current (kg)</label>
                 <input style={s.inp} type="number" value={weight} onChange={e => setWeight(e.target.value)} placeholder="80" /></div>
               <div><label style={s.lbl}>Goal (kg)</label>
