@@ -334,14 +334,14 @@ export default function Meals(){
       if(!p||!p.setup_complete){router.push("/setup");return;}
       setProfile(p);
       if(p.active_template_id){
-        const[{data:linked},{data:custom}]=await Promise.all([
-          sb.from("food_template_links").select("template_food_items(*)")
-            .eq("template_id",p.active_template_id),
+        const[{data:template_foods},{data:custom}]=await Promise.all([
+          sb.from("template_food_items").select("*")
+            .eq("template_id",p.active_template_id)
+            .eq("added_by_user",false),
           sb.from("template_food_items").select("*")
             .eq("added_by_user",true).eq("added_by_user_id",p.id),
         ]);
-        const jf=(linked||[]).map(l=>l.template_food_items).filter(Boolean);
-        const all=[...jf,...(custom||[])];
+        const all=[...(template_foods||[]),...(custom||[])];
         // Filter by diet_type — never show wrong diet items
         const dietFilter={
           "Vegetarian":   f=>f.diet_tag!=="non-veg"&&f.diet_tag!=="egg",
