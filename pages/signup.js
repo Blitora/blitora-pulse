@@ -95,6 +95,14 @@ export default function SignupPage() {
 
   async function handleFinalSubmit() {
     setError('');
+    // Validate required fields before submitting
+    if (type === 'individual') {
+      if (!dob)      { setError('Please enter your date of birth.'); return; }
+      if (!gender)   { setError('Please select your gender.'); return; }
+      if (!activity) { setError('Please select your activity level.'); return; }
+      if (diets.length === 0) { setError('Please select at least one dietary preference.'); return; }
+      if (goals.length === 0) { setError('Please select at least one primary goal.'); return; }
+    }
     setLoading(true);
     const supabase = getSupabase();
     try {
@@ -356,14 +364,14 @@ export default function SignupPage() {
                 ) : (
                   <div style={{display:'flex',gap:8}}>
                     <div style={{flex:1}}>
-                      <input style={s.inp} type="number" value={heightFt}
-                        onChange={e => setHeightFt(e.target.value)} placeholder="ft  e.g. 5" />
-                      <div style={{fontSize:'0.65rem',color:'#9CA3AF',marginTop:-10,marginBottom:12,paddingLeft:2}}>feet</div>
+                      <div style={{fontSize:'0.7rem',fontWeight:600,color:'#374151',marginBottom:4}}>Feet</div>
+                      <input style={s.inp} type="number" min="1" max="8" value={heightFt}
+                        onChange={e => setHeightFt(e.target.value)} placeholder="e.g. 5" />
                     </div>
                     <div style={{flex:1}}>
-                      <input style={s.inp} type="number" value={heightIn}
-                        onChange={e => setHeightIn(e.target.value)} placeholder="in  e.g. 7" />
-                      <div style={{fontSize:'0.65rem',color:'#9CA3AF',marginTop:-10,marginBottom:12,paddingLeft:2}}>inches</div>
+                      <div style={{fontSize:'0.7rem',fontWeight:600,color:'#374151',marginBottom:4}}>Inches</div>
+                      <input style={s.inp} type="number" min="0" max="11" value={heightIn}
+                        onChange={e => setHeightIn(e.target.value)} placeholder="e.g. 9" />
                     </div>
                     {(heightFt || heightIn) && (
                       <div style={{display:'flex',alignItems:'center',paddingBottom:12}}>
@@ -407,6 +415,7 @@ export default function SignupPage() {
               {MEALS.map(m => <Chip key={m} label={m} selected={mealPlan===m} onClick={() => setMealPlan(m)} />)}
             </div>
 
+            <div style={{height:8}} />
             <div style={s.trialNote}>✓ 3-day free trial · We'll send a verification email next</div>
             <button style={{ ...s.btn, opacity: loading ? 0.7 : 1 }} disabled={loading}
               onClick={handleFinalSubmit}>
