@@ -156,9 +156,8 @@ export default function SignupPage() {
           weight_target: goalWeight ? parseFloat(goalWeight) : null,
           activity_level: activity || null,
           conditions: conditions.length ? conditions : null,
-          dietary_pref: diets.length ? diets.join(', ') : null,
-          meal_plan_type: mealPlan || null,
-          goal: goals.length ? goals.join(', ') : null,
+          diet_type: diets.length ? diets[0] : null,  // primary diet type
+          meals_per_day: mealPlan ? parseInt(mealPlan) : 5,
           role: 'patient',
           status: 'active',
           setup_complete: true, // all data collected during signup
