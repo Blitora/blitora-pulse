@@ -123,14 +123,13 @@ export default function Dashboard(){
       setProfile(p);
       // Load food names for meal summary display
       if(p.active_template_id){
-        const[{data:linked},{data:custom}]=await Promise.all([
-          sb.from("food_template_links").select("template_food_items(id,name,calories,protein)")
-            .eq("template_id",p.active_template_id),
+        const[{data:template_foods},{data:custom}]=await Promise.all([
+          sb.from("template_food_items").select("id,name,calories,protein")
+            .eq("template_id",p.active_template_id).eq("added_by_user",false),
           sb.from("template_food_items").select("id,name,calories,protein")
             .eq("added_by_user",true).eq("added_by_user_id",p.id),
         ]);
-        const jf=(linked||[]).map(l=>l.template_food_items).filter(Boolean);
-        const all=[...jf,...(custom||[])];
+        const all=[...(template_foods||[]),...(custom||[])];
         setFoods(Array.from(new Map(all.map(f=>[f.id,f])).values()));
       }
     }
@@ -219,6 +218,16 @@ export default function Dashboard(){
 
       <Layout>
         <div style={{padding:"16px",maxWidth:600,margin:"0 auto"}}>
+
+          {/* Greeting */}
+          <div style={{marginBottom:12}}>
+            <div style={{fontSize:20,fontWeight:800,color:TXT}}>
+              {profile?.full_name ? `Hi, ${profile.full_name.split(' ')[0]} 👋` : 'Welcome back 👋'}
+            </div>
+            <div style={{fontSize:12,color:TXT2,marginTop:2}}>
+              {profile?.weight_target ? `Goal: ${profile.weight_start||'?'}kg → ${profile.weight_target}kg` : 'Track your health today'}
+            </div>
+          </div>
 
           {/* Date navigation */}
           <div className="date-nav">
