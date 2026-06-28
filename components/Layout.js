@@ -1,6 +1,7 @@
 // components/Layout.js
 import { useRouter } from 'next/router';
 import Link from 'next/link';
+import { useState, useEffect } from 'react';
 import { useRole, ROLES, isClinicRole } from '../lib/useRole';
 import { getSupabase } from '../lib/supabase';
 const supabase = getSupabase();
@@ -30,6 +31,16 @@ const SUPER_ADMIN_NAV = [
 export default function Layout({ children }) {
   const router  = useRouter();
   const { role, org, loading } = useRole();
+  const [userName, setUserName] = useState('');
+
+  useEffect(() => {
+    getSupabase().auth.getSession().then(async ({ data: { session } }) => {
+      if (!session) return;
+      const { data: p } = await getSupabase()
+        .from('profiles').select('full_name').eq('id', session.user.id).single();
+      if (p?.full_name) setUserName(p.full_name.split(' ')[0]);
+    });
+  }, []);
 
   const nav = role === ROLES.SUPER_ADMIN ? SUPER_ADMIN_NAV
             : isClinicRole(role)         ? CLINIC_NAV
@@ -54,7 +65,8 @@ export default function Layout({ children }) {
             <div style={sb.logoTag}>
               {role === ROLES.SUPER_ADMIN ? 'Super Admin'
                 : isClinicRole(role)      ? (org?.name || 'Clinic')
-                :                           'Health Platform'}
+                : userName                ? userName
+                :                          'Health Platform'}
             </div>
           </div>
         </div>
@@ -93,7 +105,7 @@ export default function Layout({ children }) {
             <div>
               <div style={mb.logoName}>VitaLog</div>
               <div style={mb.logoTag}>
-                {isClinicRole(role) ? (org?.name || 'Clinic') : 'Health Platform'}
+                {isClinicRole(role) ? (org?.name || 'Clinic') : userName ? userName : 'Health Platform'}
               </div>
             </div>
           </div>
