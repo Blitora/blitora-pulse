@@ -7,10 +7,22 @@ import { getSupabase } from '../lib/supabase';
 import PasswordInput from '../components/PasswordInput';
 import Link from 'next/link';
 
-const CONDITIONS = ['Diabetes Type 2','High BP','Thyroid','PCOD/PCOS','High Cholesterol'];
-const GOALS      = ['Lose weight','Gain weight','Maintain weight','Manage health condition','Build muscle'];
+const CONDITIONS = [
+  'Diabetes Type 2','High BP','Thyroid','PCOD/PCOS','High Cholesterol',
+  'Obesity','Kidney Issues','Heart Condition','Fatty Liver',
+  'Arthritis / Joint Pain','IBS / Acidity / Bloating','Anaemia',
+  'Uric Acid / Gout','Skin Issues (Acne/Eczema)','Low Immunity',
+  'Stress / Anxiety','Hormonal Imbalance','Pre-Diabetes',
+];
+const GOALS = [
+  'Lose weight','Gain weight','Maintain weight',
+  'Build muscle','Manage health condition',
+  'Improve energy & stamina','Eat healthier','Reduce stress & sleep better',
+  'Manage post-pregnancy weight','Improve gut health',
+  'Control blood sugar','Reduce cholesterol',
+];
 const ACTIVITY   = ['Sedentary','Light','Moderate','Active','Very Active'];
-const DIETS      = ['Vegetarian','Eggetarian','Non-Vegetarian','Vegan'];
+const DIETS = ['Vegetarian','Eggetarian','Non-Vegetarian','Vegan','Jain','Keto','Gluten-Free','Dairy-Free'];
 const MEALS      = ['3 meals','5 meals','6 meals'];
 const CLINIC_TYPES = ['Solo Dietitian','Multi-dietitian Clinic','Hospital','Corporate Wellness'];
 const PATIENT_VOL  = ['Less than 10','10–50','50–200','200+'];
@@ -44,12 +56,20 @@ export default function SignupPage() {
   const [goalWeight, setGoalWeight] = useState('');
   const [activity,   setActivity]   = useState('');
   const [conditions, setConditions] = useState([]);
-  const [diet,       setDiet]       = useState('');
-  const [goal,       setGoal]       = useState('');
+  const [diets,      setDiets]      = useState([]);
+  const [goals,      setGoals]      = useState([]);
   const [mealPlan,   setMealPlan]   = useState('');
 
   function toggleCondition(c) {
     setConditions(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c]);
+  }
+
+  function toggleDiet(d) {
+    setDiets(prev => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d]);
+  }
+
+  function toggleGoal(g) {
+    setGoals(prev => prev.includes(g) ? prev.filter(x => x !== g) : [...prev, g]);
   }
 
   function validateAccount() {
@@ -111,9 +131,9 @@ export default function SignupPage() {
           goal_weight: parseFloat(goalWeight),
           activity_level: activity,
           health_conditions: conditions,
-          dietary_pref: diet,
+          dietary_pref: diets.join(', '),
           meal_plan_type: mealPlan,
-          goal,
+          goal: goals.join(', '),
         });
         // self-assign as patient
         await supabase.from('patient_assignments').insert({
@@ -265,14 +285,14 @@ export default function SignupPage() {
               <Chip label="None" selected={conditions.length===0} onClick={() => setConditions([])} />
             </div>
 
-            <label style={s.lbl}>Dietary preference *</label>
+            <label style={s.lbl}>Dietary preference * <span style={{fontSize:'0.6rem',color:'#9CA3AF',fontWeight:400}}>(select all that apply)</span></label>
             <div style={s.chipRow}>
-              {DIETS.map(d => <Chip key={d} label={d} selected={diet===d} onClick={() => setDiet(d)} />)}
+              {DIETS.map(d => <Chip key={d} label={d} selected={diets.includes(d)} onClick={() => toggleDiet(d)} />)}
             </div>
 
-            <label style={s.lbl}>Primary goal *</label>
+            <label style={s.lbl}>Primary goals * <span style={{fontSize:'0.6rem',color:'#9CA3AF',fontWeight:400}}>(pick all that apply)</span></label>
             <div style={s.chipRow}>
-              {GOALS.map(g => <Chip key={g} label={g} selected={goal===g} onClick={() => setGoal(g)} />)}
+              {GOALS.map(g => <Chip key={g} label={g} selected={goals.includes(g)} onClick={() => toggleGoal(g)} />)}
             </div>
 
             <label style={s.lbl}>Meal plan preference *</label>
