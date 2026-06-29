@@ -17,6 +17,26 @@ const CONDITIONS=[
 ];
 const ACTIVITY_LEVELS=[{val:"sedentary",label:"Sedentary"},{val:"light",label:"Lightly active"},{val:"moderate",label:"Moderately active"},{val:"active",label:"Very active"}];
 const CUISINES=["Indian (North)","Indian (South)","Continental","Mixed / No preference"];
+const COUNTRIES = [
+  'Afghanistan','Albania','Algeria','Angola','Argentina','Armenia','Australia',
+  'Austria','Azerbaijan','Bahrain','Bangladesh','Belarus','Belgium','Bolivia',
+  'Brazil','Bulgaria','Cambodia','Cameroon','Canada','Chile','China',
+  'Colombia','Costa Rica','Croatia','Cuba','Cyprus','Czech Republic',
+  'Denmark','Dominican Republic','Ecuador','Egypt','Ethiopia','Finland',
+  'France','Georgia','Germany','Ghana','Greece','Guatemala','Honduras',
+  'Hungary','India','Indonesia','Iran','Iraq','Ireland','Israel','Italy',
+  'Jamaica','Japan','Jordan','Kazakhstan','Kenya','Kuwait','Latvia',
+  'Lebanon','Libya','Lithuania','Luxembourg','Malaysia','Mexico','Moldova',
+  'Morocco','Mozambique','Myanmar','Nepal','Netherlands','New Zealand',
+  'Nicaragua','Nigeria','Norway','Oman','Pakistan','Panama','Paraguay',
+  'Peru','Philippines','Poland','Portugal','Qatar','Romania','Russia',
+  'Saudi Arabia','Senegal','Serbia','Singapore','Slovakia','Slovenia',
+  'Somalia','South Africa','South Korea','Spain','Sri Lanka','Sudan',
+  'Sweden','Switzerland','Syria','Taiwan','Tanzania','Thailand','Tunisia',
+  'Turkey','Uganda','Ukraine','United Arab Emirates','United Kingdom',
+  'United States','Uruguay','Uzbekistan','Venezuela','Vietnam','Yemen','Zimbabwe',
+];
+
 
 export default function Profile(){
   const router=useRouter();
@@ -59,7 +79,7 @@ export default function Profile(){
       weight_target:form.weight_target?+form.weight_target:null,
       activity_level:form.activity_level,conditions:form.conditions||{},
       allergies:form.allergies||null,medications:form.medications||null,
-      diet_type:form.diet_type,preferred_cuisine:form.preferred_cuisine,
+      diet_type:form.diet_type,preferred_cuisine:form.preferred_cuisine,country:form.country||null,
       meals_per_day:form.meals_per_day||6,water_target:form.water_target||3.5,
       calorie_target:form.calorie_target?+form.calorie_target:1600,
       protein_target:form.protein_target?+form.protein_target:100,
@@ -272,6 +292,12 @@ export default function Profile(){
               </div>
             </div>
             <div className="iwrap">
+              <label className="label">Country</label>
+              <select className="inp" style={{marginBottom:13}} value={form.country||""} onChange={e=>set("country",e.target.value)}>
+                <option value="">Select country</option>
+                {COUNTRIES.map(c=><option key={c} value={c}>{c}</option>)}
+              </select>
+
               <label className="label">Preferred cuisine</label>
               <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                 {CUISINES.map(c=><button key={c} className={`rbtn${form.preferred_cuisine===c?" sel":""}`} onClick={()=>set("preferred_cuisine",c)}>{c}</button>)}
@@ -282,7 +308,7 @@ export default function Profile(){
         ):(
           <div className="card">
             <div className="ctitle">Diet & lifestyle</div>
-            {[["Diet type",profile.diet_type||"Not set"],["Preferred cuisine",profile.preferred_cuisine||"Not set"],["Activity level",profile.activity_level||"Not set"]].map(([l,v])=>(
+            {[["Diet type",profile.diet_type||"Not set"],["Preferred cuisine",profile.preferred_cuisine||"Not set"],["Country",profile.country||"Not set"],["Activity level",profile.activity_level||"Not set"]].map(([l,v])=>(
               <div key={l} className="prow"><span style={{color:TXT2}}>{l}</span><b>{v}</b></div>
             ))}
           </div>
@@ -292,3 +318,4 @@ export default function Profile(){
     </>
   );
 }
+
