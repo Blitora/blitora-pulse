@@ -29,7 +29,31 @@ export default function IndexPage() {
     setSubmitting(true);
     const supabase = getSupabase();
 
+    // Check lockout before attempting login
+    try {
+      const lockRes = await fetch('/api/auth/check-lockout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim().toLowerCase() }),
+      });
+      const lockData = await lockRes.json();
+      if (lockData.locked) {
+        setError('locked');
+        setSubmitting(false);
+        return;
+      }
+    } catch (e) { /* non-critical — proceed */ }
+
     const { error: err } = await supabase.auth.signInWithPassword({ email, password });
+
+    // Record this attempt
+    try {
+      await fetch('/api/auth/check-lockout', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim().toLowerCase(), success: !err }),
+      });
+    } catch (e) { /* non-critical */ }
 
     if (err) {
       const msg = err.message?.toLowerCase() || '';
@@ -104,6 +128,12 @@ export default function IndexPage() {
               <div>
                 <div style={{fontWeight:700,marginBottom:4}}>📬 Email not verified yet</div>
                 <div>Please check your inbox and click the verification link we sent you before signing in.</div>
+              </div>
+            )}
+            {error === 'locked' && (
+              <div>
+                <div style={{fontWeight:700,marginBottom:4}}>🔒 Account temporarily locked</div>
+                <div>Too many failed attempts. Please wait 15 minutes before trying again.</div>
               </div>
             )}
             {error === 'rate_limit' && (
