@@ -62,8 +62,68 @@ function FoodCard({food,checked,onToggle}){
   );
 }
 
+// ── AI Food Suggestion Card ────────────────────────────────────────────────
+function AISuggestionCard({ suggestion, loading, onAdd }) {
+  if (loading) return (
+    <div style={{
+      margin: '8px 12px', padding: '10px 12px', borderRadius: 10,
+      background: 'linear-gradient(135deg, #f3eef1, #ede8f5)',
+      border: '1px solid #e0d8ec',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ fontSize: 14, flexShrink: 0 }}>✨</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ height: 7, borderRadius: 4, background: '#d8cfe8', width: '70%', marginBottom: 5, animation: 'pulse 1.4s ease-in-out infinite' }} />
+          <div style={{ height: 6, borderRadius: 4, background: '#d8cfe8', width: '45%', animation: 'pulse 1.4s ease-in-out 0.2s infinite' }} />
+        </div>
+      </div>
+    </div>
+  );
+
+  if (!suggestion) return null;
+
+  return (
+    <div style={{
+      margin: '8px 12px', padding: '10px 12px', borderRadius: 10,
+      background: 'linear-gradient(135deg, #f3eef1, #ede8f5)',
+      border: '1px solid #e0d8ec',
+      display: 'flex', alignItems: 'center', gap: 8,
+      animation: 'fadein .3s ease',
+    }}>
+      <div style={{ fontSize: 14, flexShrink: 0 }}>✨</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: '#714B67', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>
+          AI Pick
+        </div>
+        <div style={{ fontSize: 12, fontWeight: 600, color: '#2c1a3a', marginBottom: 1 }}>
+          {suggestion.name} <span style={{ fontWeight: 400, color: '#718096' }}>· {suggestion.quantity}</span>
+        </div>
+        <div style={{ fontSize: 10, color: '#714B67' }}>
+          {suggestion.calories} kcal · {suggestion.protein}g protein
+        </div>
+        {suggestion.reason && (
+          <div style={{ fontSize: 10, color: '#718096', marginTop: 2, lineHeight: 1.4 }}>
+            {suggestion.reason}
+          </div>
+        )}
+      </div>
+      <button
+        onClick={() => onAdd(suggestion)}
+        style={{
+          padding: '6px 10px', borderRadius: 8, border: 'none',
+          background: '#714B67', color: '#fff', fontSize: 11, fontWeight: 700,
+          cursor: 'pointer', flexShrink: 0,
+          fontFamily: "'Poppins', Arial, sans-serif",
+        }}
+      >
+        + Log
+      </button>
+    </div>
+  );
+}
+
 // ── Expandable meal slot ───────────────────────────────────────────────────
-function MealSlot({meal,foods,sel,onToggle,onAddCustom}){
+function MealSlot({meal,foods,sel,onToggle,onAddCustom,suggestion,suggestionLoading,onLogSuggestion}){
   const [open,setOpen]=useState(false);
   const [search,setSearch]=useState("");
   const selKeys=Object.keys(sel);
@@ -127,6 +187,15 @@ function MealSlot({meal,foods,sel,onToggle,onAddCustom}){
             );
           })}
         </div>
+      )}
+
+      {/* AI Suggestion Card — shown whether open or closed */}
+      {(suggestion||suggestionLoading)&&(
+        <AISuggestionCard
+          suggestion={suggestion}
+          loading={suggestionLoading}
+          onAdd={onLogSuggestion}
+        />
       )}
 
       {/* Expanded — food picker */}
@@ -324,6 +393,8 @@ export default function Meals(){
   const [saving,setSaving]=useState(false);
   const [toast,setToast]=useState(null);
   const [addFoodModal,setAddFoodModal]=useState({show:false,mealId:null});
+  const [suggestions,setSuggestions]=useState({}); // mealId -> suggestion object
+  const [suggestionLoading,setSuggestionLoading]=useState({}); // mealId -> bool
 
   useEffect(()=>{
     async function init(){
@@ -333,6 +404,7 @@ export default function Meals(){
       const{data:p}=await sb.from("profiles").select("*").eq("id",session.user.id).single();
       if(!p||!p.setup_complete){router.push("/setup");return;}
       setProfile(p);
+      // Suggestions will be fetched after log loads
       if(p.active_template_id){
         const[{data:template_foods},{data:custom}]=await Promise.all([
           sb.from("template_food_items").select("*")
@@ -356,6 +428,58 @@ export default function Meals(){
     init();
   },[]);
 
+
+  // ── AI Food Suggestions ─────────────────────────────────────────────────
+  // Fetches one AI food pick per meal slot — cached 24h
+  // Only fetches for today when the meal is not yet logged
+  async function fetchSuggestionForSlot(p, mealId, currentLog) {
+    if (!p) return;
+    const mealLabel = MEAL_DEFS.find(m => m.id === mealId)?.label || mealId;
+    const isLogged = Object.keys(currentLog?.foods?.[mealId] || {}).length > 0;
+    if (isLogged) return; // don't suggest if already logged
+
+    setSuggestionLoading(prev => ({ ...prev, [mealId]: true }));
+    try {
+      const res = await fetch('/api/ai/food-suggestion', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: p.id,
+          plan: p.plan || 'trial',
+          mealSlot: mealLabel,
+          profile: {
+            healthConditions: p.conditions
+              ? Object.keys(p.conditions).filter(k => k !== 'none') : [],
+            dietaryPref: p.diet_type || 'Mixed',
+            proteinTarget: p.protein_target || 100,
+          },
+          todayLog: { totalProtein: 0 },
+          country: p.country || null,
+        }),
+      });
+      const data = await res.json();
+      if (data.suggestion) {
+        setSuggestions(prev => ({ ...prev, [mealId]: data.suggestion }));
+      }
+    } catch (err) {
+      console.error('Suggestion error:', mealId, err);
+    } finally {
+      setSuggestionLoading(prev => ({ ...prev, [mealId]: false }));
+    }
+  }
+
+  // Fetch suggestions for unlogged meal slots on load
+  async function fetchAllSuggestions(p, currentLog) {
+    // Only fetch for first 3 unlogged slots to avoid hammering API
+    const unlogged = MEAL_DEFS.filter(m =>
+      Object.keys(currentLog?.foods?.[m.id] || {}).length === 0
+    ).slice(0, 3);
+
+    for (const meal of unlogged) {
+      await fetchSuggestionForSlot(p, meal.id, currentLog);
+    }
+  }
+
   const loadLog=useCallback(async(dk)=>{
     if(!profile)return;
     const{data}=await getSupabase().from("health_logs").select("foods")
@@ -364,6 +488,10 @@ export default function Meals(){
   },[profile]);
 
   useEffect(()=>{if(profile)loadLog(dateKey);},[profile,dateKey]);
+  // Fetch AI suggestions whenever log changes (new day, new data)
+  useEffect(()=>{
+    if(profile && dateKey===today()) fetchAllSuggestions(profile, log);
+  },[profile, dateKey]);
 
   function showToast(m){setToast(m);setTimeout(()=>setToast(null),1800);}
 
@@ -380,6 +508,24 @@ export default function Meals(){
     const mf={...(log.foods[mealId]||{})};
     mf[foodId]?delete mf[foodId]:(mf[foodId]=true);
     persist({foods:{...log.foods,[mealId]:mf}});
+  }
+
+  function handleSuggestionLog(suggestion, mealId) {
+    // Add as custom food if not in list, then log it
+    const existing = foods.find(f =>
+      f.name.toLowerCase() === suggestion.name.toLowerCase()
+    );
+    if (existing) {
+      toggleFood(mealId, String(existing.id));
+    } else {
+      // Log by name directly
+      const mf = { ...(log.foods[mealId] || {}) };
+      mf[suggestion.name] = true;
+      persist({ foods: { ...log.foods, [mealId]: mf } });
+    }
+    // Clear suggestion for this slot
+    setSuggestions(prev => ({ ...prev, [mealId]: null }));
+    showToast('Logged ✓');
   }
 
   function handleFoodAdded(newFood,mealId){
@@ -407,7 +553,7 @@ export default function Meals(){
   return(
     <>
       <Head><title>Meals — VitaLog</title></Head>
-      <style>{`body{font-family:'Poppins',Arial,sans-serif;}`}</style>
+      <style>{`body{font-family:'Poppins',Arial,sans-serif;} @keyframes fadein{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}} @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}`}</style>
 
       {toast&&(
         <div style={{position:"fixed",top:70,left:"50%",transform:"translateX(-50%)",
@@ -476,6 +622,9 @@ export default function Meals(){
               sel={log.foods[meal.id]||{}}
               onToggle={toggleFood}
               onAddCustom={(mealId)=>setAddFoodModal({show:true,mealId})}
+              suggestion={suggestions[meal.id]||null}
+              suggestionLoading={suggestionLoading[meal.id]||false}
+              onLogSuggestion={(sug)=>handleSuggestionLog(sug,meal.id)}
             />
           ))}
 
