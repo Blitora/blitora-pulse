@@ -93,6 +93,23 @@ export default function SignupPage() {
     return null;
   }
 
+  function assignTemplate(conds, goals) {
+    const c = (conds || []).map(x => x.toLowerCase());
+    const g = (goals || []).map(x => x.toLowerCase());
+    const hasDiabetes = c.some(x => x.includes('diabet'));
+    const hasBP       = c.some(x => x.includes('bp') || x.includes('blood pressure') || x.includes('hypertension') || x.includes('high bp'));
+    const hasThyroid  = c.some(x => x.includes('thyroid'));
+    const wantsLoss   = g.some(x => x.includes('lose') || x.includes('weight loss'));
+    const wantsGain   = g.some(x => x.includes('gain'));
+    if (hasDiabetes && hasBP)  return '7973c519-e1fa-45f1-aafa-ee9a6f93cb77'; // Diabetic + High BP
+    if (hasDiabetes)           return '0974fddc-3502-4e7c-9dc7-72c79888a0dc'; // Diabetic only
+    if (hasBP)                 return '49c466ad-58e1-4145-b757-d12729610bb7'; // High BP only
+    if (hasThyroid)            return 'f3063e9a-988c-4028-94b1-42c1dd058a93'; // Thyroid support
+    if (wantsLoss)             return '018c7c3c-293b-4553-a8cd-bc4c1425c235'; // Weight loss
+    if (wantsGain)             return '0d407f4a-628f-43ad-ae78-d6e019341096'; // Weight gain
+    return '353334b9-330b-4059-b816-1ba86ca14dd6'; // General healthy (default)
+  }
+
   async function handleFinalSubmit() {
     setError('');
     // Validate required fields before submitting
@@ -156,11 +173,12 @@ export default function SignupPage() {
           weight_target: goalWeight ? parseFloat(goalWeight) : null,
           activity_level: activity || null,
           conditions: conditions.length ? conditions : null,
-          diet_type: diets.length ? diets[0] : null,  // primary diet type
+          diet_type: diets.length ? diets[0] : null,
           meals_per_day: mealPlan ? parseInt(mealPlan) : 5,
           role: 'patient',
           status: 'active',
-          setup_complete: true, // all data collected during signup
+          setup_complete: true,
+          active_template_id: assignTemplate(conditions, goals),
         }, { onConflict: 'id' });
       } else {
         await supabase.from('profiles').upsert({
