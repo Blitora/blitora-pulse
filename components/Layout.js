@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useRole, ROLES, isClinicRole } from '../lib/useRole';
 import { getSupabase } from '../lib/supabase';
+import TrialBanner from './TrialBanner';
 const supabase = getSupabase();
 
 const PATIENT_NAV = [
@@ -115,6 +116,7 @@ export default function Layout({ children }) {
             )}
           </div>
         </div>
+        <TrialBanner />
         {children}
       </main>
 
