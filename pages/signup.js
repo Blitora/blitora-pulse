@@ -29,6 +29,27 @@ const MEALS      = ['3 meals','5 meals','6 meals'];
 const CLINIC_TYPES = ['Solo Dietitian','Multi-dietitian Clinic','Hospital','Corporate Wellness'];
 const PATIENT_VOL  = ['Less than 10','10–50','50–200','200+'];
 const REFERRAL     = ['Google','Referral','Social Media','Other'];
+const COUNTRIES = [
+  'Afghanistan','Albania','Algeria','Angola','Argentina','Armenia','Australia',
+  'Austria','Azerbaijan','Bahrain','Bangladesh','Belarus','Belgium','Bolivia',
+  'Bosnia and Herzegovina','Brazil','Bulgaria','Cambodia','Cameroon','Canada',
+  'Chile','China','Colombia','Costa Rica','Croatia','Cuba','Cyprus',
+  'Czech Republic','Denmark','Dominican Republic','Ecuador','Egypt',
+  'El Salvador','Estonia','Ethiopia','Finland','France','Georgia','Germany',
+  'Ghana','Greece','Guatemala','Honduras','Hungary','India','Indonesia','Iran',
+  'Iraq','Ireland','Israel','Italy','Jamaica','Japan','Jordan','Kazakhstan',
+  'Kenya','Kuwait','Kyrgyzstan','Latvia','Lebanon','Libya','Lithuania',
+  'Luxembourg','Malaysia','Mexico','Moldova','Morocco','Mozambique','Myanmar',
+  'Nepal','Netherlands','New Zealand','Nicaragua','Nigeria','Norway',
+  'Oman','Pakistan','Panama','Paraguay','Peru','Philippines','Poland',
+  'Portugal','Qatar','Romania','Russia','Saudi Arabia','Senegal','Serbia',
+  'Singapore','Slovakia','Slovenia','Somalia','South Africa','South Korea',
+  'Spain','Sri Lanka','Sudan','Sweden','Switzerland','Syria','Taiwan',
+  'Tanzania','Thailand','Tunisia','Turkey','Uganda','Ukraine',
+  'United Arab Emirates','United Kingdom','United States','Uruguay',
+  'Uzbekistan','Venezuela','Vietnam','Yemen','Zimbabwe',
+];
+
 
 // ── Brand colours (VitaLog theme) ─────────────────────────────────────────
 const G = '#1D9E75'; // Health Green
@@ -70,6 +91,7 @@ export default function SignupPage() {
   const [diets,      setDiets]      = useState([]);
   const [goals,      setGoals]      = useState([]);
   const [mealPlan,   setMealPlan]   = useState('5 meals'); // default
+  const [country,    setCountry]    = useState('');
 
   function getHeightCm() {
     if (heightUnit === 'cm') return height ? parseFloat(height) : null;
@@ -179,6 +201,7 @@ export default function SignupPage() {
           status: 'active',
           setup_complete: true,
           active_template_id: assignTemplate(conditions, goals),
+          country: country || null,
         }, { onConflict: 'id' });
       } else {
         await supabase.from('profiles').upsert({
@@ -188,6 +211,7 @@ export default function SignupPage() {
           role: 'org_admin',
           status: 'active',
           setup_complete: true,
+          country: country || null,
         }, { onConflict: 'id' });
       }
 
@@ -320,6 +344,12 @@ export default function SignupPage() {
             <label style={s.lbl}>City *</label>
             <input style={s.inp} value={city} onChange={e => setCity(e.target.value)} placeholder="e.g. Mumbai" required />
 
+            <label style={s.lbl}>Country *</label>
+            <select style={s.inp} value={country} onChange={e => setCountry(e.target.value)} required>
+              <option value="">Select country</option>
+              {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+
             <label style={s.lbl}>Patients you manage</label>
             <div style={s.chipRow}>
               {PATIENT_VOL.map(v => <Chip key={v} label={v} selected={patVol===v} onClick={() => setPatVol(v)} />)}
@@ -359,6 +389,13 @@ export default function SignupPage() {
                 </select>
               </div>
             </div>
+
+
+            <label style={s.lbl}>Country *</label>
+            <select style={s.inp} value={country} onChange={e => setCountry(e.target.value)} required>
+              <option value="">Select your country</option>
+              {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
 
             <div style={s.row3}>
               <div style={{gridColumn:'1/-1'}}>
