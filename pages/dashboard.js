@@ -451,6 +451,7 @@ export default function Dashboard(){
   );
 
   return(
+    <RoleGuard allow={[ROLES.PATIENT]}>
     <>
       <Head><title>Home — VitaLog</title></Head>
       <style>{`
@@ -715,5 +716,6 @@ export default function Dashboard(){
         </div>
       </Layout>
     </>
+    </RoleGuard>
   );
 }
