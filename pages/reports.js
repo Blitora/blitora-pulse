@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import Head from "next/head";
 import { useRouter } from "next/router";
 import { getSupabase } from "../lib/supabase";
+import RoleGuard from '../components/RoleGuard';
+import { ROLES } from '../lib/useRole';
 import Layout from "../components/Layout";
 
 const P="#714B67",PL="#f3eef1",G="#1D9E75",GL="#e1f5ee",A="#EF9F27",AL="#faeeda",R="#E24B4A";
