@@ -551,6 +551,7 @@ export default function Meals(){
   );
 
   return(
+    <RoleGuard allow={[ROLES.PATIENT]}>
     <>
       <Head><title>Meals — VitaLog</title></Head>
       <style>{`body{font-family:'Poppins',Arial,sans-serif;} @keyframes fadein{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}} @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}`}</style>
@@ -641,5 +642,6 @@ export default function Meals(){
         </div>
       </Layout>
     </>
+    </RoleGuard>
   );
 }
