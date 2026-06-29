@@ -215,7 +215,32 @@ export default function SignupPage() {
         }, { onConflict: 'id' });
       }
 
-      // 5. Show verify email screen
+      // 5. Trigger AI meal template generation async (non-blocking)
+      if (type === 'individual') {
+        fetch('/api/ai/signup-meal-template', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId,
+            profile: {
+              fullName: name.trim(),
+              age: dob ? Math.floor((Date.now() - new Date(dob)) / (365.25 * 864e5)) : 25,
+              gender: gender || 'Not specified',
+              heightCm: getHeightCm(),
+              currentWeightKg: weight ? parseFloat(weight) : 70,
+              goalWeightKg: goalWeight ? parseFloat(goalWeight) : 65,
+              activityLevel: activity || 'Moderate',
+              healthConditions: conditions.length ? conditions : [],
+              dietaryPref: diets.length ? diets[0] : 'Mixed',
+              primaryGoal: goals.length ? goals[0] : 'Stay healthy',
+              mealPlanType: mealPlan ? parseInt(mealPlan) : 5,
+            },
+            country: country || null,
+          }),
+        }).catch(e => console.warn('AI template gen non-critical error:', e));
+      }
+
+      // 6. Show verify email screen
       setDone(true);
     } catch (err) {
       setError(err.message);
