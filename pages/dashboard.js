@@ -50,6 +50,108 @@ function calcBMR(p){
   return p.gender==="Female"?base-161:base+5;
 }
 
+// ── Tomorrow Plan Card ─────────────────────────────────────────────────────
+function TomorrowPlanCard({ plan, loading, onClose }) {
+  const G = '#1D9E75', A = '#EF9F27', TXT = '#0D1B3E', TXT2 = '#718096';
+  const BORDER = '#E0E3ED', CARD = '#fff';
+
+  if (loading) return (
+    <div style={{
+      background: CARD, borderRadius: 14, border: `1px solid ${BORDER}`,
+      padding: '16px', marginBottom: 12,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: TXT2, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+          🌙 Tomorrow's Plan
+        </div>
+      </div>
+      {[80, 60, 70, 55].map((w, i) => (
+        <div key={i} style={{ height: 8, borderRadius: 4, background: '#F0F0F7', width: `${w}%`, marginBottom: 8, animation: `pulse 1.4s ease-in-out ${i * 0.15}s infinite` }} />
+      ))}
+    </div>
+  );
+
+  if (!plan) return null;
+
+  if (plan.notAvailable) return (
+    <div style={{
+      background: '#FFFBEB', borderRadius: 14, border: '1px solid #FDE68A',
+      padding: '14px 16px', marginBottom: 12,
+    }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: '#92400E', marginBottom: 4 }}>
+        🌙 Tomorrow's Plan — Pro & Premium only
+      </div>
+      <div style={{ fontSize: 12, color: '#92400E' }}>
+        Upgrade to Pro to get an AI-generated meal plan for tomorrow based on today's gaps.
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{
+      background: CARD, borderRadius: 14, border: `1px solid ${BORDER}`,
+      padding: '16px', marginBottom: 12, animation: 'fadein .4s ease',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: TXT2, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+          🌙 Tomorrow's Meal Plan
+        </div>
+        <button onClick={onClose} style={{ border: 'none', background: 'none', cursor: 'pointer', color: TXT2, fontSize: 18, padding: 0 }}>×</button>
+      </div>
+
+      {plan.summary && (
+        <div style={{ fontSize: 12, color: TXT2, marginBottom: 12, lineHeight: 1.5, fontStyle: 'italic' }}>
+          {plan.summary}
+        </div>
+      )}
+
+      {(plan.meals || []).map((meal, i) => (
+        <div key={i} style={{
+          padding: '10px 0',
+          borderBottom: i < (plan.meals.length - 1) ? `1px solid ${BORDER}` : 'none',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: TXT }}>{meal.slot}</div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {meal.estimatedCalories > 0 && (
+                <span style={{ fontSize: 11, fontWeight: 700, color: G }}>{meal.estimatedCalories} kcal</span>
+              )}
+              {meal.estimatedProtein > 0 && (
+                <span style={{ fontSize: 10, color: '#2B6CB0' }}>{meal.estimatedProtein}g P</span>
+              )}
+            </div>
+          </div>
+          {meal.time && (
+            <div style={{ fontSize: 10, color: TXT2, marginBottom: 4 }}>{meal.time}</div>
+          )}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+            {(meal.items || []).map((item, j) => (
+              <span key={j} style={{
+                fontSize: 10, padding: '3px 8px', borderRadius: 12,
+                background: '#F5F6FA', color: TXT2, border: `1px solid ${BORDER}`,
+              }}>{item}</span>
+            ))}
+          </div>
+        </div>
+      ))}
+
+      {plan.tip && (
+        <div style={{
+          marginTop: 10, padding: '8px 12px', borderRadius: 9,
+          background: '#F0FDF8', border: '1px solid #A7F3D0',
+          fontSize: 11, color: '#065F46',
+        }}>
+          💡 {plan.tip}
+        </div>
+      )}
+
+      <div style={{ fontSize: 10, color: TXT2, marginTop: 10 }}>
+        Total: ~{(plan.totalCalories || 0)} kcal · ~{(plan.totalProtein || 0)}g protein
+      </div>
+    </div>
+  );
+}
+
 // ── AI Insight Card ────────────────────────────────────────────────────────
 function InsightCard({ content, loading, downgraded }) {
   const P = "#714B67";
@@ -173,6 +275,9 @@ export default function Dashboard(){
   const [insight,setInsight]=useState(null);        // AI insight card content
   const [insightLoading,setInsightLoading]=useState(false); // loading state
   const [insightDowngraded,setInsightDowngraded]=useState(false); // true if Gemini fallback used
+  const [tomorrowPlan,setTomorrowPlan]=useState(null);         // AI tomorrow plan
+  const [tomorrowLoading,setTomorrowLoading]=useState(false);  // tomorrow plan loading
+  const [showTomorrow,setShowTomorrow]=useState(false);        // toggle visibility
 
   useEffect(()=>{
     async function init(){
@@ -239,6 +344,57 @@ export default function Dashboard(){
       console.error('Insight fetch error:', err);
     } finally {
       setInsightLoading(false);
+    }
+  }
+
+
+  // ── AI Tomorrow Plan ─────────────────────────────────────────────────────
+  // Only available on Pro and Premium plans
+  // Cached until midnight — re-generates next day
+  async function fetchTomorrowPlan() {
+    if (!profile) return;
+    setTomorrowLoading(true);
+    setShowTomorrow(true);
+    try {
+      const allFoodIds = Object.values(log.foods).flatMap(m => Object.keys(m));
+      const macNow = allFoodIds.reduce((a, id) => {
+        const f = foods.find(x => String(x.id) === String(id) || x.name === id);
+        return f ? { cal: a.cal + (f.calories || 0), pro: a.pro + (f.protein || 0) } : a;
+      }, { cal: 0, pro: 0 });
+
+      const res = await fetch('/api/ai/tomorrow-plan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: profile.id,
+          plan: profile.plan || 'trial',
+          profile: {
+            dietaryPref: profile.diet_type || 'Mixed',
+            healthConditions: profile.conditions
+              ? Object.keys(profile.conditions).filter(k => k !== 'none') : [],
+            mealPlanType: profile.meals_per_day || 5,
+            dailyCalorieTarget: profile.calorie_target || 1600,
+            proteinTarget: profile.protein_target || 100,
+            carbTarget: profile.carb_target || 130,
+            fatTarget: profile.fat_target || 55,
+          },
+          todayLog: {
+            totalCalories: macNow.cal,
+            totalProtein: macNow.pro,
+          },
+          country: profile.country || null,
+        }),
+      });
+      const data = await res.json();
+      if (data.error === 'not_available') {
+        setTomorrowPlan({ notAvailable: true });
+      } else if (data.plan) {
+        setTomorrowPlan(data.plan);
+      }
+    } catch (err) {
+      console.error('Tomorrow plan error:', err);
+    } finally {
+      setTomorrowLoading(false);
     }
   }
 
@@ -335,6 +491,37 @@ export default function Dashboard(){
               {profile?.weight_target ? `Goal: ${profile.weight_start||'?'}kg → ${profile.weight_target}kg` : 'Track your health today'}
             </div>
           </div>
+
+          {/* AI quick actions */}
+          <div style={{display:'flex',gap:8,marginBottom:12}}>
+            <button
+              onClick={()=>router.push('/ai/chat')}
+              style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',gap:6,
+                padding:'10px',borderRadius:12,border:'none',
+                background:'linear-gradient(135deg,#714B67,#9B59B6)',
+                color:'#fff',fontSize:12,fontWeight:700,cursor:'pointer',
+                fontFamily:"'Poppins',Arial,sans-serif"}}>
+              ✨ AI Chat
+            </button>
+            <button
+              onClick={fetchTomorrowPlan}
+              disabled={tomorrowLoading}
+              style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',gap:6,
+                padding:'10px',borderRadius:12,border:`1.5px solid ${BORDER}`,
+                background:CARD,color:TXT,fontSize:12,fontWeight:700,cursor:'pointer',
+                fontFamily:"'Poppins',Arial,sans-serif",opacity:tomorrowLoading?0.7:1}}>
+              🌙 {tomorrowLoading?'Generating…':'Tomorrow Plan'}
+            </button>
+          </div>
+
+          {/* Tomorrow Plan Card */}
+          {showTomorrow&&(
+            <TomorrowPlanCard
+              plan={tomorrowPlan}
+              loading={tomorrowLoading}
+              onClose={()=>{setShowTomorrow(false);setTomorrowPlan(null);}}
+            />
+          )}
 
           {/* AI Insight Card — today only */}
           <InsightCard content={insight} loading={insightLoading} downgraded={insightDowngraded} />
