@@ -164,56 +164,30 @@ export default function SignupPage() {
       const userId = authData.user?.id;
       if (!userId) throw new Error('Signup failed — please try again.');
 
-      // 2. Create organisation (can do before email confirm — user can't log in until confirmed)
-      const trialDays = type === 'clinic' ? 7 : 3;
-      const orgName   = type === 'clinic' ? clinicName.trim() : `${name.trim()}'s Account`;
-      const { data: org, error: orgErr } = await supabase.from('organisations').insert({
-        name: orgName,
-        plan: 'trial',
-        trial_ends_at: new Date(Date.now() + trialDays * 86400000).toISOString(),
-        max_patients: type === 'clinic' ? 50 : 1,
-      }).select().single();
-      if (orgErr) throw orgErr;
-
-      // 3. Org membership
-      const memberRole = type === 'clinic' ? 'org_admin' : 'patient';
-      await supabase.from('organisation_members').insert({
-        org_id: org.id, user_id: userId, role: memberRole,
+      // 2. Create org + membership + profile via API (uses service role to bypass RLS)
+      // Direct DB calls fail here because user email not yet confirmed = not authenticated
+      const completeRes = await fetch('/api/auth/signup-complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          email: email.trim().toLowerCase(),
+          name: name.trim(),
+          type,
+          profile: type === 'individual' ? {
+            dob, gender, heightCm: getHeightCm(),
+            weight: weight ? parseFloat(weight) : null,
+            goalWeight: goalWeight ? parseFloat(goalWeight) : null,
+            activity, conditions, diets, goals,
+            mealPlan, country,
+          } : null,
+          clinicData: type === 'clinic' ? {
+            clinicName: clinicName.trim(), clinicType, city, patVol, referral, country,
+          } : null,
+        }),
       });
-
-      // 4. Save health profile immediately (individual) — setup page can update later
-      if (type === 'individual') {
-        await supabase.from('profiles').upsert({
-          id: userId,
-          full_name: name.trim(),
-          email: email.trim().toLowerCase(),
-          dob: dob || null,
-          gender: gender || null,
-          height_cm: getHeightCm(),
-          weight_start: weight ? parseFloat(weight) : null,
-          weight_current: weight ? parseFloat(weight) : null,
-          weight_target: goalWeight ? parseFloat(goalWeight) : null,
-          activity_level: activity || null,
-          conditions: conditions.length ? conditions : null,
-          diet_type: diets.length ? diets[0] : null,
-          meals_per_day: mealPlan ? parseInt(mealPlan) : 5,
-          role: 'patient',
-          status: 'active',
-          setup_complete: true,
-          active_template_id: assignTemplate(conditions, goals),
-          country: country || null,
-        }, { onConflict: 'id' });
-      } else {
-        await supabase.from('profiles').upsert({
-          id: userId,
-          full_name: name.trim(),
-          email: email.trim().toLowerCase(),
-          role: 'org_admin',
-          status: 'active',
-          setup_complete: true,
-          country: country || null,
-        }, { onConflict: 'id' });
-      }
+      const completeData = await completeRes.json();
+      if (!completeData.success) throw new Error(completeData.error || 'Account setup failed.');
 
       // 5. Trigger AI meal template generation async (non-blocking)
       if (type === 'individual') {
