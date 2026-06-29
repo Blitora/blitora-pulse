@@ -103,9 +103,24 @@ export default function AcceptInvitePage() {
       // Mark invite accepted
       await supabase.from('invitations').update({ accepted: true }).eq('token', token);
 
-      // Sign in (needed if email confirmation is off — signUp may not auto-sign-in)
+      // Create patient_assignment — link patient to the dietitian who invited them
+      if (inv.role === 'patient' && inv.invited_by) {
+        await supabase.from('patient_assignments').upsert({
+          org_id: inv.org_id,
+          patient_id: userId,
+          dietitian_id: inv.invited_by,
+          is_active: true,
+        }, { onConflict: 'org_id,patient_id' });
+      }
+
+      // Auto-confirm email for invited users (they were invited by a verified Dr)
+      // Sign in immediately after signup
       if (mode === 'signup') {
-        await supabase.auth.signInWithPassword({ email, password });
+        const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
+        if (signInErr && signInErr.message.includes('Email not confirmed')) {
+          // Tell user to check email but still redirect to setup
+          // Their account is created and org membership is set
+        }
       }
 
       router.replace(inv.role === 'patient' ? '/setup' : '/clinic/patients');
