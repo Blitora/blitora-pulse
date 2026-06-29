@@ -50,6 +50,65 @@ function calcBMR(p){
   return p.gender==="Female"?base-161:base+5;
 }
 
+// ── AI Insight Card ────────────────────────────────────────────────────────
+function InsightCard({ content, loading, downgraded }) {
+  const P = "#714B67";
+  if (loading) return (
+    <div style={{
+      background: "linear-gradient(135deg, #f3eef1, #ede8f5)",
+      borderRadius: 14, border: "1px solid #e0d8ec",
+      padding: "14px 16px", marginBottom: 12,
+      display: "flex", alignItems: "center", gap: 10,
+    }}>
+      <div style={{
+        width: 32, height: 32, borderRadius: "50%",
+        background: P, display: "flex", alignItems: "center",
+        justifyContent: "center", flexShrink: 0, fontSize: 16,
+      }}>✨</div>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: P, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 5 }}>
+          AI Insight
+        </div>
+        <div style={{ display: "flex", gap: 4 }}>
+          {[0,1,2].map(i => (
+            <div key={i} style={{
+              width: `${[60,80,45][i]}%`, height: 8, borderRadius: 4,
+              background: "#d8cfe8",
+              animation: `pulse 1.4s ease-in-out ${i*0.2}s infinite`,
+            }}/>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  if (!content) return null;
+
+  return (
+    <div style={{
+      background: "linear-gradient(135deg, #f3eef1, #ede8f5)",
+      borderRadius: 14, border: "1px solid #e0d8ec",
+      padding: "14px 16px", marginBottom: 12,
+    }}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+        <div style={{
+          width: 32, height: 32, borderRadius: "50%",
+          background: P, display: "flex", alignItems: "center",
+          justifyContent: "center", flexShrink: 0, fontSize: 16,
+        }}>✨</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: P, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
+            AI Insight {downgraded && <span style={{ fontWeight: 400, textTransform: "none", fontSize: 9, color: "#9CA3AF" }}>· basic mode</span>}
+          </div>
+          <div style={{ fontSize: 13, color: "#2c1a3a", lineHeight: 1.6, fontWeight: 400 }}>
+            {content}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Ring chart ─────────────────────────────────────────────────────────────
 function Ring({pct=0,size=76,color,label,sub}){
   const r=(size-8)/2,c=2*Math.PI*r,d=Math.min(pct/100,1)*c;
@@ -111,6 +170,9 @@ export default function Dashboard(){
   const [log,setLog]=useState({foods:{},activity:{},water:0,habits:{},weight:null});
   const [saving,setSaving]=useState(false);
   const [toast,setToast]=useState(null);
+  const [insight,setInsight]=useState(null);        // AI insight card content
+  const [insightLoading,setInsightLoading]=useState(false); // loading state
+  const [insightDowngraded,setInsightDowngraded]=useState(false); // true if Gemini fallback used
 
   useEffect(()=>{
     async function init(){
@@ -121,6 +183,8 @@ export default function Dashboard(){
       if(!p){router.push("/");return;}
       if(!p.setup_complete){router.push("/setup");return;}
       setProfile(p);
+      // Fetch AI insight card for today
+      fetchInsight(p, {cal:0,pro:0,water:0,activity:{}}, today());
       // Load food names for meal summary display
       if(p.active_template_id){
         const[{data:template_foods},{data:custom}]=await Promise.all([
@@ -135,6 +199,48 @@ export default function Dashboard(){
     }
     init();
   },[]);
+
+
+  // ── AI Insight Card ──────────────────────────────────────────────────────
+  // Fetches from /api/ai/insight — cached 24h in Supabase ai_cache table
+  // Only fetches for today — no insight on past dates
+  async function fetchInsight(p, currentLog, dk) {
+    if (!p || dk !== today()) return; // no insight for past dates
+    setInsightLoading(true);
+    try {
+      const res = await fetch('/api/ai/insight', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: p.id,
+          plan: p.plan || 'trial',
+          profile: {
+            fullName: p.full_name,
+            healthConditions: p.conditions ? Object.keys(p.conditions).filter(k => k !== 'none') : [],
+            primaryGoal: p.goals?.[0] || 'Stay healthy',
+            dailyCalorieTarget: p.calorie_target || 1600,
+            proteinTarget: p.protein_target || 100,
+          },
+          todayLog: {
+            totalCalories: currentLog?.cal || 0,
+            totalProtein: currentLog?.pro || 0,
+            totalWaterMl: ((currentLog?.water || 0) * 500),
+            walkMinutes: WALKS.reduce((s,w) => s + (currentLog?.activity?.[w.k] || 0), 0),
+          },
+          country: p.country || null,
+        }),
+      });
+      const data = await res.json();
+      if (data.content) {
+        setInsight(data.content);
+        setInsightDowngraded(data.downgraded || false);
+      }
+    } catch (err) {
+      console.error('Insight fetch error:', err);
+    } finally {
+      setInsightLoading(false);
+    }
+  }
 
   const loadLog=useCallback(async(dk)=>{
     if(!profile)return;
@@ -208,6 +314,7 @@ export default function Dashboard(){
         .meal-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid ${BORDER};cursor:pointer;text-decoration:none}
         .meal-row:last-child{border-bottom:none}
         @media(max-width:480px){.kpi-grid{grid-template-columns:repeat(2,1fr)!important}}
+        @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
       `}</style>
 
       {toast&&(
@@ -228,6 +335,9 @@ export default function Dashboard(){
               {profile?.weight_target ? `Goal: ${profile.weight_start||'?'}kg → ${profile.weight_target}kg` : 'Track your health today'}
             </div>
           </div>
+
+          {/* AI Insight Card — today only */}
+          <InsightCard content={insight} loading={insightLoading} downgraded={insightDowngraded} />
 
           {/* Date navigation */}
           <div className="date-nav">
