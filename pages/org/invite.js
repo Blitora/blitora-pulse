@@ -25,6 +25,7 @@ function InviteView() {
   const [inviteLink, setInviteLink] = useState('');
   const [copied,  setCopied]  = useState(false);
   const [error,   setError]   = useState('');
+  const [success,  setSuccess]  = useState('');
   const [recent,  setRecent]  = useState([]);
 
   useEffect(() => {
@@ -61,6 +62,7 @@ function InviteView() {
       setInviteLink(link);
       setRecent(prev => [inv, ...prev]);
       setEmail('');
+      setSuccess(`Invite sent to ${email.trim().toLowerCase()}! They'll receive a link to join your clinic.`);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -91,6 +93,11 @@ function InviteView() {
       </p>
 
       <div style={{ background:'#fff', borderRadius:14, padding:'20px', border:`1px solid ${BORDER}`, marginBottom:16 }}>
+        {success && (
+          <div style={{ background:'#ECFDF5', border:'1px solid #6EE7B7', color:'#065F46', borderRadius:10, padding:'10px 14px', fontSize:'0.76rem', marginBottom:14, display:'flex', alignItems:'center', gap:8 }}>
+            <span>✅</span> {success}
+          </div>
+        )}
         {error && (
           <div style={{ background:'#FEF2F2', border:'1px solid #FECACA', color:'#DC2626', borderRadius:10, padding:'10px 14px', fontSize:'0.76rem', marginBottom:14 }}>
             {error}
@@ -103,7 +110,7 @@ function InviteView() {
             style={{ width:'100%', padding:'10px 13px', border:`1.5px solid ${BORDER}`, borderRadius:10, fontSize:'0.82rem', fontFamily:'Inter,sans-serif', outline:'none', marginBottom:14, boxSizing:'border-box', color:'#111827', background:'#fff' }}
             type="email"
             value={email}
-            onChange={e => { setEmail(e.target.value); setInviteLink(''); }}
+            onChange={e => { setEmail(e.target.value); setInviteLink(''); setSuccess(''); setError(''); }}
             placeholder="patient@example.com"
             required
           />
