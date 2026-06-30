@@ -164,9 +164,12 @@ export default function SignupPage() {
       const userId = authData.user?.id;
       if (!userId) throw new Error('Signup failed — please try again.');
 
-      // 2. Create org + membership + profile via API (uses service role to bypass RLS)
-      // Direct DB calls fail here because user email not yet confirmed = not authenticated
-      const completeRes = await fetch('/api/auth/signup-complete', {
+      // 2. Org + base profile + membership are created automatically by the
+      //    handle_new_individual_signup() DB trigger (security definer — bypasses RLS).
+      //    This call only patches in the detailed health-profile / clinic fields.
+      //    It is intentionally non-blocking: if it fails, signup still succeeds —
+      //    the user completes their profile on /setup instead.
+      fetch('/api/auth/signup-complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -185,9 +188,7 @@ export default function SignupPage() {
             clinicName: clinicName.trim(), clinicType, city, patVol, referral, country,
           } : null,
         }),
-      });
-      const completeData = await completeRes.json();
-      if (!completeData.success) throw new Error(completeData.error || 'Account setup failed.');
+      }).catch(e => console.warn('Profile detail patch non-critical error:', e));
 
       // 5. Trigger AI meal template generation async (non-blocking)
       if (type === 'individual') {
