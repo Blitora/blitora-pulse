@@ -155,7 +155,12 @@ export default function SignupPage() {
         email: email.trim().toLowerCase(),
         password,
         options: {
-          data: { full_name: name.trim(), phone },
+          data: {
+            full_name: name.trim(),
+            phone,
+            account_type: type,                 // 'individual' | 'clinic' — read by DB trigger
+            clinic_name: type === 'clinic' ? clinicName.trim() : null,
+          },
           // After email click → /auth/callback → /setup
           emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
