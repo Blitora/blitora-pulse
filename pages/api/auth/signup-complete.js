@@ -1,11 +1,19 @@
 // pages/api/auth/signup-complete.js
-// Called after auth.signUp() to create org, membership, and profile
-// Uses service role to bypass RLS since user is not yet authenticated
-// This is the correct pattern for post-signup DB writes
+// Called after auth.signUp() to PATCH in detailed profile fields
+// (org, membership, and base profile are already created by the
+//  handle_new_individual_signup() DB trigger — security definer, runs instantly on auth.users insert)
+//
+// This route is non-critical / best-effort: it just fills in height, weight,
+// conditions, diet, goals etc. If it fails, the user still has a working
+// account and can complete these details on /setup.
+//
+// Uses service role if available (bypasses RLS entirely — most reliable).
+// Falls back to anon key — works because of the "Users update own profile"
+// and "Users update own org" policies below, which is fine since by the time
+// this call resolves the user's session often already exists client-side.
 
 import { createClient } from '@supabase/supabase-js'
 
-// Service role client — bypasses RLS
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -15,58 +23,18 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
   const { userId, email, name, type, profile, clinicData } = req.body
-
   if (!userId || !email || !type) {
     return res.status(400).json({ error: 'Missing required fields' })
   }
 
   try {
-    // 1. Create organisation
-    const trialDays = type === 'clinic' ? 7 : 3
-    const orgName = type === 'clinic'
-      ? (clinicData?.clinicName || `${name}'s Clinic`)
-      : `${name}'s Account`
-
-    const { data: org, error: orgErr } = await supabaseAdmin
-      .from('organisations')
-      .insert({
-        name: orgName,
-        plan: 'trial',
-        trial_ends_at: new Date(Date.now() + trialDays * 86400000).toISOString(),
-        max_patients: type === 'clinic' ? 50 : 1,
-      })
-      .select()
-      .single()
-
-    if (orgErr) throw new Error('Organisation creation failed: ' + orgErr.message)
-
-    // 2. Create org membership
-    const memberRole = type === 'clinic' ? 'org_admin' : 'patient'
-    const { error: memErr } = await supabaseAdmin
-      .from('organisation_members')
-      .insert({
-        org_id: org.id,
-        user_id: userId,
-        role: memberRole,
-        is_active: true,
-        joined_at: new Date().toISOString(),
-      })
-
-    if (memErr) throw new Error('Membership creation failed: ' + memErr.message)
-
-    // 3. Save profile
-    const profileData = {
-      id: userId,
-      full_name: name,
-      email: email.toLowerCase(),
-      role: memberRole,
-      status: 'active',
-      setup_complete: type === 'individual',
-      country: profile?.country || null,
+    // Patch detailed profile fields (base row already exists via trigger)
+    const profileUpdate = {
+      country: profile?.country || clinicData?.country || null,
     }
 
     if (type === 'individual' && profile) {
-      Object.assign(profileData, {
+      Object.assign(profileUpdate, {
         dob: profile.dob || null,
         gender: profile.gender || null,
         height_cm: profile.heightCm || null,
@@ -77,43 +45,50 @@ export default async function handler(req, res) {
         conditions: profile.conditions?.length ? profile.conditions : null,
         diet_type: profile.diets?.length ? profile.diets[0] : null,
         meals_per_day: profile.mealPlan ? parseInt(profile.mealPlan) : 5,
-        calorie_target: 1600, // will be updated by AI template generation
-        protein_target: 100,
-        carb_target: 130,
-        fat_target: 55,
-      })
-    }
-
-    if (type === 'clinic' && clinicData) {
-      Object.assign(profileData, {
         setup_complete: true,
       })
     }
 
     const { error: profileErr } = await supabaseAdmin
       .from('profiles')
-      .upsert(profileData, { onConflict: 'id' })
+      .update(profileUpdate)
+      .eq('id', userId)
 
-    if (profileErr) throw new Error('Profile save failed: ' + profileErr.message)
-
-    // 4. Save clinic info to org if clinic signup
-    if (type === 'clinic' && clinicData) {
-      await supabaseAdmin
-        .from('organisations')
-        .update({
-          name: clinicData.clinicName || orgName,
-        })
-        .eq('id', org.id)
+    if (profileErr) {
+      console.warn('Profile patch warning:', profileErr.message)
     }
 
-    return res.status(200).json({
-      success: true,
-      orgId: org.id,
-      role: memberRole,
-    })
+    // Patch clinic name on the trigger-created org
+    if (type === 'clinic' && clinicData?.clinicName) {
+      const { data: membership } = await supabaseAdmin
+        .from('organisation_members')
+        .select('org_id')
+        .eq('user_id', userId)
+        .eq('role', 'org_admin')
+        .limit(1)
+        .single()
+
+      if (membership?.org_id) {
+        await supabaseAdmin
+          .from('organisations')
+          .update({
+            name: clinicData.clinicName,
+            max_patients: 50, // clinic trial gets higher limit than default 1
+          })
+          .eq('id', membership.org_id)
+
+        await supabaseAdmin
+          .from('profiles')
+          .update({ setup_complete: true })
+          .eq('id', userId)
+      }
+    }
+
+    return res.status(200).json({ success: true })
 
   } catch (err) {
-    console.error('Signup complete error:', err)
-    return res.status(500).json({ error: err.message })
+    console.error('Signup-complete patch error (non-critical):', err)
+    // Always 200 — this is best-effort, user can finish on /setup
+    return res.status(200).json({ success: false, error: err.message })
   }
 }
