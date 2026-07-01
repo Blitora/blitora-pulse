@@ -453,7 +453,7 @@ export default function Dashboard(){
   return(
     <RoleGuard allow={[ROLES.PATIENT]}>
     <>
-      <Head><title>Home — VitaLog</title></Head>
+      <Head><title>Home — Blitora Pulse</title></Head>
       <style>{`
         body{font-family:'Poppins',Arial,sans-serif;}
         .card{background:${CARD};border-radius:14px;border:1px solid ${BORDER};padding:16px;margin-bottom:12px}
