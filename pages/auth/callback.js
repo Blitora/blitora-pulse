@@ -78,7 +78,7 @@ export default function AuthCallback() {
         <div style={{ width:56, height:56, border:`4px solid ${G}`, borderTopColor:'transparent', borderRadius:'50%', animation:'spin 0.8s linear infinite', margin:'0 auto 20px' }} />
 
         <div style={{ fontSize:'1rem', fontWeight:600, color:N, marginBottom:6 }}>
-          VitaLog
+          Blitora Pulse
         </div>
         <p style={{ fontSize:'0.82rem', color:'#6B7280' }}>{status}</p>
 
