@@ -100,7 +100,7 @@ export default function IndexPage() {
         <div style={st.logoRow}>
           <div style={st.logoIcon}>🌿</div>
           <div>
-            <div style={st.logoName}>VitaLog</div>
+            <div style={st.logoName}>Blitora Pulse</div>
             <div style={st.logoTag}>Health Platform</div>
           </div>
         </div>
@@ -195,7 +195,7 @@ export default function IndexPage() {
         </button>
 
         <p style={st.signupLink}>
-          New to VitaLog?{' '}
+          New to Blitora Pulse?{' '}
           <a href="/signup" style={{ color:'#10B981', fontWeight:600, textDecoration:'none' }}>Create account</a>
         </p>
       </div>
