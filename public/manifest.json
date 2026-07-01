@@ -1,12 +1,12 @@
 {
-  "name": "MyHealth — Health Tracker",
-  "short_name": "MyHealth",
-  "description": "Track your daily meals, water, walks and health goals",
+  "name": "Blitora Pulse",
+  "short_name": "Pulse",
+  "description": "Track your daily meals, water, walks and health goals with AI-powered insights",
   "start_url": "/dashboard",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#4e1644",
-  "theme_color": "#714B67",
+  "background_color": "#0D1B3E",
+  "theme_color": "#1D9E75",
   "icons": [
     { "src": "/icon-48.png",  "sizes": "48x48",   "type": "image/png" },
     { "src": "/icon-72.png",  "sizes": "72x72",   "type": "image/png" },
