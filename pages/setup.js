@@ -132,14 +132,21 @@ export default function Setup() {
     }).eq("id", userId);
 
     if (err) { setError(err.message); setSaving(false); return; }
-    router.replace("/dashboard");
+    // Verify write succeeded before redirecting (prevents stale-cache loop)
+    const { data: verify } = await sb.from('profiles').select('setup_complete').eq('id', userId).single();
+    if (!verify?.setup_complete) {
+      setError('Profile save failed. Please try again.');
+      setSaving(false);
+      return;
+    }
+    router.replace('/dashboard');
   }
 
   const bmi = getBMI();
 
   return (
     <>
-      <Head><title>Profile setup — VitaLog</title></Head>
+      <Head><title>Profile setup — Blitora Pulse</title></Head>
       <style>{`
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { background: ${BG}; font-family: 'Inter', system-ui, sans-serif; color: ${TXT}; min-height: 100vh; }
@@ -194,7 +201,7 @@ export default function Setup() {
       <div className="wrap">
         <div className="logo">
           <div className="logo-mark">🌿</div>
-          <div><div className="logo-text">VitaLog</div><div style={{fontSize:9,color:"#9CA3AF",letterSpacing:"0.07em",textTransform:"uppercase",marginTop:1}}>Health Platform</div></div>
+          <div><div className="logo-text">Blitora Pulse</div><div style={{fontSize:9,color:"#9CA3AF",letterSpacing:"0.07em",textTransform:"uppercase",marginTop:1}}>Health Platform</div></div>
         </div>
 
         <div className="progress-bar">
