@@ -39,7 +39,7 @@ export default function AuthCallback() {
         .limit(1)
         .maybeSingle();
 
-      // Check if profile setup is complete
+      // Always fetch profile regardless of org membership
       const { data: profile } = await supabase
         .from('profiles')
         .select('setup_complete, role')
@@ -48,22 +48,17 @@ export default function AuthCallback() {
 
       await new Promise(r => setTimeout(r, 600));
 
-      if (!member) {
-        // No org at all — edge case, send to signup
-        router.replace('/signup');
+      // Clinic staff (org_admin / dietitian) → patient management
+      if (member && (member.role === 'org_admin' || member.role === 'dietitian')) {
+        router.replace('/clinic/patients');
         return;
       }
 
-      const role = member.role;
-
-      if (role === 'org_admin' || role === 'dietitian') {
-        // Clinic staff → patient management
-        router.replace('/clinic/patients');
-      } else if (profile?.setup_complete) {
-        // Patient with complete profile → dashboard
+      // Everyone else — individual users, invited patients, no org yet
+      // Route based on whether they have completed profile setup
+      if (profile?.setup_complete) {
         router.replace('/dashboard');
       } else {
-        // Invited patient who hasn't filled profile yet → setup
         router.replace('/setup');
       }
     }
@@ -74,14 +69,11 @@ export default function AuthCallback() {
   return (
     <div style={{ minHeight:'100vh', background:'#F5F6FA', display:'flex', alignItems:'center', justifyContent:'center', padding:24, fontFamily:"'Poppins', Arial, sans-serif" }}>
       <div style={{ textAlign:'center', maxWidth:320 }}>
-        {/* Animated ring */}
         <div style={{ width:56, height:56, border:`4px solid ${G}`, borderTopColor:'transparent', borderRadius:'50%', animation:'spin 0.8s linear infinite', margin:'0 auto 20px' }} />
-
         <div style={{ fontSize:'1rem', fontWeight:600, color:N, marginBottom:6 }}>
           Blitora Pulse
         </div>
         <p style={{ fontSize:'0.82rem', color:'#6B7280' }}>{status}</p>
-
         <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
       </div>
     </div>
