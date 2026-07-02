@@ -424,8 +424,24 @@ function Pricing() {
                   <span style={{ fontWeight:800, fontSize:38, color:c.navy, lineHeight:1 }}>
                     {useINR ? getPrice(plan).toLocaleString('en-IN') : getPrice(plan)}
                   </span>
+                  <span style={{ fontSize:13, color:c.bgrey, marginTop:8, marginLeft:4 }}>/mo</span>
                 </div>
-                <p style={{ fontSize:12, color:c.bgrey, marginBottom:16 }}>/month{billing==='annual'?' · billed annually':''}</p>
+                {billing==='annual' ? (
+                  <div style={{ marginBottom:14 }}>
+                    <span style={{ fontSize:13, fontWeight:700, color:c.green }}>
+                      {useINR
+                        ? `₹${(getPrice(plan)*12).toLocaleString('en-IN')} billed today`
+                        : `$${(getPrice(plan)*12).toFixed(2)} billed today`}
+                    </span>
+                    <span style={{ fontSize:12, color:c.bgrey, marginLeft:6 }}>
+                      · save {useINR
+                        ? `₹${(plan.priceINR*12 - getPrice(plan)*12).toLocaleString('en-IN')}`
+                        : `$${(plan.priceUSD*12 - getPrice(plan)*12).toFixed(2)}`}
+                    </span>
+                  </div>
+                ) : (
+                  <p style={{ fontSize:12, color:c.bgrey, marginBottom:14 }}>billed monthly · cancel anytime</p>
+                )}
 
                 <a href={plan.trial ? '/signup' : '/signup?skipTrial=1'} style={{ display:'block', textAlign:'center', padding:'12px', borderRadius:12, fontWeight:700, fontSize:13, textDecoration:'none', textTransform:'uppercase', letterSpacing:'0.04em', backgroundColor:ctaBg(plan.ctaStyle), color:ctaColor(plan.ctaStyle), border:ctaBorder(plan.ctaStyle) }}>
                   {plan.ctaLabel}
