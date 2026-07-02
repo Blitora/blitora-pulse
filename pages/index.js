@@ -252,6 +252,134 @@ function FourAnswers() {
   );
 }
 
+
+/* ── AI DEMO SECTION ── */
+function AISection() {
+  const [tab, setTab] = useState(0);
+  const scenarios = [
+    { label:"You say", input:"I want to lose weight, I'm vegetarian",
+      outputs:[{icon:"📋",lbl:"AI creates",val:"7-day personalised meal plan"},{icon:"🧮",lbl:"AI calculates",val:"Your exact daily calorie target"},{icon:"💊",lbl:"AI flags",val:"Nutrients you're likely missing"},{icon:"⏰",lbl:"AI schedules",val:"Daily reminders tailored to you"},{icon:"📊",lbl:"AI tracks",val:"Your progress automatically"}],
+      chat:[{role:"user",msg:"I want to lose weight. I'm vegetarian, don't like broccoli, and have 30 mins to cook each evening."},{role:"ai",msg:"Got it! I've built a 7-day vegetarian plan targeting a 500-cal daily deficit — no broccoli. Daily target: 1,650 kcal. I've also added iron and B12-rich foods since vegetarians often run low. Want a grocery list?"}] },
+    { label:"Dietitian says", input:"My patient isn't hitting protein targets",
+      outputs:[{icon:"🔍",lbl:"AI analyses",val:"7 days of patient logs instantly"},{icon:"📈",lbl:"AI identifies",val:"Exact meals causing the shortfall"},{icon:"💡",lbl:"AI suggests",val:"3 simple meal swaps to fix it"},{icon:"📩",lbl:"AI drafts",val:"A patient message explaining why"},{icon:"📅",lbl:"AI schedules",val:"A follow-up check in 5 days"}],
+      chat:[{role:"user",msg:"My patient Ramesh isn't hitting his 120g protein target. Can you check his logs?"},{role:"ai",msg:"Reviewed Ramesh's last 7 days — he's averaging 74g daily. Gap is at breakfast (17g) and snacks (0g). Quick fix: swap morning toast for eggs or Greek yoghurt (+15g), add roasted chickpeas as snack (+7g). I've drafted a message to send him — want me to update his plan too?"}] },
+    { label:"You ask", input:"Why do I feel tired after lunch every day?",
+      outputs:[{icon:"🧠",lbl:"AI reviews",val:"Your lunch meals for 2 weeks"},{icon:"📉",lbl:"AI spots",val:"Your blood sugar spike pattern"},{icon:"🍱",lbl:"AI recommends",val:"Lower-GI food swaps"},{icon:"⚡",lbl:"AI predicts",val:"Energy improvement in 3–5 days"},{icon:"📖",lbl:"AI explains",val:"Exactly why this is happening"}],
+      chat:[{role:"user",msg:"Why do I feel tired every day after lunch? It's been happening for weeks."},{role:"ai",msg:"Checked your last 14 lunches — 11 out of 14 were high-GI meals (white rice, white bread, or sugary drinks). This causes a blood sugar spike then a crash at 2–3pm — exactly what you're feeling. I've already swapped 4 meals in your plan this week to lower-GI options. Most people notice the difference in 3–5 days. I'll check in on Friday."}] },
+  ];
+  const active = scenarios[tab];
+
+  return (
+    <section style={{ padding:'64px 24px 80px', backgroundColor:c.white }}>
+      <div style={{ maxWidth:1152, margin:'0 auto' }}>
+        {/* Header */}
+        <div style={{ textAlign:'center', marginBottom:40 }}>
+          <div style={{ display:'inline-flex', alignItems:'center', gap:8, padding:'6px 16px', borderRadius:50, marginBottom:16, fontSize:12, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', backgroundColor:`rgba(29,158,117,0.1)`, color:c.green }}>✦ The AI advantage</div>
+          <h2 style={{ fontWeight:800, fontSize:'clamp(24px,4vw,40px)', letterSpacing:'-0.5px', color:c.navy, marginBottom:12 }}>
+            You give it a little.<br/><span style={{ color:c.green }}>It gives back everything.</span>
+          </h2>
+          <p style={{ fontSize:15, color:c.dgrey, maxWidth:520, margin:'0 auto' }}>Most health apps make you do all the work. Our AI reads between the lines, connects the dots, and acts — so you don't have to think about it.</p>
+        </div>
+
+        {/* Tabs */}
+        <div style={{ display:'flex', gap:10, overflowX:'auto', paddingBottom:8, marginBottom:28 }}>
+          {scenarios.map((s,i)=>(
+            <button key={i} onClick={()=>setTab(i)} style={{ padding:'10px 18px', borderRadius:50, fontSize:13, fontWeight:600, whiteSpace:'nowrap', flexShrink:0, cursor:'pointer', border:'none', fontFamily:'inherit', backgroundColor:tab===i?c.navy:c.lgrey, color:tab===i?c.white:c.dgrey }}>
+              {s.label}: "{s.input}"
+            </button>
+          ))}
+        </div>
+
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1.4fr', gap:24, alignItems:'start' }}>
+          {/* Left: input + outputs */}
+          <div>
+            <div style={{ borderRadius:16, padding:'16px', marginBottom:16, backgroundColor:c.lgrey, border:`2px solid ${c.green}40` }}>
+              <div style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', color:c.green, marginBottom:8 }}>👤 {active.label}</div>
+              <p style={{ fontSize:15, fontWeight:600, color:c.navy, margin:0 }}>"{active.input}"</p>
+            </div>
+            <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:14 }}>
+              <div style={{ flex:1, height:1, backgroundColor:c.mgrey }}/>
+              <div style={{ width:28, height:28, borderRadius:'50%', backgroundColor:c.green, display:'flex', alignItems:'center', justifyContent:'center', color:c.white, fontSize:13, fontWeight:700, flexShrink:0 }}>↓</div>
+              <div style={{ flex:1, height:1, backgroundColor:c.mgrey }}/>
+            </div>
+            <p style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', color:c.bgrey, marginBottom:12 }}>AI instantly does all of this</p>
+            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+              {active.outputs.map(({icon,lbl,val},i)=>(
+                <div key={i} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:12, backgroundColor:c.white, border:`1px solid ${c.mgrey}` }}>
+                  <span style={{ fontSize:18, flexShrink:0 }}>{icon}</span>
+                  <div>
+                    <div style={{ fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.08em', color:c.bgrey }}>{lbl}</div>
+                    <div style={{ fontSize:13, fontWeight:600, color:c.navy }}>{val}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Right: AI chat */}
+          <div style={{ borderRadius:24, overflow:'hidden', boxShadow:'0 8px 40px rgba(13,27,62,0.12)', border:`1px solid ${c.mgrey}` }}>
+            {/* Chat header */}
+            <div style={{ padding:'14px 20px', display:'flex', alignItems:'center', gap:12, backgroundColor:c.navy }}>
+              <div style={{ width:34, height:34, borderRadius:'50%', backgroundColor:c.green, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+              </div>
+              <div>
+                <div style={{ color:c.white, fontWeight:700, fontSize:14 }}>Pulse AI Coach</div>
+                <div style={{ color:'rgba(255,255,255,0.45)', fontSize:11, display:'flex', alignItems:'center', gap:4 }}>
+                  <span style={{ width:6, height:6, borderRadius:'50%', backgroundColor:c.green, display:'inline-block' }}/>
+                  AI-powered · always on
+                </div>
+              </div>
+            </div>
+            {/* Messages */}
+            <div style={{ padding:'16px', backgroundColor:'#FAFBFC', minHeight:280, display:'flex', flexDirection:'column', gap:12 }}>
+              {active.chat.map((msg,i)=>(
+                <div key={i} style={{ display:'flex', justifyContent:msg.role==='user'?'flex-end':'flex-start', alignItems:'flex-start', gap:8 }}>
+                  {msg.role==='ai' && (
+                    <div style={{ width:24, height:24, borderRadius:'50%', backgroundColor:c.green, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, marginTop:2 }}>
+                      <svg width="9" height="9" viewBox="0 0 24 24" fill="white"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                    </div>
+                  )}
+                  <div style={{ maxWidth:'85%', borderRadius:16, padding:'10px 14px', fontSize:13, lineHeight:1.5,
+                    ...(msg.role==='user'
+                      ? { backgroundColor:c.navy, color:c.white, borderBottomRightRadius:4 }
+                      : { backgroundColor:c.white, color:c.dgrey, border:`1px solid ${c.mgrey}`, borderBottomLeftRadius:4 }) }}>
+                    {msg.msg}
+                  </div>
+                </div>
+              ))}
+              {/* Typing indicator */}
+              <div style={{ display:'flex', alignItems:'center', gap:8, paddingLeft:32 }}>
+                <div style={{ display:'flex', gap:4, padding:'10px 14px', borderRadius:16, backgroundColor:c.white, border:`1px solid ${c.mgrey}` }}>
+                  {[0,1,2].map(i=>(<div key={i} style={{ width:6, height:6, borderRadius:'50%', backgroundColor:c.bgrey, opacity:0.5 }}/>))}
+                </div>
+                <span style={{ fontSize:11, color:c.bgrey }}>AI is reviewing your data…</span>
+              </div>
+            </div>
+            {/* Input */}
+            <div style={{ padding:'10px 14px 14px', backgroundColor:'#FAFBFC', borderTop:`1px solid ${c.mgrey}` }}>
+              <div style={{ display:'flex', gap:8 }}>
+                <input readOnly type="text" placeholder="Ask your AI health coach anything…"
+                  style={{ flex:1, padding:'10px 14px', borderRadius:12, border:`1.5px solid ${c.mgrey}`, fontSize:13, outline:'none', fontFamily:'inherit', backgroundColor:c.white }}/>
+                <button style={{ width:38, height:38, borderRadius:10, backgroundColor:c.green, border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Try CTA */}
+        <div style={{ textAlign:'center', marginTop:40 }}>
+          <a href="/signup" style={{ display:'inline-block', padding:'14px 32px', borderRadius:50, backgroundColor:c.green, color:c.white, fontWeight:700, fontSize:15, textDecoration:'none' }}>
+            Try it free — this is what you get from day one →
+          </a>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 /* ── FEATURES ── */
 function Features() {
   const list = [
@@ -628,6 +756,7 @@ export default function PulseIndex() {
       <Nav/>
       <Hero/>
       <FourAnswers/>
+      <AISection/>
       <Features/>
       <ForWho/>
       <Pricing/>
