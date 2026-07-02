@@ -177,7 +177,7 @@ export default function AIChat() {
 
   return (
     <>
-      <Head><title>AI Health Chat — VitaLog</title></Head>
+      <Head><title>AI Health Coach — Blitora Pulse</title></Head>
       <style>{`
         body { font-family: 'Poppins', Arial, sans-serif; }
         .msg-bubble { max-width: 85%; word-break: break-word; line-height: 1.55; }
