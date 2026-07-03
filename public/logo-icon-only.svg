@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <rect width="200" height="200" rx="36" fill="#0D1B3E"/>
+  <!-- B letterform -->
+  <path d="M48 38 L48 148 L112 148 C134 148 152 132 152 112 C152 100 146 90 136 84 C144 78 150 68 150 56 C150 44 138 38 112 38 Z
+           M68 58 L110 58 C120 58 126 64 126 72 C126 80 120 86 110 86 L68 86 Z
+           M68 106 L112 106 C124 106 132 112 132 120 C132 128 124 134 112 134 L68 134 Z" fill="white"/>
+  <!-- Lightning bolt -->
+  <polygon points="105,46 84,90 100,90 82,136 124,80 106,80 120,46" fill="#1D9E75"/>
+  <!-- Heartbeat line bottom -->
+  <polyline points="20,162 42,162 50,144 60,180 70,152 80,162 180,162" stroke="#1D9E75" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
