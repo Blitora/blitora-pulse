@@ -122,15 +122,40 @@ export default function LogPage() {
 
             {/* ── WATER ── */}
             <Section icon="💧" title="Water intake">
-              <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginBottom: 10 }}>
+              {/* Glass size reference */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#EBF8FF", borderRadius: 10, padding: "8px 12px", marginBottom: 14, border: "1px solid #BEE3F8" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 18 }}>🥛</span>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: BL }}>1 glass = 250 ml</div>
+                    <div style={{ fontSize: 10, color: TXT2 }}>Standard drinking glass · ~8 fl oz</div>
+                  </div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: BL }}>{glasses * 250} ml</div>
+                  <div style={{ fontSize: 10, color: TXT2 }}>consumed today</div>
+                </div>
+              </div>
+              {/* Glass tap grid */}
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
                 {Array.from({ length: waterGoal }, (_, i) => (
                   <div key={i} onClick={() => saveWater(i < glasses ? i : i + 1)}
-                    style={{ width: 36, height: 36, borderRadius: "50%", border: `2px solid ${i < glasses ? BL : BORDER}`, background: i < glasses ? BL : "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 16 }}>
-                    <span style={{ color: i < glasses ? "#fff" : "#ccc" }}>💧</span>
+                    style={{ width: 40, height: 48, borderRadius: 10, border: `2px solid ${i < glasses ? BL : BORDER}`, background: i < glasses ? "#EBF8FF" : "transparent", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", cursor: "pointer", gap: 2, transition: "all .15s" }}>
+                    <span style={{ fontSize: i < glasses ? 18 : 16, opacity: i < glasses ? 1 : 0.35 }}>💧</span>
+                    <span style={{ fontSize: 8, fontWeight: 700, color: i < glasses ? BL : TXT2 }}>{(i+1)*250}ml</span>
                   </div>
                 ))}
               </div>
-              <div style={{ fontSize: 12, color: TXT2 }}>{glasses} of {waterGoal} glasses · {Math.max(0, waterGoal - glasses)} remaining</div>
+              {/* Progress bar */}
+              <div style={{ height: 6, background: BORDER, borderRadius: 6, overflow: "hidden", marginBottom: 6 }}>
+                <div style={{ height: "100%", width: `${Math.min(100, (glasses / waterGoal) * 100)}%`, background: BL, borderRadius: 6, transition: "width .3s" }} />
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: TXT2 }}>
+                <span>{glasses} of {waterGoal} glasses ({glasses * 250}ml of {waterGoal * 250}ml)</span>
+                <span style={{ color: glasses >= waterGoal ? G : TXT2, fontWeight: glasses >= waterGoal ? 700 : 400 }}>
+                  {glasses >= waterGoal ? "✓ Goal reached!" : `${Math.max(0, waterGoal - glasses)} glasses to go`}
+                </span>
+              </div>
             </Section>
 
             {/* ── WALKS ── */}
