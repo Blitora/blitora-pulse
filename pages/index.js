@@ -12,7 +12,7 @@ const c = {
 const indPlans = [
   { name:'Starter', sub:'Great to get started', priceINR:99, priceUSD:4.99, highlight:false,
     trial:'30-day free trial', trialSub:'Then ₹99/month · Cancel anytime',
-    ctaLabel:'Start 30-day free trial', ctaStyle:'trial',
+    ctaLabel:'Start free trial', ctaStyle:'trial',
     tag:'Includes in trial & plan:',
     features:[{l:'AI chat messages',v:'20/month'},{l:'AI meal plans',v:'2/month'},{l:'Food log history',v:'90 days'},{l:'Daily AI insights',v:true},{l:'Data export',v:false}] },
   { name:'Plus', sub:'Most popular choice', priceINR:189, priceUSD:8.99, highlight:true,
@@ -196,7 +196,7 @@ function Hero() {
         <p style={{ fontSize:13, marginBottom:32, color:'rgba(255,255,255,0.4)' }}>For individuals · dietitians · clinics</p>
         <div style={{ display:'flex', flexWrap:'wrap', gap:16, justifyContent:'center', marginBottom:16 }}>
           <a href="/signup" style={{ padding:'16px 32px', borderRadius:50, backgroundColor:c.green, color:c.white, fontWeight:700, fontSize:16, textDecoration:'none', boxShadow:'0 8px 32px rgba(29,158,117,0.4)' }}>
-            Start free — 30 days →
+            Start free trial →
           </a>
           <a href="#ai" style={{ padding:'16px 32px', borderRadius:50, color:c.white, fontWeight:600, fontSize:16, textDecoration:'none', border:'1.5px solid rgba(255,255,255,0.3)' }}>
             ▶ See how it works
@@ -207,7 +207,7 @@ function Hero() {
           <a href="/login" style={{ color:c.green, fontWeight:600, textDecoration:'none' }}>Sign in →</a>
         </p>
         <div style={{ display:'flex', flexWrap:'wrap', justifyContent:'center', gap:10 }}>
-          {['30 days free','Starter features included','No credit card','Cancel anytime'].map(s=>(
+          {['Free trial included','Starter features included','No credit card','Cancel anytime'].map(s=>(
             <span key={s} style={{ fontSize:13, padding:'6px 12px', borderRadius:50, fontWeight:500, backgroundColor:'rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.5)' }}>✓ {s}</span>
           ))}
         </div>
@@ -248,7 +248,7 @@ function FourAnswers() {
           ))}
         </div>
         <div style={{ textAlign:'center', marginTop:28 }}>
-          <a href="/signup" style={{ display:'inline-block', padding:'14px 32px', borderRadius:50, backgroundColor:c.green, color:c.white, fontWeight:700, fontSize:15, textDecoration:'none' }}>Try it free for 30 days →</a>
+          <a href="/signup" style={{ display:'inline-block', padding:'14px 32px', borderRadius:50, backgroundColor:c.green, color:c.white, fontWeight:700, fontSize:15, textDecoration:'none' }}>Start your free trial →</a>
         </div>
       </div>
     </section>
@@ -427,9 +427,9 @@ function ForWho() {
         </div>
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(320px,1fr))', gap:24 }}>
           {[
-            {emoji:'🙋',label:'For Individuals',headline:'The health app that actually thinks for you.',color:c.green,cta:'Start 30-day free trial',href:'/signup',
+            {emoji:'🙋',label:'For Individuals',headline:'The health app that actually thinks for you.',color:c.green,cta:'Start free trial',href:'/signup',
               points:['Log a photo — AI identifies and logs the meal','Ask why you\'re tired — AI analyses your last 2 weeks','Not losing weight? — AI tells you exactly why','Get a personalised meal plan every week automatically','Track macros, water, steps, weight in one place']},
-            {emoji:'👩‍⚕️',label:'For Dietitians & Clinics',headline:'Less admin. More impact. AI does the heavy lifting.',color:c.navy,cta:'Start 14-day clinic trial',href:'/signup?type=clinic',
+            {emoji:'👩‍⚕️',label:'For Dietitians & Clinics',headline:'Less admin. More impact. AI does the heavy lifting.',color:c.navy,cta:'Start free trial',href:'/signup?type=clinic',
               points:['Patient misses a meal? — AI flags it before your session','New patient? — AI generates intake summary automatically','Compliance low? — AI drafts a personalised nudge message','Scale to 200 patients without additional overhead','AI handles the admin. You focus on care.']},
           ].map(({emoji,label,headline,color,cta,href,points})=>(
             <div key={label} style={{ borderRadius:28, padding:'36px', backgroundColor:c.lgrey, display:'flex', flexDirection:'column' }}>
@@ -495,7 +495,7 @@ function Pricing() {
             <div>
               <p style={{ fontSize:14, fontWeight:700, color:c.navy, margin:'0 0 2px' }}>Free trial on Starter plans only</p>
               <p style={{ fontSize:13, color:c.dgrey, margin:0, lineHeight:1.5 }}>
-                Individual: 30 days free with Starter features, no card needed.<br/>
+                Individual: Free trial included with Starter features, no card needed.<br/>
                 Clinic: 14 days free with Starter features, no card needed.<br/>
                 Plus &amp; Premium: subscribe for 1 month to evaluate, cancel anytime.
               </p>
@@ -657,7 +657,7 @@ function CTA() {
         <h2 style={{ fontWeight:800, fontSize:'clamp(24px,4vw,42px)', color:c.white, marginBottom:20, letterSpacing:'-0.5px' }}>
           Answer 4 questions.<br/>Get your health plan.
         </h2>
-        <p style={{ fontSize:16, color:'#B8D8CC', marginBottom:32 }}>Free for 30 days. Starter features included. No credit card.</p>
+        <p style={{ fontSize:16, color:'#B8D8CC', marginBottom:32 }}>Free trial on Starter plans. No credit card.</p>
         <div style={{ display:'flex', flexWrap:'wrap', gap:16, justifyContent:'center' }}>
           <a href="/signup" style={{ padding:'16px 32px', borderRadius:50, backgroundColor:c.green, color:c.white, fontWeight:700, fontSize:16, textDecoration:'none' }}>Start free trial →</a>
           <a href="mailto:hello@blitora.com" style={{ padding:'16px 32px', borderRadius:50, color:c.white, fontWeight:600, fontSize:16, textDecoration:'none', border:'1.5px solid rgba(255,255,255,0.3)' }}>Schedule a demo</a>
