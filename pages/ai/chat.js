@@ -1,20 +1,15 @@
-// pages/ai/chat.js
-// Blitora Pulse — AI Chat Screen
-// Full conversational AI for individual users
-// Model: Gemini (basic/trial) | Haiku (pro/premium)
-// Quota tracked per user per month
+// pages/ai/chat.js — Blitora Pulse AI Chat v2
+// Updated to match new prototype UI: navy topbar, purple AI orb, chip navigation
 
 import { useState, useEffect, useRef } from 'react';
 import Head from 'next/head';
+import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { getSupabase } from '../../lib/supabase';
-import Layout from '../../components/Layout';
 
-const G = '#1D9E75', P = '#714B67', PL = '#f3eef1';
-const BORDER = '#E0E3ED', TXT = '#0D1B3E', TXT2 = '#718096', TXT3 = '#CBD5E0';
-const BG = '#F5F6FA', CARD = '#fff';
+const G='#1D9E75', N='#0D1B3E', PU='#714B67', MG='#E0E3ED', LG='#F5F6FA';
+const DG='#4A5568', BG='#718096', WH='#fff';
 
-// Quick chip questions shown at start
 const QUICK_CHIPS = [
   'What should I eat for breakfast?',
   'Am I getting enough protein?',
@@ -22,19 +17,22 @@ const QUICK_CHIPS = [
   'How much water should I drink?',
   'What foods help with weight loss?',
   'Suggest a light dinner for tonight',
+  'Plan tomorrow\'s meals',
+  'Goal timeline — when will I reach my target?',
 ];
 
 export default function AIChat() {
   const router = useRouter();
-  const [profile, setProfile] = useState(null);
+  const [profile, setProfile]   = useState(null);
   const [todayLog, setTodayLog] = useState(null);
-  const [messages, setMessages] = useState([]); // { role: 'user'|'assistant', content, model? }
-  const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [quota, setQuota] = useState(null); // { used, limit, remaining }
-  const [error, setError] = useState('');
+  const [messages, setMessages] = useState([]);
+  const [input, setInput]       = useState('');
+  const [loading, setLoading]   = useState(false);
+  const [quota, setQuota]       = useState(null);
+  const [error, setError]       = useState('');
+  const [initDone, setInitDone] = useState(false);
   const bottomRef = useRef(null);
-  const inputRef = useRef(null);
+  const inputRef  = useRef(null);
 
   useEffect(() => {
     async function init() {
@@ -44,361 +42,170 @@ export default function AIChat() {
       const { data: p } = await sb.from('profiles').select('*').eq('id', session.user.id).single();
       if (!p) { router.push('/'); return; }
       setProfile(p);
-
-      // Load today's log for context
       const today = new Date().toISOString().split('T')[0];
-      const { data: log } = await sb.from('health_logs').select('*')
-        .eq('user_id', p.id).eq('log_date', today).single();
+      const { data: log } = await sb.from('health_logs').select('*').eq('user_id', p.id).eq('log_date', today).single();
       setTodayLog(log);
-
-      // Load quota
       fetchQuota(p.id);
+      setInitDone(true);
     }
     init();
   }, []);
 
-  // Scroll to bottom when messages change
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, loading]);
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior:'smooth' }); }, [messages, loading]);
 
   async function fetchQuota(userId) {
     try {
-      const res = await fetch('/api/ai/chat-quota', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId }),
-      });
-      const data = await res.json();
-      setQuota(data);
-    } catch (e) {
-      console.error('Quota fetch error:', e);
-    }
+      const res = await fetch('/api/ai/chat-quota', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ userId }) });
+      setQuota(await res.json());
+    } catch(e) { console.error(e); }
   }
 
   async function sendMessage(text) {
     const userText = (text || input).trim();
-    if (!userText || loading || !profile) return;
-    if (quota && quota.remaining <= 0) {
-      setError('quota_exceeded');
-      return;
-    }
-
+    if (!userText || loading) return;
+    if (quota && quota.remaining <= 0) { setError(`Daily limit reached (${quota.limit} messages). Resets tomorrow.`); return; }
     setInput('');
     setError('');
-    setMessages(prev => [...prev, { role: 'user', content: userText }]);
+    setMessages(m => [...m, { role:'user', content:userText }]);
     setLoading(true);
-
     try {
-      // Build conversation history for context
-      const history = messages.map(m => ({
-        role: m.role,
-        content: m.content,
-      }));
-
       const res = await fetch('/api/ai/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: profile.id,
-          plan: profile.plan || 'trial',
-          message: userText,
-          history,
-          profile: {
-            fullName: profile.full_name,
-            age: profile.dob
-              ? Math.floor((Date.now() - new Date(profile.dob)) / (365.25 * 864e5))
-              : profile.age || 30,
-            gender: profile.gender || 'Not specified',
-            healthConditions: profile.conditions
-              ? Object.keys(profile.conditions).filter(k => k !== 'none')
-              : [],
-            dietaryPref: profile.diet_type || 'Mixed',
-            primaryGoal: 'Stay healthy',
-            dailyCalorieTarget: profile.calorie_target || 1600,
-            proteinTarget: profile.protein_target || 100,
-            carbTarget: profile.carb_target || 130,
-            fatTarget: profile.fat_target || 55,
-          },
-          todayLog: todayLog ? {
-            totalCalories: todayLog.total_calories || 0,
-            totalProtein: todayLog.total_protein || 0,
-            totalWaterMl: (todayLog.water || 0) * 500,
-          } : null,
-          country: profile.country || null,
-        }),
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ message: userText, profile, todayLog }),
       });
-
       const data = await res.json();
-
-      if (data.error === 'quota_exceeded') {
-        setError('quota_exceeded');
-        setMessages(prev => prev.slice(0, -1)); // remove user message
-        return;
-      }
-
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: data.content,
-        model: data.model,
-        downgraded: data.downgraded,
-      }]);
-
-      // Refresh quota after each message
-      fetchQuota(profile.id);
-
-    } catch (err) {
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: 'Something went wrong. Please try again.',
-        model: 'error',
-      }]);
+      if (!res.ok) throw new Error(data.error || 'Something went wrong');
+      setMessages(m => [...m, { role:'assistant', content:data.reply, model:data.model }]);
+      if (profile) fetchQuota(profile.id);
+    } catch(e) {
+      setError(e.message);
+      setMessages(m => [...m, { role:'assistant', content:'Sorry, something went wrong. Please try again.', error:true }]);
     } finally {
       setLoading(false);
-      inputRef.current?.focus();
+      setTimeout(() => inputRef.current?.focus(), 100);
     }
   }
 
-  function handleKeyDown(e) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
-  }
-
-  const isToday = true; // chat always about today
-
-  if (!profile) return (
-    <div style={{ minHeight: '100vh', background: BG, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ width: 36, height: 36, border: `3px solid ${G}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin .8s linear infinite' }} />
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-    </div>
-  );
+  const firstName = profile?.full_name?.split(' ')[0] || 'there';
 
   return (
     <>
-      <Head><title>AI Health Coach — Blitora Pulse</title></Head>
-      <style>{`
-        body { font-family: 'Poppins', Arial, sans-serif; }
-        .msg-bubble { max-width: 85%; word-break: break-word; line-height: 1.55; }
-        @keyframes fadein { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-        @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.4} }
-        @keyframes spin { to { transform: rotate(360deg); } }
-      `}</style>
+      <Head>
+        <title>Pulse AI · Blitora Pulse</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+      </Head>
 
-      <Layout>
-        <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 120px)', maxWidth: 600, margin: '0 auto' }}>
+      <div style={{display:'flex',flexDirection:'column',height:'100vh',background:LG,fontFamily:"'Poppins',Arial,sans-serif"}}>
 
-          {/* Header */}
-          <div style={{ padding: '12px 16px 8px', background: CARD, borderBottom: `1px solid ${BORDER}`, flexShrink: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{
-                width: 36, height: 36, borderRadius: '50%', background: P,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0,
-              }}>✨</div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: TXT }}>AI Health Coach</div>
-                <div style={{ fontSize: 10, color: TXT2 }}>Ask anything about your nutrition & health</div>
-              </div>
-              {quota && (
-                <div style={{
-                  fontSize: 10, color: quota.remaining < 10 ? '#EF9F27' : TXT2,
-                  fontWeight: 600, textAlign: 'right',
-                }}>
-                  {quota.remaining}/{quota.limit}<br />
-                  <span style={{ fontWeight: 400 }}>msgs left</span>
-                </div>
-              )}
-            </div>
+        {/* ── Topbar ── */}
+        <div style={{background:N,padding:'12px 16px',display:'flex',alignItems:'center',gap:12,flexShrink:0,position:'sticky',top:0,zIndex:20}}>
+          <Link href="/dashboard" style={{textDecoration:'none'}}>
+            <div style={{width:32,height:32,display:'flex',alignItems:'center',justifyContent:'center',color:'rgba(255,255,255,0.6)',fontSize:22,cursor:'pointer'}}>←</div>
+          </Link>
+          <div style={{width:36,height:36,background:PU,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:16,flexShrink:0}}>✦</div>
+          <div>
+            <div style={{color:'#fff',fontSize:14,fontWeight:700}}>Pulse AI</div>
+            <div style={{color:'rgba(255,255,255,0.45)',fontSize:10}}>Health companion · Active</div>
           </div>
-
-          {/* Messages area */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-
-            {/* Welcome state */}
-            {messages.length === 0 && (
-              <div style={{ animation: 'fadein .4s ease' }}>
-                <div style={{
-                  background: 'linear-gradient(135deg, #f3eef1, #ede8f5)',
-                  borderRadius: 14, padding: '14px 16px', marginBottom: 16,
-                  border: '1px solid #e0d8ec',
-                }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: P, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
-                    ✨ AI Health Coach
-                  </div>
-                  <div style={{ fontSize: 13, color: TXT, lineHeight: 1.6 }}>
-                    Hi {profile.full_name?.split(' ')[0] || 'there'}! I'm your AI health coach. I know your health profile and today's food log, so I can give you personalised advice.
-                    <br /><br />
-                    Ask me anything about nutrition, meal suggestions, or your health goals.
-                  </div>
-                </div>
-
-                {/* Quick chips */}
-                <div style={{ fontSize: 10, fontWeight: 700, color: TXT2, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
-                  Quick questions
-                </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {QUICK_CHIPS.map(chip => (
-                    <button
-                      key={chip}
-                      onClick={() => sendMessage(chip)}
-                      style={{
-                        padding: '7px 12px', borderRadius: 20,
-                        border: `1.5px solid ${BORDER}`, background: CARD,
-                        fontSize: 11, color: TXT, cursor: 'pointer', fontWeight: 500,
-                        fontFamily: "'Poppins', Arial, sans-serif",
-                        transition: 'all .15s',
-                      }}
-                    >
-                      {chip}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Message bubbles */}
-            {messages.map((msg, i) => (
-              <div
-                key={i}
-                style={{
-                  display: 'flex',
-                  justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
-                  animation: 'fadein .3s ease',
-                }}
-              >
-                {msg.role === 'assistant' && (
-                  <div style={{
-                    width: 28, height: 28, borderRadius: '50%', background: P,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 14, flexShrink: 0, marginRight: 8, marginTop: 2,
-                  }}>✨</div>
-                )}
-                <div
-                  className="msg-bubble"
-                  style={{
-                    padding: '10px 14px',
-                    borderRadius: msg.role === 'user' ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
-                    background: msg.role === 'user' ? G : CARD,
-                    color: msg.role === 'user' ? '#fff' : TXT,
-                    fontSize: 13,
-                    border: msg.role === 'assistant' ? `1px solid ${BORDER}` : 'none',
-                    boxShadow: msg.role === 'assistant' ? '0 1px 4px rgba(0,0,0,0.06)' : 'none',
-                  }}
-                >
-                  {msg.content}
-                  {msg.downgraded && (
-                    <div style={{ fontSize: 9, color: TXT3, marginTop: 4 }}>· basic mode</div>
-                  )}
-                </div>
-              </div>
-            ))}
-
-            {/* Typing indicator */}
-            {loading && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, animation: 'fadein .3s ease' }}>
-                <div style={{
-                  width: 28, height: 28, borderRadius: '50%', background: P,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14,
-                }}>✨</div>
-                <div style={{ display: 'flex', gap: 4, padding: '10px 14px', background: CARD, borderRadius: '18px 18px 18px 4px', border: `1px solid ${BORDER}` }}>
-                  {[0, 1, 2].map(i => (
-                    <div key={i} style={{
-                      width: 7, height: 7, borderRadius: '50%', background: P,
-                      animation: `pulse 1.2s ease-in-out ${i * 0.2}s infinite`,
-                    }} />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Quota exceeded message */}
-            {error === 'quota_exceeded' && (
-              <div style={{
-                background: '#FFFBEB', border: '1px solid #FDE68A',
-                borderRadius: 12, padding: '14px 16px', animation: 'fadein .3s ease',
-              }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: '#92400E', marginBottom: 6 }}>
-                  Monthly AI limit reached
-                </div>
-                <div style={{ fontSize: 12, color: '#92400E', marginBottom: 12 }}>
-                  You've used all your AI messages this month.
-                </div>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <button style={{
-                    padding: '8px 14px', borderRadius: 8, background: '#EF9F27',
-                    color: '#fff', border: 'none', fontSize: 12, fontWeight: 700,
-                    cursor: 'pointer', fontFamily: "'Poppins', Arial, sans-serif",
-                  }}>
-                    Buy 20 more messages — ₹49
-                  </button>
-                  <button
-                    onClick={() => router.push('/profile')}
-                    style={{
-                      padding: '8px 14px', borderRadius: 8, background: G,
-                      color: '#fff', border: 'none', fontSize: 12, fontWeight: 700,
-                      cursor: 'pointer', fontFamily: "'Poppins', Arial, sans-serif",
-                    }}
-                  >
-                    Upgrade plan
-                  </button>
-                </div>
-              </div>
-            )}
-
-            <div ref={bottomRef} />
-          </div>
-
-          {/* Input area */}
-          <div style={{
-            padding: '10px 16px 16px',
-            background: CARD,
-            borderTop: `1px solid ${BORDER}`,
-            flexShrink: 0,
-          }}>
-            <div style={{
-              display: 'flex', gap: 8, alignItems: 'flex-end',
-              background: BG, borderRadius: 14, padding: '8px 12px',
-              border: `1.5px solid ${BORDER}`,
-            }}>
-              <textarea
-                ref={inputRef}
-                value={input}
-                onChange={e => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Ask your AI health coach…"
-                rows={1}
-                style={{
-                  flex: 1, border: 'none', background: 'transparent',
-                  fontSize: 13, color: TXT, outline: 'none', resize: 'none',
-                  fontFamily: "'Poppins', Arial, sans-serif", lineHeight: 1.5,
-                  maxHeight: 80, overflowY: 'auto',
-                }}
-              />
-              <button
-                onClick={() => sendMessage()}
-                disabled={loading || !input.trim()}
-                style={{
-                  width: 34, height: 34, borderRadius: '50%',
-                  background: input.trim() && !loading ? G : BORDER,
-                  border: 'none', cursor: input.trim() && !loading ? 'pointer' : 'default',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  flexShrink: 0, transition: 'background .2s', fontSize: 16,
-                }}
-              >
-                {loading
-                  ? <div style={{ width: 14, height: 14, border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin .8s linear infinite' }} />
-                  : <span style={{ color: '#fff', fontSize: 14, marginLeft: 2 }}>▶</span>
-                }
-              </button>
+          {quota && (
+            <div style={{marginLeft:'auto',background:'rgba(255,255,255,0.1)',borderRadius:20,padding:'3px 10px',color:'rgba(255,255,255,0.5)',fontSize:10}}>
+              {quota.remaining}/{quota.limit} left
             </div>
-            <div style={{ fontSize: 9, color: TXT3, textAlign: 'center', marginTop: 6 }}>
-              AI provides nutrition guidance only · Always consult a doctor for medical advice
-            </div>
-          </div>
-
+          )}
         </div>
-      </Layout>
+
+        {/* ── Messages ── */}
+        <div style={{flex:1,overflowY:'auto',padding:'16px 14px',display:'flex',flexDirection:'column',gap:12}}>
+
+          {/* Welcome message */}
+          {initDone && messages.length === 0 && (
+            <div style={{display:'flex',alignItems:'flex-end',gap:8}}>
+              <div style={{width:28,height:28,borderRadius:'50%',background:PU,display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:12,flexShrink:0}}>✦</div>
+              <div style={{maxWidth:'82%',padding:'11px 14px',borderRadius:16,borderBottomLeftRadius:4,background:WH,border:`1px solid ${MG}`,fontSize:13,lineHeight:1.6,color:DG}}>
+                Hi {firstName} 👋 I'm Pulse AI, your health companion.
+                {todayLog && todayLog.total_calories > 0 && (
+                  <> You've logged <strong style={{color:G}}>{todayLog.total_calories} kcal</strong> today. </>
+                )}
+                {' '}Ask me anything about your nutrition, meal ideas, or health goals.
+              </div>
+            </div>
+          )}
+
+          {messages.map((m, i) => (
+            <div key={i} style={{display:'flex',alignItems:'flex-end',gap:8,flexDirection:m.role==='user'?'row-reverse':'row'}}>
+              <div style={{width:28,height:28,borderRadius:'50%',background:m.role==='user'?G:PU,display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:11,fontWeight:700,flexShrink:0}}>
+                {m.role==='user'?firstName[0].toUpperCase():'✦'}
+              </div>
+              <div style={{maxWidth:'80%',padding:'10px 14px',borderRadius:16,fontSize:13,lineHeight:1.6,
+                background:m.role==='user'?N:WH,
+                color:m.role==='user'?'#fff':m.error?'#E24B4A':DG,
+                border:m.role==='user'?'none':`1px solid ${MG}`,
+                borderBottomLeftRadius:m.role==='user'?16:4,
+                borderBottomRightRadius:m.role==='user'?4:16,
+              }}>
+                {m.content}
+                {m.model && <div style={{fontSize:9,color:'rgba(255,255,255,0.3)',marginTop:4}}>via {m.model}</div>}
+              </div>
+            </div>
+          ))}
+
+          {loading && (
+            <div style={{display:'flex',alignItems:'center',gap:8}}>
+              <div style={{width:28,height:28,borderRadius:'50%',background:PU,display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:12}}>✦</div>
+              <div style={{background:WH,border:`1px solid ${MG}`,borderRadius:16,borderBottomLeftRadius:4,padding:'10px 16px',display:'flex',gap:5,alignItems:'center'}}>
+                {[0,1,2].map(i => (
+                  <div key={i} style={{width:7,height:7,borderRadius:'50%',background:MG,animation:`pulse 1.2s ease-in-out ${i*0.2}s infinite`}}/>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {error && (
+            <div style={{background:'#FEF2F2',border:'1px solid #FECACA',borderRadius:12,padding:'10px 14px',fontSize:12,color:'#DC2626'}}>
+              {error}
+            </div>
+          )}
+
+          <div ref={bottomRef}/>
+        </div>
+
+        {/* ── Quick chips ── */}
+        {messages.length < 2 && (
+          <div style={{display:'flex',gap:8,padding:'0 14px 10px',overflowX:'auto',flexShrink:0,scrollbarWidth:'none'}}>
+            {QUICK_CHIPS.map(c => (
+              <button key={c} onClick={() => sendMessage(c)} style={{background:WH,border:`1.5px solid ${MG}`,borderRadius:20,padding:'6px 13px',fontSize:11,fontWeight:600,color:N,whiteSpace:'nowrap',cursor:'pointer',fontFamily:"'Poppins',Arial,sans-serif",flexShrink:0}}>
+                {c}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* ── Input row ── */}
+        <div style={{background:WH,borderTop:`1px solid ${MG}`,padding:'10px 14px',display:'flex',gap:9,alignItems:'center',flexShrink:0}}>
+          <input
+            ref={inputRef}
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => e.key==='Enter' && !e.shiftKey && sendMessage()}
+            placeholder="Ask Pulse AI anything…"
+            disabled={loading}
+            style={{flex:1,border:`1.5px solid ${MG}`,borderRadius:24,padding:'9px 16px',fontSize:13,fontFamily:"'Poppins',Arial,sans-serif",color:N,outline:'none',background:LG}}
+          />
+          <button
+            onClick={() => sendMessage()}
+            disabled={loading || !input.trim()}
+            style={{width:38,height:38,background:input.trim()?G:MG,borderRadius:'50%',border:'none',color:'#fff',fontSize:18,cursor:input.trim()?'pointer':'default',transition:'background .15s',display:'flex',alignItems:'center',justifyContent:'center'}}
+          >
+            →
+          </button>
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes pulse { 0%,100%{opacity:.3} 50%{opacity:1} }
+        ::-webkit-scrollbar { display:none }
+      `}</style>
     </>
   );
 }
