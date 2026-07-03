@@ -98,10 +98,15 @@ export default function IndexPage() {
     <div style={st.page}>
       <div style={st.card}>
         <div style={st.logoRow}>
-          <div style={st.logoIcon}>🌿</div>
+          <svg width="42" height="42" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" style={{flexShrink:0}}>
+            <rect width="200" height="200" rx="36" fill="#0D1B3E"/>
+            <path d="M48 38L48 148L112 148C134 148 152 132 152 112C152 100 146 90 136 84C144 78 150 68 150 56C150 44 138 38 112 38ZM68 58L110 58C120 58 126 64 126 72C126 80 120 86 110 86L68 86ZM68 106L112 106C124 106 132 112 132 120C132 128 124 134 112 134L68 134Z" fill="white"/>
+            <polygon points="105,46 84,90 100,90 82,136 124,80 106,80 120,46" fill="#1D9E75"/>
+            <polyline points="20,162 42,162 50,144 60,180 70,152 80,162 180,162" stroke="#1D9E75" strokeWidth="5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
           <div>
-            <div style={st.logoName}>Blitora Pulse</div>
-            <div style={st.logoTag}>Health Platform</div>
+            <div style={st.logoName}>Blitora <span style={{color:'#1D9E75'}}>Pulse</span></div>
+            <div style={st.logoTag}>Health Made Intelligent.</div>
           </div>
         </div>
 
@@ -216,10 +221,9 @@ const st = {
   page:      { minHeight:'100vh', background:'#F7F8FA', display:'flex', alignItems:'center', justifyContent:'center', padding:'24px' },
   center:    { minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center' },
   card:      { background:'#fff', borderRadius:20, padding:'36px 32px', width:'100%', maxWidth:400, boxShadow:'0 4px 24px rgba(0,0,0,0.08)', border:'1px solid #E5E7EB' },
-  logoRow:   { display:'flex', alignItems:'center', gap:10, marginBottom:28 },
-  logoIcon:  { width:38, height:38, background:'linear-gradient(135deg,#10B981,#059669)', borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', fontSize:18 },
-  logoName:  { fontFamily:'Sora,sans-serif', fontSize:'1.1rem', fontWeight:800, color:'#111827', letterSpacing:'-0.02em' },
-  logoTag:   { fontSize:'0.58rem', color:'#6B7280', letterSpacing:'0.07em', textTransform:'uppercase', marginTop:1 },
+  logoRow:   { display:'flex', alignItems:'center', gap:12, marginBottom:28 },
+  logoName:  { fontFamily:"'Poppins', Arial, sans-serif", fontSize:'1.05rem', fontWeight:700, color:'#0D1B3E', letterSpacing:'0.01em' },
+  logoTag:   { fontSize:'0.58rem', color:'#718096', letterSpacing:'0.04em', fontStyle:'italic', marginTop:1 },
   h1:        { fontFamily:'Sora,sans-serif', fontSize:'1.4rem', fontWeight:800, color:'#111827', marginBottom:4 },
   sub:       { fontSize:'0.8rem', color:'#6B7280', marginBottom:24 },
   err:       { background:'#FEF2F2', border:'1px solid #FECACA', color:'#DC2626', borderRadius:10, padding:'10px 14px', fontSize:'0.76rem', marginBottom:16 },
