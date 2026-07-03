@@ -149,12 +149,15 @@ function Nav() {
     <header style={{ position:'sticky', top:0, zIndex:50, backgroundColor:'rgba(255,255,255,0.96)', backdropFilter:'blur(8px)', borderBottom:`1px solid ${c.mgrey}` }}>
       <div style={{ maxWidth:1152, margin:'0 auto', padding:'0 24px', height:66, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
         <a href="/" style={{ display:'flex', alignItems:'center', gap:10, textDecoration:'none' }}>
-          <div style={{ width:32, height:32, backgroundColor:c.navy, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center' }}>
-            <span style={{ color:c.green, fontWeight:900, fontSize:18 }}>B</span>
-          </div>
+          <svg width="34" height="34" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect width="200" height="200" rx="36" fill="#0D1B3E"/>
+            <path d="M48 38L48 148L112 148C134 148 152 132 152 112C152 100 146 90 136 84C144 78 150 68 150 56C150 44 138 38 112 38ZM68 58L110 58C120 58 126 64 126 72C126 80 120 86 110 86L68 86ZM68 106L112 106C124 106 132 112 132 120C132 128 124 134 112 134L68 134Z" fill="white"/>
+            <polygon points="105,46 84,90 100,90 82,136 124,80 106,80 120,46" fill="#1D9E75"/>
+            <polyline points="20,162 42,162 50,144 60,180 70,152 80,162 180,162" stroke="#1D9E75" strokeWidth="5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
           <div style={{ lineHeight:1 }}>
-            <div style={{ fontWeight:800, fontSize:15, letterSpacing:'-0.5px', color:c.navy }}>BLITORA</div>
-            <div style={{ fontWeight:700, fontSize:10, letterSpacing:'0.2em', textTransform:'uppercase', color:c.green }}>PULSE</div>
+            <div style={{ fontWeight:800, fontSize:15, letterSpacing:'-0.3px', color:c.navy, fontFamily:"'Poppins', Arial, sans-serif" }}>BLITORA <span style={{ color:c.green }}>PULSE</span></div>
+            <div style={{ fontWeight:500, fontSize:9.5, letterSpacing:'0.06em', color:'#718096', fontFamily:"'Poppins', Arial, sans-serif" }}>Health Made Intelligent.</div>
           </div>
         </a>
         <nav style={{ display:'flex', alignItems:'center', gap:24, fontSize:14, fontWeight:500 }} className="hide-mobile">
