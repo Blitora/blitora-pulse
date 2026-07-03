@@ -113,11 +113,11 @@ export default function Layout({ children }) {
         {/* AI chat link for patients */}
         {isPatient && (
           <Link href="/ai/chat" style={{textDecoration:'none'}}>
-            <div style={{margin:'8px 12px',padding:'10px 14px',borderRadius:12,background:'rgba(113,75,103,0.25)',border:'1px solid rgba(113,75,103,0.4)',display:'flex',alignItems:'center',gap:8,cursor:'pointer'}}>
+            <div style={{margin:'8px 12px',padding:'10px 14px',borderRadius:12,background:'rgba(29,158,117,0.18)',border:'1px solid rgba(29,158,117,0.4)',display:'flex',alignItems:'center',gap:8,cursor:'pointer'}}>
               <span style={{fontSize:16}}>✦</span>
               <div>
-                <div style={{fontSize:11,fontWeight:700,color:'#e2d4f0'}}>Pulse AI</div>
-                <div style={{fontSize:9,color:'rgba(255,255,255,0.35)'}}>Ask your health companion</div>
+                <div style={{fontSize:11,fontWeight:700,color:'#7DF0BF'}}>✦ Pulse AI</div>
+                <div style={{fontSize:9,color:'rgba(29,158,117,0.7)'}}>Your health companion</div>
               </div>
             </div>
           </Link>
@@ -146,7 +146,7 @@ export default function Layout({ children }) {
             )}
             {isPatient && (
               <Link href="/ai/chat" style={{textDecoration:'none'}}>
-                <div style={{width:30,height:30,background:PU,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:14}}>✦</div>
+                <div style={{height:28,background:G,borderRadius:20,display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:11,fontWeight:700,padding:'0 10px',gap:4}}>✦ <span>Pulse AI</span></div>
               </Link>
             )}
             {isClinicRole(role) && (
