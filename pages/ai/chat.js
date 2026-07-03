@@ -1,5 +1,5 @@
 // pages/ai/chat.js — Blitora Pulse AI Chat v2
-// Updated to match new prototype UI: navy topbar, purple AI orb, chip navigation
+// Updated to match new prototype UI: navy topbar, green Pulse AI branding, chip navigation
 
 import { useState, useEffect, useRef } from 'react';
 import Head from 'next/head';
@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { getSupabase } from '../../lib/supabase';
 
-const G='#1D9E75', N='#0D1B3E', PU='#714B67', MG='#E0E3ED', LG='#F5F6FA';
+const G='#1D9E75', N='#0D1B3E', PU='#1D9E75', MG='#E0E3ED', LG='#F5F6FA';
 const DG='#4A5568', BG='#718096', WH='#fff';
 
 const QUICK_CHIPS = [
@@ -103,10 +103,10 @@ export default function AIChat() {
           <Link href="/dashboard" style={{textDecoration:'none'}}>
             <div style={{width:32,height:32,display:'flex',alignItems:'center',justifyContent:'center',color:'rgba(255,255,255,0.6)',fontSize:22,cursor:'pointer'}}>←</div>
           </Link>
-          <div style={{width:36,height:36,background:PU,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:16,flexShrink:0}}>✦</div>
+          <div style={{height:34,background:G,borderRadius:'50%',width:34,display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:15,flexShrink:0}}>✦</div>
           <div>
             <div style={{color:'#fff',fontSize:14,fontWeight:700}}>Pulse AI</div>
-            <div style={{color:'rgba(255,255,255,0.45)',fontSize:10}}>Health companion · Active</div>
+            <div style={{color:G,fontSize:10,fontWeight:600}}>Health companion · Active</div>
           </div>
           {quota && (
             <div style={{marginLeft:'auto',background:'rgba(255,255,255,0.1)',borderRadius:20,padding:'3px 10px',color:'rgba(255,255,255,0.5)',fontSize:10}}>
