@@ -51,7 +51,7 @@ const COUNTRIES = [
 ];
 
 
-// ── Brand colours (VitaLog theme) ─────────────────────────────────────────
+// ── Brand colours (Blitora Pulse) ──────────────────────────────────────────
 const G = '#1D9E75'; // Health Green
 const N = '#0D1B3E'; // Navy
 const BORDER = '#E0E3ED';
@@ -281,7 +281,7 @@ export default function SignupPage() {
         {step === 1 && (
           <>
             <h1 style={s.h1}>Create your account</h1>
-            <p style={s.sub}>How will you be using VitaLog?</p>
+            <p style={s.sub}>How will you be using Blitora Pulse?</p>
             <div style={s.typeGrid}>
               <TypeCard icon="🏥" title="Clinic / Dietitian" desc="Manage patients, assign meal plans, track compliance"
                 onClick={() => { setType('clinic'); setStep(2); }} />
@@ -499,10 +499,15 @@ export default function SignupPage() {
 function Logo() {
   return (
     <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:20 }}>
-      <div style={{ width:34, height:34, background:`linear-gradient(135deg,${G},#159960)`, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', fontSize:16 }}>🌿</div>
+          <svg width="38" height="38" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" style={{flexShrink:0}}>
+            <rect width="200" height="200" rx="36" fill="#0D1B3E"/>
+            <path d="M48 38L48 148L112 148C134 148 152 132 152 112C152 100 146 90 136 84C144 78 150 68 150 56C150 44 138 38 112 38ZM68 58L110 58C120 58 126 64 126 72C126 80 120 86 110 86L68 86ZM68 106L112 106C124 106 132 112 132 120C132 128 124 134 112 134L68 134Z" fill="white"/>
+            <polygon points="105,46 84,90 100,90 82,136 124,80 106,80 120,46" fill="#1D9E75"/>
+            <polyline points="20,162 42,162 50,144 60,180 70,152 80,162 180,162" stroke="#1D9E75" strokeWidth="5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
       <div>
-        <div style={{ fontFamily:'Sora,sans-serif', fontSize:'1rem', fontWeight:800, color:N }}>VitaLog</div>
-        <div style={{ fontSize:'0.5rem', color:'#9CA3AF', letterSpacing:'0.07em', textTransform:'uppercase' }}>Health Platform</div>
+        <div style={{ fontFamily:"'Poppins',Arial,sans-serif", fontSize:'1rem', fontWeight:700, color:'#0D1B3E' }}>Blitora <span style={{color:'#1D9E75'}}>Pulse</span></div>
+        <div style={{ fontFamily:"'Poppins',Arial,sans-serif", fontSize:'0.52rem', color:'#718096', letterSpacing:'0.04em', fontStyle:'italic' }}>Health Made Intelligent.</div>
       </div>
     </div>
   );
