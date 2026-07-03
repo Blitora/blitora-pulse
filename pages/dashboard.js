@@ -11,7 +11,7 @@ import Layout from "../components/Layout";
 import RoleGuard, { ROLE_HOME } from "../components/RoleGuard";
 import { useRole, ROLES } from "../lib/useRole";
 
-const G="#1D9E75",GL="#e1f5ee",P="#714B67",PL="#f3eef1";
+const G="#1D9E75",GL="#e1f5ee",P="#1D9E75",PL="#e8f8f3";
 const A="#EF9F27",AL="#faeeda",R="#E24B4A",T="#2B6CB0";
 const BORDER="#E0E3ED",TXT="#0D1B3E",TXT2="#718096",TXT3="#CBD5E0",BG="#F5F6FA",CARD="#fff";
 
