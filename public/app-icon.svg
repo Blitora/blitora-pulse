@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect width="1024" height="1024" rx="180" fill="#0D1B3E"/>
+  <path d="M220 180 L220 740 L560 740 C660 740 740 660 740 560 C740 500 710 450 664 420 C704 392 730 342 730 280 C730 220 680 180 560 180 Z
+           M320 280 L550 280 C590 280 620 308 620 344 C620 380 590 408 550 408 L320 408 Z
+           M320 530 L560 530 C610 530 640 558 640 596 C640 634 610 660 560 660 L320 660 Z" fill="white"/>
+  <polygon points="520,220 415,450 505,450 410,700 630,400 530,400 610,220" fill="#1D9E75"/>
+  <polyline points="80,820 180,820 220,720 280,900 330,760 380,820 944,820" stroke="#1D9E75" stroke-width="26" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
