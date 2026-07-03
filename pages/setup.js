@@ -200,7 +200,12 @@ export default function Setup() {
 
       <div className="wrap">
         <div className="logo">
-          <div className="logo-mark">🌿</div>
+                    <svg width="38" height="38" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" style={{flexShrink:0}}>
+            <rect width="200" height="200" rx="36" fill="#0D1B3E"/>
+            <path d="M48 38L48 148L112 148C134 148 152 132 152 112C152 100 146 90 136 84C144 78 150 68 150 56C150 44 138 38 112 38ZM68 58L110 58C120 58 126 64 126 72C126 80 120 86 110 86L68 86ZM68 106L112 106C124 106 132 112 132 120C132 128 124 134 112 134L68 134Z" fill="white"/>
+            <polygon points="105,46 84,90 100,90 82,136 124,80 106,80 120,46" fill="#1D9E75"/>
+            <polyline points="20,162 42,162 50,144 60,180 70,152 80,162 180,162" stroke="#1D9E75" strokeWidth="5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
           <div><div className="logo-text">Blitora Pulse</div><div style={{fontSize:9,color:"#9CA3AF",letterSpacing:"0.07em",textTransform:"uppercase",marginTop:1}}>Health Platform</div></div>
         </div>
 
@@ -228,7 +233,20 @@ export default function Setup() {
               <div className="input-row">
                 <div>
                   <label className="label">Date of birth</label>
-                  <input className="input" type="date" value={form.dob} onChange={e=>set("dob",e.target.value)}/>
+                  <div style={{display:'flex',gap:8}}>
+                    <select className="input" value={form.dob.split('-')[2]||''} onChange={e=>{const[y,m]=form.dob.split('-');set('dob',`${y||new Date().getFullYear()}-${m||'01'}-${e.target.value.padStart(2,'0')}`);}} style={{flex:1}}>
+                      <option value="">Day</option>
+                      {Array.from({length:31},(_,i)=><option key={i+1} value={String(i+1).padStart(2,'0')}>{i+1}</option>)}
+                    </select>
+                    <select className="input" value={form.dob.split('-')[1]||''} onChange={e=>{const[y,,d]=form.dob.split('-');set('dob',`${y||new Date().getFullYear()}-${e.target.value}-${d||'01'}`);}} style={{flex:1}}>
+                      <option value="">Month</option>
+                      {['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].map((m,i)=><option key={i} value={String(i+1).padStart(2,'0')}>{m}</option>)}
+                    </select>
+                    <select className="input" value={form.dob.split('-')[0]||''} onChange={e=>{const[,m,d]=form.dob.split('-');set('dob',`${e.target.value}-${m||'01'}-${d||'01'}`);}} style={{flex:1}}>
+                      <option value="">Year</option>
+                      {Array.from({length:80},(_,i)=><option key={i} value={new Date().getFullYear()-i}>{new Date().getFullYear()-i}</option>)}
+                    </select>
+                  </div>
                 </div>
                 <div>
                   <label className="label">Gender</label>
