@@ -55,10 +55,14 @@ export default function AuthCallback() {
       }
 
       // Everyone else — individual users, invited patients, no org yet
-      // Route based on whether they have completed profile setup
       if (profile?.setup_complete) {
+        // Returning user — go straight to dashboard
         router.replace('/dashboard');
+      } else if (!profile || !profile.user_type) {
+        // Brand new signup via Google — they haven't chosen clinic vs individual yet
+        router.replace('/signup');
       } else {
+        // Has user_type but hasn't completed setup
         router.replace('/setup');
       }
     }
