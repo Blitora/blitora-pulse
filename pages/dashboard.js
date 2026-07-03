@@ -8,6 +8,8 @@ import Head from "next/head";
 import { useRouter } from "next/router";
 import { getSupabase } from "../lib/supabase";
 import Layout from "../components/Layout";
+import RoleGuard, { ROLE_HOME } from "../components/RoleGuard";
+import { useRole, ROLES } from "../lib/useRole";
 
 const G="#1D9E75",GL="#e1f5ee",P="#714B67",PL="#f3eef1";
 const A="#EF9F27",AL="#faeeda",R="#E24B4A",T="#2B6CB0";
@@ -451,7 +453,7 @@ export default function Dashboard(){
   );
 
   return(
-    <RoleGuard allow={[ROLES.PATIENT]}>
+    <RoleGuard allow={[ROLES.PATIENT, ROLES.UNASSIGNED]}>
     <>
       <Head><title>Home — Blitora Pulse</title></Head>
       <style>{`
