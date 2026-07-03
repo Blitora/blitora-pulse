@@ -7,6 +7,8 @@ import Head from "next/head";
 import { useRouter } from "next/router";
 import { getSupabase } from "../lib/supabase";
 import Layout from "../components/Layout";
+import RoleGuard from "../components/RoleGuard";
+import { useRole, ROLES } from "../lib/useRole";
 
 const G="#1D9E75",GL="#e1f5ee",P="#714B67",PL="#f3eef1";
 const A="#EF9F27",R="#E24B4A";
@@ -551,7 +553,7 @@ export default function Meals(){
   );
 
   return(
-    <RoleGuard allow={[ROLES.PATIENT]}>
+    <RoleGuard allow={[ROLES.PATIENT, ROLES.UNASSIGNED]}>
     <>
       <Head><title>Meals — VitaLog</title></Head>
       <style>{`body{font-family:'Poppins',Arial,sans-serif;} @keyframes fadein{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}} @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}`}</style>
