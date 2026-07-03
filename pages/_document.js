@@ -1,54 +1,54 @@
-import { Html, Head, Main, NextScript } from "next/document";
+// pages/_document.js — Blitora Pulse v2 brand meta + favicon
+import { Html, Head, Main, NextScript } from 'next/document';
 
 export default function Document() {
   return (
     <Html lang="en">
       <Head>
-        {/* ── PWA & App Meta ─────────────────────────────────────────────── */}
-        <link rel="manifest" href="/manifest.json" />
+        {/* Fonts */}
+        <link rel="preconnect" href="https://fonts.googleapis.com"/>
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous"/>
+        <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 
-        {/* iOS PWA support */}
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="MyHealth" />
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+        {/* Favicons — Blitora Pulse B icon */}
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg"/>
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png"/>
+        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png"/>
+        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"/>
+        <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png"/>
+        <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png"/>
 
-        {/* iOS splash screens — portrait only (most common iPhones) */}
-        <link rel="apple-touch-startup-image" href="/splash-1080x1920.png"
-          media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3)" />
-        <link rel="apple-touch-startup-image" href="/splash-1080x1920.png"
-          media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3)" />
-        <link rel="apple-touch-startup-image" href="/splash-1080x1920.png"
-          media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2)" />
+        {/* PWA */}
+        <link rel="manifest" href="/manifest.json"/>
+        <meta name="theme-color" content="#0D1B3E"/>
+        <meta name="apple-mobile-web-app-capable" content="yes"/>
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+        <meta name="apple-mobile-web-app-title" content="Blitora Pulse"/>
+        <meta name="application-name" content="Blitora Pulse"/>
 
-        {/* Favicon */}
-        <link rel="icon" href="/favicon.ico" sizes="any" />
-        <link rel="icon" href="/icon-96.png" type="image/png" sizes="96x96" />
+        {/* SEO */}
+        <meta name="description" content="Health Made Intelligent. Track meals, macros, water and habits — with AI-powered insights from your dietitian."/>
 
-        {/* Theme colour (browser chrome colour on Android) */}
-        <meta name="theme-color" content="#714B67" />
-        <meta name="msapplication-TileColor" content="#714B67" />
-        <meta name="msapplication-TileImage" content="/icon-192.png" />
+        {/* Open Graph */}
+        <meta property="og:type" content="website"/>
+        <meta property="og:site_name" content="Blitora Pulse"/>
+        <meta property="og:title" content="Blitora Pulse — Health Made Intelligent."/>
+        <meta property="og:description" content="Track meals, macros, water and habits with AI-powered insights from your dietitian."/>
+        <meta property="og:image" content="https://pulse.blitora.com/og-image.svg"/>
+        <meta property="og:image:width" content="1200"/>
+        <meta property="og:image:height" content="630"/>
+        <meta property="og:url" content="https://pulse.blitora.com"/>
 
-        {/* Social / OG */}
-        <meta property="og:type" content="website" />
-        <meta property="og:site_name" content="MyHealth" />
-        <meta property="og:image" content="https://myhealth.grabntrust.in/og-social-1200x630.png" />
-        <meta property="og:image:width" content="1200" />
-        <meta property="og:image:height" content="630" />
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:image" content="https://myhealth.grabntrust.in/og-social-1200x630.png" />
-
-        {/* Mobile viewport */}
-        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-        <meta name="mobile-web-app-capable" content="yes" />
-
-        {/* Prevent phone number detection */}
-        <meta name="format-detection" content="telephone=no" />
+        {/* Twitter */}
+        <meta name="twitter:card" content="summary_large_image"/>
+        <meta name="twitter:title" content="Blitora Pulse — Health Made Intelligent."/>
+        <meta name="twitter:description" content="Track meals, macros, water and habits with AI-powered insights."/>
+        <meta name="twitter:image" content="https://pulse.blitora.com/og-image.svg"/>
+        <meta name="twitter:site" content="@blitorapulse"/>
       </Head>
       <body>
-        <Main />
-        <NextScript />
+        <Main/>
+        <NextScript/>
       </body>
     </Html>
   );
