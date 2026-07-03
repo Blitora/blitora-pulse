@@ -156,11 +156,11 @@ function TomorrowPlanCard({ plan, loading, onClose }) {
 
 // ── AI Insight Card ────────────────────────────────────────────────────────
 function InsightCard({ content, loading, downgraded }) {
-  const P = "#714B67";
+  const P = "#1D9E75";
   if (loading) return (
     <div style={{
-      background: "linear-gradient(135deg, #f3eef1, #ede8f5)",
-      borderRadius: 14, border: "1px solid #e0d8ec",
+      background: "linear-gradient(135deg, #e8f8f3, #d4f1e7)",
+      borderRadius: 14, border: "1px solid #b8e8d8",
       padding: "14px 16px", marginBottom: 12,
       display: "flex", alignItems: "center", gap: 10,
     }}>
@@ -168,7 +168,7 @@ function InsightCard({ content, loading, downgraded }) {
         width: 32, height: 32, borderRadius: "50%",
         background: P, display: "flex", alignItems: "center",
         justifyContent: "center", flexShrink: 0, fontSize: 16,
-      }}>✨</div>
+      }}>✦</div>
       <div style={{ flex: 1 }}>
         <div style={{ fontSize: 10, fontWeight: 700, color: P, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 5 }}>
           AI Insight
@@ -177,7 +177,7 @@ function InsightCard({ content, loading, downgraded }) {
           {[0,1,2].map(i => (
             <div key={i} style={{
               width: `${[60,80,45][i]}%`, height: 8, borderRadius: 4,
-              background: "#d8cfe8",
+              background: "#a8dfc9",
               animation: `pulse 1.4s ease-in-out ${i*0.2}s infinite`,
             }}/>
           ))}
@@ -190,8 +190,8 @@ function InsightCard({ content, loading, downgraded }) {
 
   return (
     <div style={{
-      background: "linear-gradient(135deg, #f3eef1, #ede8f5)",
-      borderRadius: 14, border: "1px solid #e0d8ec",
+      background: "linear-gradient(135deg, #e8f8f3, #d4f1e7)",
+      borderRadius: 14, border: "1px solid #b8e8d8",
       padding: "14px 16px", marginBottom: 12,
     }}>
       <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
@@ -199,12 +199,12 @@ function InsightCard({ content, loading, downgraded }) {
           width: 32, height: 32, borderRadius: "50%",
           background: P, display: "flex", alignItems: "center",
           justifyContent: "center", flexShrink: 0, fontSize: 16,
-        }}>✨</div>
+        }}>✦</div>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: P, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
             AI Insight {downgraded && <span style={{ fontWeight: 400, textTransform: "none", fontSize: 9, color: "#9CA3AF" }}>· basic mode</span>}
           </div>
-          <div style={{ fontSize: 13, color: "#2c1a3a", lineHeight: 1.6, fontWeight: 400 }}>
+          <div style={{ fontSize: 13, color: "#0D3D2E", lineHeight: 1.6, fontWeight: 400 }}>
             {content}
           </div>
         </div>
@@ -501,10 +501,10 @@ export default function Dashboard(){
               onClick={()=>router.push('/ai/chat')}
               style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',gap:6,
                 padding:'10px',borderRadius:12,border:'none',
-                background:'linear-gradient(135deg,#714B67,#9B59B6)',
+                background:'linear-gradient(135deg,#1D9E75,#159960)',
                 color:'#fff',fontSize:12,fontWeight:700,cursor:'pointer',
                 fontFamily:"'Poppins',Arial,sans-serif"}}>
-              ✨ AI Chat
+              ✦ AI Chat
             </button>
             <button
               onClick={fetchTomorrowPlan}
