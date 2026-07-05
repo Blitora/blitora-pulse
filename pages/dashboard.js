@@ -234,7 +234,7 @@ export default function Dashboard(){
     if(!profile)return;setTomorrowLoading(true);setShowTomorrow(true);
     try{
       const macNow=allFoodsCalFromLog(log,foods);
-      const res=await fetch('/api/ai/tomorrow-plan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:profile.id,plan:(!profile.plan||profile.plan==='trial')?'individual_pro':profile.plan,profile:{dietaryPref:profile.diet_type||'Mixed',healthConditions:profile.conditions?Object.keys(profile.conditions).filter(k=>k!=='none'):[],mealPlanType:profile.meals_per_day||5,dailyCalorieTarget:profile.calorie_target||1600,proteinTarget:profile.protein_target||100,carbTarget:profile.carb_target||130,fatTarget:profile.fat_target||55},todayLog:{totalCalories:macNow},country:profile.country||null})});
+      const res=await fetch('/api/ai/tomorrow-plan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:profile.id,plan:profile.plan||'trial',profile:{dietaryPref:profile.diet_type||'Mixed',healthConditions:profile.conditions?Object.keys(profile.conditions).filter(k=>k!=='none'):[],mealPlanType:profile.meals_per_day||5,dailyCalorieTarget:profile.calorie_target||1600,proteinTarget:profile.protein_target||100,carbTarget:profile.carb_target||130,fatTarget:profile.fat_target||55},todayLog:{totalCalories:macNow},country:profile.country||null})});
       const data=await res.json();
       setTomorrowPlan(data.error==='not_available'?{notAvailable:true}:(data.plan||null));
     }catch(e){console.error(e);}finally{setTomorrowLoading(false);}
@@ -462,7 +462,7 @@ export default function Dashboard(){
                 <button onClick={()=>{setShowTomorrow(false);setTomorrowPlan(null);}} style={{border:"none",background:"none",cursor:"pointer",color:BGY,fontSize:18}}>×</button>
               </div>
               {tomorrowPlan.notAvailable?(
-                <p style={{fontSize:13,color:AMB}}>Tomorrow's Plan is available on Pro & Premium plans. Upgrade to unlock AI meal planning.</p>
+                <p style={{fontSize:13,color:AMB}}>Tomorrow's Plan is available on Plus & Premium individual plans, or Professional & Premium clinic plans. Upgrade to unlock →</p>
               ):(
                 <>
                   {tomorrowPlan.summary&&<p style={{fontSize:12,color:BGY,marginBottom:14,fontStyle:"italic"}}>{tomorrowPlan.summary}</p>}
