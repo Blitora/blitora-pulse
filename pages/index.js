@@ -4,7 +4,7 @@ import Head from 'next/head';
 import { getSupabase } from '../lib/supabase';
 
 /* ==========================================================
-   Blitora Pulse — marketing landing page (v9 — crisp ECG line replaces particle field in hero & final CTA)
+   Blitora Pulse — marketing landing page (v10 — gravity playground returns with Magnet mode (chips chase cursor))
    - Real pricing pulled from live site (as-of deploy day)
    - Session check: logged-in users → /dashboard
    - Reuses existing /api/lead-capture + /public brochures
@@ -606,6 +606,7 @@ export default function Home() {
   const [broOpen, setBroOpen] = useState(null); // brochure object or null
   const [vidOpen, setVidOpen] = useState(false);
   const [offerOn, setOfferOn] = useState(true);
+  const [magnetOn, setMagnetOn] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [aiOpts, setAiOpts] = useState({ goal:'Lose weight', diet:'Vegetarian', cond:'None', meals:'5 meals', cuisine:'Indian' });
   const planBodyRef = useRef(null);
@@ -747,6 +748,64 @@ export default function Home() {
     }),{threshold:.3});
     dio.observe(holo);
     return ()=>{timers.forEach(clearInterval);dio.disconnect();};
+  },[checking]);
+
+  // Gravity + Magnet playground (Matter.js)
+  useEffect(()=>{
+    if(checking)return;
+    const box=document.getElementById('physbox');if(!box)return;
+    let engine,render,runner;
+    const load=()=>new Promise((res,rej)=>{if(window.Matter){res(window.Matter);return;}
+      const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js';
+      s.onload=()=>res(window.Matter);s.onerror=rej;document.head.appendChild(s);});
+    const io=new IntersectionObserver(async es=>{
+      if(!es[0].isIntersecting||engine)return;io.disconnect();
+      try{const M=await load();
+        const cv=document.getElementById('physcanvas'),w=box.offsetWidth,hh=box.offsetHeight;
+        engine=M.Engine.create();engine.gravity.y=1;window._physEngine=engine;
+        render=M.Render.create({canvas:cv,engine,options:{width:w,height:hh,wireframes:false,background:'transparent',pixelRatio:window.devicePixelRatio||1}});
+        const wall={isStatic:true,render:{visible:false}};
+        M.Composite.add(engine.world,[
+          M.Bodies.rectangle(w/2,hh+28,w,60,wall),M.Bodies.rectangle(w/2,-300,w,60,wall),
+          M.Bodies.rectangle(-28,hh/2,60,hh*3,wall),M.Bodies.rectangle(w+28,hh/2,60,hh*3,wall)]);
+        const FOODS=[['Paneer 150g · 27g P','#2BD99F'],['Dal bowl · 9g P','#F5B544'],['2 Roti · 6g P','#8B5CF6'],['Egg x2 · 12g P','#3EA6FF'],['Chicken 150g · 33g P','#F4645F'],['Curd 100g · 4g P','#2BD99F'],['Almonds 10 · 3g P','#8B5CF6'],['Sprouts · 8g P','#2BD99F'],['Salmon 100g · 20g P','#3EA6FF'],['Greek yogurt · 10g P','#2BD99F'],['Tofu 100g · 8g P','#8B5CF6'],['Quinoa cup · 8g P','#F5B544'],['Oats bowl · 6g P','#F5B544'],['Avocado ½ · 2g P','#2BD99F']];
+        const makeFood=x=>{const [label,color]=FOODS[Math.floor(Math.random()*FOODS.length)];
+          const wd=Math.max(96,label.length*7.4),b=M.Bodies.rectangle(x,-30,wd,40,{chamfer:{radius:19},restitution:.55,friction:.28,render:{fillStyle:'rgba(11,21,51,.95)',strokeStyle:color,lineWidth:1.6}});
+          b.foodLabel=label;b.foodColor=color;return b;};
+        for(let i=0;i<10;i++)setTimeout(()=>M.Composite.add(engine.world,makeFood(60+Math.random()*(w-120))),i*140);
+        const mouse=M.Mouse.create(cv),mc=M.MouseConstraint.create(engine,{mouse,constraint:{stiffness:.18,render:{visible:false}}});
+        M.Composite.add(engine.world,mc);
+        if(mouse.element&&mouse.mousewheel)mouse.element.removeEventListener('wheel',mouse.mousewheel);
+        // MAGNET MODE — every chip is attracted to the cursor
+        M.Events.on(engine,'beforeUpdate',()=>{
+          if(!window._magnetMode)return;
+          const mp=mouse.position;if(!mp||mp.x===undefined||mp.x===-1)return;
+          for(const b of M.Composite.allBodies(engine.world)){
+            if(!b.foodLabel)continue;
+            const dx=mp.x-b.position.x,dy=mp.y-b.position.y,d=Math.max(Math.hypot(dx,dy),40);
+            const f=(.00011*b.mass*Math.min(d,220))/d;
+            M.Body.applyForce(b,b.position,{x:dx*f,y:dy*f});
+          }
+        });
+        M.Render.run(render);runner=M.Runner.create();M.Runner.run(runner,engine);
+        M.Events.on(render,'afterRender',()=>{const c=render.context;
+          c.font='600 12px Poppins,Arial,sans-serif';c.textAlign='center';c.textBaseline='middle';
+          for(const b of M.Composite.allBodies(engine.world)){if(!b.foodLabel)continue;
+            c.save();c.translate(b.position.x,b.position.y);c.rotate(b.angle);
+            c.fillStyle=b.foodColor;c.shadowColor=b.foodColor;c.shadowBlur=6;
+            c.fillText(b.foodLabel,0,1);c.restore();}});
+        window._physDrop=()=>M.Composite.add(engine.world,makeFood(60+Math.random()*(w-120)));
+        let flipped=false;window._physFlip=()=>{flipped=!flipped;engine.gravity.y=flipped?-1:1;};
+        window._physBoom=()=>{for(const b of M.Composite.allBodies(engine.world)){if(!b.foodLabel)continue;
+          M.Body.setVelocity(b,{x:(Math.random()-.5)*18,y:-(6+Math.random()*11)});
+          M.Body.setAngularVelocity(b,(Math.random()-.5)*.45);}};
+      }catch(e){console.warn('physics load failed',e);}
+    },{threshold:.25});
+    io.observe(box);
+    return ()=>{io.disconnect();window._magnetMode=false;
+      if(runner&&window.Matter)window.Matter.Runner.stop(runner);
+      if(render&&window.Matter)window.Matter.Render.stop(render);
+      if(engine&&window.Matter)window.Matter.Engine.clear(engine);};
   },[checking]);
 
   // Escape key closes modals
@@ -1133,15 +1192,24 @@ export default function Home() {
       </section>
 
       {/* PHYSICS */}
-      <section className="phys" id="plate">
+      <section className="phys" id="play">
         {ecg(12)}
         <div className="wrap">
           <div className="reveal">
-            <span className="eyebrow">Try the food database</span>
-            <h2 className="sec">Build a plate. <span className="g">Watch the macros move.</span></h2>
-            <p className="sub">Tap foods on and off your plate — calories and protein update live, and Pulse AI judges the plate exactly like it does in the app.</p>
+            <span className="eyebrow">A little gravity, because we can</span>
+            <h2 className="sec">Your plate, with <span className="g">real physics.</span></h2>
+            <p className="sub">Drag and throw the foods — each chip carries its real protein count. Hit 🧲 Magnet mode and the whole plate chases your cursor, Blitora-style.</p>
           </div>
-          <PlateBuilder/>
+          <div id="physbox" className="reveal">
+            <canvas id="physcanvas"></canvas>
+            <div className="phys-hint">Drag · Throw · Magnetise — live physics</div>
+            <div className="phys-btns">
+              <button className="btn btn-g btn-sm" onClick={()=>window._physDrop&&window._physDrop()}>+ Drop food</button>
+              <button className={"btn btn-sm "+(magnetOn?'btn-v':'btn-o')} onClick={()=>setMagnetOn(o=>{const n=!o;window._magnetMode=n;if(window._physEngine)window._physEngine.gravity.y=n?0.12:1;return n;})}>🧲 Magnet {magnetOn?'ON':'mode'}</button>
+              <button className="btn btn-o btn-sm" onClick={()=>window._physFlip&&window._physFlip()}>Flip gravity ⤒</button>
+              <button className="btn btn-o btn-sm" onClick={()=>window._physBoom&&window._physBoom()}>💥 Explode</button>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -1366,44 +1434,6 @@ function ChatBot({ open, setOpen }){
       </div>
     </div>
   </>;
-}
-
-/* ────── PLATE BUILDER ────── */
-function PlateBuilder(){
-  const FOODS=[
-    ['Paneer 150g',265,27],['Dal bowl',180,9],['2 Roti',200,6],['Egg x2',156,12],
-    ['Chicken 150g',248,33],['Curd 100g',60,4],['Almonds 10',70,3],['Sprouts bowl',110,8],
-    ['Salmon 100g',208,20],['Greek yogurt',97,10],['Tofu 100g',76,8],['Quinoa cup',222,8],
-    ['Oats bowl',150,6],['Avocado ½',120,2]
-  ];
-  const [sel,setSel]=useState([0,4,7]);
-  const toggle=i=>setSel(s=>s.includes(i)?s.filter(x=>x!==i):[...s,i]);
-  const kcal=sel.reduce((a,i)=>a+FOODS[i][1],0);
-  const prot=sel.reduce((a,i)=>a+FOODS[i][2],0);
-  const verdict= prot>=45?'💪 Excellent protein — this plate works hard for you.'
-    : prot>=25?'✦ Decent plate. One more protein source would make it great.'
-    : '⚠ Protein is light here — add paneer, eggs, chicken or tofu.';
-  return (
-    <div className="plate-wrap reveal">
-      <div className="plate-chips">
-        {FOODS.map((f,i)=>(
-          <button key={f[0]} className={'pchip'+(sel.includes(i)?' on':'')} onClick={()=>toggle(i)}>
-            {f[0]}<em>{f[2]}g P</em>
-          </button>
-        ))}
-      </div>
-      <div className="plate-side">
-        <div className="plate-tot">
-          <div><b>{kcal.toLocaleString('en-IN')}</b><span>kcal on plate</span></div>
-          <div><b>{prot} g</b><span>protein</span></div>
-          <div><b>{sel.length}</b><span>items</span></div>
-        </div>
-        <div className="plate-bar"><i style={{width:Math.min(100,Math.round(prot/60*100))+'%'}}></i></div>
-        <p className="plate-verdict">{verdict}</p>
-        <p className="plate-note">Same food database that powers Pulse — every log updates your macros instantly.</p>
-      </div>
-    </div>
-  );
 }
 
 /* ────── CONTACT FORM ────── */
