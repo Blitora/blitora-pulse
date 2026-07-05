@@ -59,18 +59,9 @@ export default function IndexPage() {
       const msg = err.message?.toLowerCase() || '';
 
       if (msg.includes('invalid login credentials') || msg.includes('invalid credentials')) {
-        // Check if the email exists in profiles (public table, anon readable)
-        const { data: profileMatch } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('email', email.trim().toLowerCase())
-          .maybeSingle();
-
-        if (!profileMatch) {
-          setError('no_account');
-        } else {
-          setError('wrong_password');
-        }
+        // Profiles are created asynchronously after signup — checking profiles table
+        // causes false 'no account' errors for newly verified users. Show combined message.
+        setError('wrong_credentials');
       } else if (msg.includes('email not confirmed')) {
         setError('unverified');
       } else if (msg.includes('too many') || msg.includes('rate limit')) {
@@ -115,18 +106,14 @@ export default function IndexPage() {
 
         {error && (
           <div style={st.err}>
-            {error === 'no_account' && (
+            {error === 'wrong_credentials' && (
               <div>
-                <div style={{fontWeight:700,marginBottom:4}}>👋 Looks like you're new here</div>
-                <div style={{marginBottom:8}}>No account found for <b>{email}</b>.</div>
-                <a href="/signup" style={{color:'#DC2626',fontWeight:700,textDecoration:'underline'}}>Create a free account →</a>
-              </div>
-            )}
-            {error === 'wrong_password' && (
-              <div>
-                <div style={{fontWeight:700,marginBottom:4}}>🔐 Password doesn't match</div>
-                <div style={{marginBottom:8}}>The password for <b>{email}</b> is incorrect.</div>
-                <a href="/auth/forgot-password" style={{color:'#DC2626',fontWeight:700,textDecoration:'underline'}}>Reset your password →</a>
+                <div style={{fontWeight:700,marginBottom:4}}>🔐 Incorrect email or password</div>
+                <div style={{marginBottom:8}}>Could not sign in with <b>{email}</b>.</div>
+                <div style={{display:'flex',gap:14,flexWrap:'wrap'}}>
+                  <a href="/auth/forgot-password" style={{color:'#DC2626',fontWeight:700,textDecoration:'underline'}}>Reset password →</a>
+                  <a href="/signup" style={{color:'#DC2626',fontWeight:700,textDecoration:'underline'}}>New here? Create account →</a>
+                </div>
               </div>
             )}
             {error === 'unverified' && (
