@@ -4,7 +4,7 @@ import Head from 'next/head';
 import { getSupabase } from '../lib/supabase';
 
 /* ==========================================================
-   Blitora Pulse — marketing landing page (v10 — gravity playground returns with Magnet mode (chips chase cursor))
+   Blitora Pulse — marketing landing page (v11 — playground buttons on top, magnetic orbs in hero & final CTA)
    - Real pricing pulled from live site (as-of deploy day)
    - Session check: logged-in users → /dashboard
    - Reuses existing /api/lead-capture + /public brochures
@@ -70,6 +70,9 @@ nav.mainnav.scrolled{background:rgba(6,13,34,.82);backdrop-filter:blur(18px);bor
 .hero-glow{position:absolute;width:640px;height:640px;border-radius:50%;filter:blur(140px);opacity:.22;pointer-events:none}
 .hg1{background:var(--green);top:-180px;right:-120px}
 .hg2{background:var(--violet);bottom:-240px;left:-160px}
+.mag-orb{position:absolute;width:14px;height:14px;border-radius:50%;background:radial-gradient(circle at 30% 30%,#7FF7CE,var(--green));box-shadow:0 0 18px rgba(43,217,159,.8);opacity:.85;pointer-events:none;transition:transform .3s ease-out;z-index:1}
+.mag-orb.v{background:radial-gradient(circle at 30% 30%,#C9B2FF,var(--violet));box-shadow:0 0 18px rgba(139,92,246,.8)}
+.mag-orb.b{background:radial-gradient(circle at 30% 30%,#9ED2FF,var(--blue));box-shadow:0 0 18px rgba(62,166,255,.8)}
 .heroline{position:absolute;left:0;right:0;top:52%;height:120px;transform:translateY(-50%);pointer-events:none;z-index:0;opacity:.45;filter:drop-shadow(0 0 8px rgba(43,217,159,.35))}
 .heroline svg{width:100%;height:100%}
 .hl-path{fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:2900;stroke-dashoffset:2900;animation:hldraw 8s linear infinite}
@@ -273,7 +276,7 @@ h1 .grad{background:linear-gradient(92deg,var(--green) 10%,var(--violet) 90%);-w
 #physbox{position:relative;height:420px;margin-top:52px;border-radius:24px;border:1px solid var(--line);background:radial-gradient(ellipse at 50% 120%,rgba(43,217,159,.08),transparent),#070F2B;overflow:hidden}
 #physcanvas{position:absolute;inset:0}
 .phys-hint{position:absolute;top:18px;left:0;right:0;text-align:center;font-family:var(--mono);font-size:11px;letter-spacing:.2em;color:var(--muted2);pointer-events:none;text-transform:uppercase}
-.phys-btns{position:absolute;bottom:18px;left:0;right:0;display:flex;justify-content:center;gap:12px}
+.phys-btns{position:absolute;top:46px;left:0;right:0;display:flex;justify-content:center;gap:12px;flex-wrap:wrap;padding:0 12px}
 
 /* WHO */
 .who{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-top:56px}
@@ -702,6 +705,14 @@ export default function Home() {
       if(btn){const r=btn.getBoundingClientRect();btn.classList.add('pull');
         btn.style.transform=`translate(${((e.clientX-r.left-r.width/2)*.3).toFixed(1)}px,${((e.clientY-r.top-r.height/2)*.3).toFixed(1)}px) scale(1.05)`;}
       glow.classList.toggle('on-btn',!!btn);
+      document.querySelectorAll('.mag-orb').forEach(o=>{
+        const r=o.getBoundingClientRect();
+        const cx=r.left+r.width/2,cy=r.top+r.height/2;
+        const dx=ev.clientX-cx,dy=ev.clientY-cy,d=Math.hypot(dx,dy)||1;
+        if(d<260){const p=(1-d/260)*34;
+          o.style.transform=`translate(${(dx/d*p).toFixed(1)}px,${(dy/d*p).toFixed(1)}px) scale(${(1+(1-d/260)*.4).toFixed(2)})`;}
+        else o.style.transform='';
+      });
     };
     const leave=()=>{if(lastBtn){lastBtn.classList.remove('pull');lastBtn.style.transform='';lastBtn=null;}};
     document.addEventListener('mousemove',move,{passive:true});
@@ -947,6 +958,11 @@ export default function Home() {
         <HeroLine seed="A"/>
         <div className="hero-glow hg1"></div>
         <div className="hero-glow hg2"></div>
+        <div className="mag-orb" style={{top:'16%',left:'6%'}} />
+        <div className="mag-orb v" style={{top:'32%',left:'44%',width:10,height:10}} />
+        <div className="mag-orb b" style={{top:'72%',left:'11%',width:12,height:12}} />
+        <div className="mag-orb v" style={{top:'12%',right:'9%'}} />
+        <div className="mag-orb" style={{bottom:'13%',right:'6%',width:10,height:10}} />
         <div className="wrap hero-in">
           <div>
             <div className="pill"><span className="dot"></span> PULSE AI · LIVE ON EVERY PLAN</div>
@@ -1340,6 +1356,10 @@ export default function Home() {
       {/* FINAL CTA */}
       <section className="final">
         <HeroLine seed="B"/>
+        <div className="mag-orb" style={{top:'20%',left:'10%'}} />
+        <div className="mag-orb v" style={{top:'26%',right:'12%'}} />
+        <div className="mag-orb b" style={{bottom:'24%',left:'18%',width:10,height:10}} />
+        <div className="mag-orb" style={{bottom:'18%',right:'20%',width:12,height:12}} />
         <div className="wrap">
           <div className="reveal">
             <h2>Your first AI diet chart is<br/><span style={{background:'linear-gradient(92deg,var(--green),var(--violet))',WebkitBackgroundClip:'text',backgroundClip:'text',color:'transparent'}}>3 minutes away.</span></h2>
