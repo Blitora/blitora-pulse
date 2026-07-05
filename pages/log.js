@@ -7,7 +7,9 @@ import Layout from "../components/Layout";
 import RoleGuard from "../components/RoleGuard";
 import { useRole, ROLES } from "../lib/useRole";
 
-const G="#1D9E75",GL="#2AE8A4",AMB="#EF9F27",RED="#E06A5A",BLU="#4A9FE8";
+const G="#1D9E75"
+function useResponsive(){const[w,setW]=useState(1400);useEffect(()=>{if(typeof window==='undefined')return;setW(window.innerWidth);const h=()=>setW(window.innerWidth);window.addEventListener('resize',h);return()=>window.removeEventListener('resize',h);},[]);return{isMobile:w<768,isTablet:w<1100};}
+const GL="#2AE8A4",AMB="#EF9F27",RED="#E06A5A",BLU="#4A9FE8";
 const BRD="rgba(255,255,255,.09)",GLS="rgba(255,255,255,.045)",BGY="#8B97AD";
 const fmt=d=>d.toISOString().split("T")[0], today=()=>fmt(new Date());
 
@@ -36,6 +38,7 @@ export default function LogPage(){
   const router=useRouter();
   const{role}=useRole();
   const[profile,setProfile]=useState(null);
+  const{isMobile,isTablet}=useResponsive();
   const[dateKey]=useState(today());
   const[saved,setSaved]=useState({});
   const[toast,setToast]=useState(null);
@@ -44,7 +47,7 @@ export default function LogPage(){
   const[waterGoal,setWaterGoal]=useState(8);
   // Activity
   const[actIdx,setActIdx]=useState(0);
-  const[actMins,setActMins]=useState(20);
+  const[actMins,setActMins]=useState(0);
   const[walks,setWalks]=useState({morning:0,afternoon:0,evening:0});
   // Vitals
   const[weight,setWeight]=useState("");
@@ -79,12 +82,15 @@ export default function LogPage(){
   }
   async function saveWater(g){setGlasses(g);await saveField("total_water_glasses",g);showToast(`💧 ${g} of ${waterGoal} glasses logged${g>=waterGoal?" · Goal reached! ⚡":""}`);}
   async function saveWalk(slot,mins){const nw={...walks,[slot]:mins};setWalks(nw);await saveField(`walk_${slot}`,mins);showToast(`👟 ${slot} walk: ${mins} min`);}
-  async function saveActivity(){const kcal=Math.round(ACTS[actIdx].met*(parseFloat(profile?.current_weight)||70)*(actMins/60));await saveField("calories_burned",kcal);markSaved("act");showToast(`✓ ${ACTS[actIdx].label} ${actMins} min — ${kcal} kcal burned`);}
+  async function saveActivity(){const mins=actIdx===0?(walks.morning||0)+(walks.afternoon||0)+(walks.evening||0):actMins;const kcal=Math.round(ACTS[actIdx].met*(parseFloat(profile?.current_weight)||70)*(mins/60));await saveField("calories_burned",kcal);markSaved("act");showToast(`✓ ${ACTS[actIdx].label} ${mins} min — ${kcal} kcal burned`);}
   async function saveWeight(){if(!weight)return;await saveField("weight_kg",parseFloat(weight));const sb=getSupabase();const{data:{session}}=await sb.auth.getSession();if(session)await sb.from("weight_logs").upsert({user_id:session.user.id,date:dateKey,weight_kg:parseFloat(weight)},{onConflict:"user_id,date"});markSaved("w");showToast(`⚖️ Weight saved: ${weight} kg`);}
   async function saveBP(){if(!bp.systolic)return;await saveField("bp_systolic",parseInt(bp.systolic));if(bp.diastolic)await saveField("bp_diastolic",parseInt(bp.diastolic));markSaved("bp");const s=bpStatus(parseInt(bp.systolic),parseInt(bp.diastolic));showToast(`💓 BP saved: ${bp.systolic}/${bp.diastolic} — ${s?.t||""}`);}
   async function saveSugar(){if(!sugar.fasting&&!sugar.postMeal)return;if(sugar.fasting)await saveField("sugar_fasting",parseFloat(sugar.fasting));if(sugar.postMeal)await saveField("sugar_post_meal",parseFloat(sugar.postMeal));markSaved("sg");showToast(`🩸 Blood sugar saved`);}
 
-  const estKcal=Math.round(ACTS[actIdx].met*(parseFloat(profile?.current_weight)||70)*(actMins/60));
+  const walkTotal=(walks.morning||0)+(walks.afternoon||0)+(walks.evening||0);
+  const isWalkAct=actIdx===0;
+  const displayMins=isWalkAct?walkTotal:actMins;
+  const estKcal=Math.round(ACTS[actIdx].met*(parseFloat(profile?.current_weight)||70)*(displayMins/60));
   const bps=bpStatus(parseInt(bp.systolic),parseInt(bp.diastolic));
   const sfs=sugarStatus(parseFloat(sugar.fasting),true);
   const sps=sugarStatus(parseFloat(sugar.postMeal),false);
@@ -102,7 +108,7 @@ export default function LogPage(){
               <p style={{fontSize:12.5,color:BGY,margin:"3px 0 0"}}>{new Date(dateKey+"T12:00:00").toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"long"})} · All in one place</p>
             </div>
 
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20}}>
+            <div style={{display:"grid",gridTemplateColumns:isTablet?"1fr":"1fr 1fr",gap:20}}>
 
               {/* LEFT */}
               <div>
@@ -157,12 +163,12 @@ export default function LogPage(){
                     ))}
                   </div>
                   <div style={{display:"flex",alignItems:"center",gap:16,justifyContent:"center",marginBottom:10}}>
-                    <button onClick={()=>setActMins(m=>Math.max(5,m-5))} style={{width:40,height:40,borderRadius:12,border:`1px solid ${BRD}`,background:"rgba(255,255,255,.06)",color:"#fff",fontSize:20,cursor:"pointer"}}>−</button>
-                    <div style={{fontSize:28,fontWeight:700,minWidth:90,textAlign:"center"}}>{actMins}<span style={{fontSize:12,color:BGY,fontWeight:500}}> min</span></div>
-                    <button onClick={()=>setActMins(m=>Math.min(120,m+5))} style={{width:40,height:40,borderRadius:12,border:`1px solid ${BRD}`,background:"rgba(255,255,255,.06)",color:"#fff",fontSize:20,cursor:"pointer"}}>+</button>
+                    <button onClick={()=>{if(!isWalkAct)setActMins(m=>Math.max(0,m-5));}} disabled={isWalkAct} style={{width:40,height:40,borderRadius:12,border:`1px solid ${BRD}`,background:"rgba(255,255,255,.06)",color:isWalkAct?"#555":"#fff",fontSize:20,cursor:isWalkAct?"default":"pointer"}}>−</button>
+                    <div style={{fontSize:28,fontWeight:700,minWidth:90,textAlign:"center",color:isWalkAct?G:"#fff"}}>{displayMins}<span style={{fontSize:12,color:BGY,fontWeight:500}}> min</span>{isWalkAct&&<div style={{fontSize:9,color:BGY,marginTop:1}}>from walk log</div>}</div>
+                    <button onClick={()=>{if(!isWalkAct)setActMins(m=>Math.min(120,m+5));}} disabled={isWalkAct} style={{width:40,height:40,borderRadius:12,border:`1px solid ${BRD}`,background:"rgba(255,255,255,.06)",color:isWalkAct?"#555":"#fff",fontSize:20,cursor:isWalkAct?"default":"pointer"}}>+</button>
                   </div>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                    <p style={{fontSize:12,color:BGY}}>Est. <strong style={{color:AMB}}>{estKcal} kcal</strong> burned</p>
+                    <p style={{fontSize:12,color:BGY}}>Est. <strong style={{color:AMB}}>{estKcal} kcal</strong> burned{isWalkAct&&displayMins>0?" (total from walk log)":""}</p>
                     <SaveBtn onClick={saveActivity} saved={saved.act} label="⚡ Log activity"/>
                   </div>
                 </Card>
