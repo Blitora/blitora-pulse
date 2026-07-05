@@ -4,7 +4,7 @@ import Head from 'next/head';
 import { getSupabase } from '../lib/supabase';
 
 /* ==========================================================
-   Blitora Pulse — marketing landing page (v6 — polished mixed theme, delegated magnetics, aurora, clinic 3D panel)
+   Blitora Pulse — marketing landing page (v7 — cursor glow + spotlight, location-aware content, light contact/resources, launch offer)
    - Real pricing pulled from live site (as-of deploy day)
    - Session check: logged-in users → /dashboard
    - Reuses existing /api/lead-capture + /public brochures
@@ -315,13 +315,15 @@ h1 .grad{background:linear-gradient(92deg,var(--green) 10%,var(--violet) 90%);-w
 
 /* BROCHURE / VIDEO */
 .bro{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-top:52px}
-.bro-c{padding:30px;border-radius:22px;position:relative;overflow:hidden;border:1px solid var(--line);background:linear-gradient(150deg,rgba(43,217,159,.09),var(--panel));display:flex;flex-direction:column}
-.bro-c.mid{background:linear-gradient(150deg,rgba(62,166,255,.09),var(--panel))}
-.bro-c.vid{background:linear-gradient(150deg,rgba(139,92,246,.14),var(--panel))}
-.bro-c h3{font-size:18px;margin:14px 0 8px}
-.bro-c p{color:var(--muted);font-size:13.5px;margin-bottom:18px;flex:1}
-.bro-ic{width:52px;height:52px;border-radius:14px;display:grid;place-items:center;font-size:24px;background:rgba(255,255,255,.05);border:1px solid var(--line)}
-.bro-meta{font-family:var(--mono);font-size:10.5px;color:var(--muted2);letter-spacing:.14em;text-transform:uppercase;margin-bottom:12px}
+.bro-c{padding:30px;border-radius:22px;position:relative;overflow:hidden;border:1px solid rgba(29,158,117,.3);background:linear-gradient(150deg,#FFFFFF,#EDF7F2);display:flex;flex-direction:column;box-shadow:0 8px 30px rgba(13,27,62,.07)}
+.bro-c.mid{border-color:rgba(62,166,255,.35);background:linear-gradient(150deg,#FFFFFF,#EAF3FF)}
+.bro-c.vid{border-color:rgba(139,92,246,.35);background:linear-gradient(150deg,#FFFFFF,#F3EEFF)}
+.bro-c h3{font-size:18px;margin:14px 0 8px;color:var(--text-dark)}
+.bro-c p{color:#4A5E80;font-size:13.5px;margin-bottom:18px;flex:1}
+.bro-c .btn-o{color:var(--text-dark);border-color:rgba(13,27,62,.28)}
+.bro-c .btn-o:hover{border-color:var(--green-d);color:var(--green-d)}
+.bro-ic{width:52px;height:52px;border-radius:14px;display:grid;place-items:center;font-size:24px;background:rgba(13,27,62,.05);border:1px solid rgba(13,27,62,.12)}
+.bro-meta{font-family:var(--mono);font-size:10.5px;color:#8896B3;letter-spacing:.14em;text-transform:uppercase;margin-bottom:12px}
 
 /* CONTACT */
 .contact-grid{display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-top:52px;align-items:start}
@@ -343,12 +345,13 @@ textarea.inp{min-height:110px;resize:vertical}
 #field2{position:absolute;inset:0;z-index:0}
 .final .wrap{position:relative;z-index:2}
 .final h2{font-size:clamp(32px,5vw,56px);font-weight:800;line-height:1.12;margin-bottom:16px}
-footer{border-top:1px solid var(--line);padding:56px 0 34px;background:#050B1D}
+footer{border-top:1px solid rgba(43,217,159,.25);padding:60px 0 36px;background:linear-gradient(180deg,#071031,#050B1D)}
 .f-grid{display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr;gap:34px;margin-bottom:44px}
-.f-grid h5{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:16px}
-.f-grid a{display:block;font-size:13.5px;color:var(--muted);margin-bottom:10px;transition:.2s}
+.f-grid h5{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:#9FB0D6;margin-bottom:16px}
+.f-grid a{display:block;font-size:14px;color:#B7C6E8;margin-bottom:11px;transition:.2s}
+.f-grid p{color:#9FB0D6;font-size:13.5px;line-height:1.7}
 .f-grid a:hover{color:var(--green)}
-.f-bot{display:flex;justify-content:space-between;align-items:center;padding-top:26px;border-top:1px solid var(--line);font-size:12px;color:var(--muted2);flex-wrap:wrap;gap:12px}
+.f-bot{display:flex;justify-content:space-between;align-items:center;padding-top:26px;border-top:1px solid var(--line);font-size:12.5px;color:#8FA3CC;flex-wrap:wrap;gap:12px}
 .f-bot .parent{color:var(--muted)}
 .f-bot .parent a{color:#F0824A;font-weight:600}
 
@@ -403,11 +406,15 @@ footer{border-top:1px solid var(--line);padding:56px 0 34px;background:#050B1D}
 .reveal{opacity:0;transform:translateY(34px);transition:opacity .8s ease,transform .8s cubic-bezier(.2,.8,.3,1)}
 .reveal.in{opacity:1;transform:none}
 
-/* MAG v6 — variable-driven, instant */
-.magcard,.who-c,.nudge,.bro-c,.c-line,.tb,.plan,.flip{will-change:transform;transition:transform .35s cubic-bezier(.2,.8,.3,1)}
-.mag-on{transform:perspective(800px) rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg)) translateY(-8px) scale(1.02)!important;transition:transform .05s linear!important}
-.magcard>.mag-ripple,.who-c>.mag-ripple,.nudge>.mag-ripple,.bro-c>.mag-ripple,.c-line>.mag-ripple,.tb>.mag-ripple,.plan>.mag-ripple,.flip>.mag-ripple{left:var(--mx,50%);top:var(--my,50%)}
-.mag-on>.mag-ripple{opacity:1;transform:translate(-50%,-50%) scale(1)}
+/* MAG v7 — cursor glow + card spotlight (buttons keep the pull) */
+#cursorGlow{position:fixed;top:0;left:0;width:32px;height:32px;border-radius:50%;pointer-events:none;z-index:9999;background:radial-gradient(circle,rgba(43,217,159,.8),rgba(43,217,159,0) 70%);mix-blend-mode:screen;transition:width .2s,height .2s}
+#cursorGlow.on-btn{width:52px;height:52px}
+.spot{position:relative}
+.spot::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;opacity:0;transition:opacity .3s;background:radial-gradient(240px circle at var(--mx,50%) var(--my,50%),rgba(43,217,159,.18),transparent 65%);z-index:2}
+.spot:hover::after{opacity:1}
+.spot:hover{border-color:rgba(43,217,159,.45)}
+.magcard,.who-c,.nudge,.bro-c,.tb,.plan,.tstep{transition:transform .35s cubic-bezier(.2,.8,.3,1),border-color .3s,box-shadow .3s}
+.magcard:hover,.who-c:hover,.bro-c:hover,.plan:hover,.tstep:hover{transform:translateY(-6px)}
 .magnet{transition:transform .35s cubic-bezier(.2,.9,.3,1.5)}
 .magnet.pull{transition:transform .09s ease-out}
 
@@ -417,6 +424,33 @@ footer{border-top:1px solid var(--line);padding:56px 0 34px;background:#050B1D}
 .ticker span{font-family:var(--mono);font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:#9FB0D6}
 .ticker span::first-letter{color:var(--green)}
 @keyframes tick{to{transform:translateX(-50%)}}
+
+/* LAUNCH OFFER PILL */
+.offerbar{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:140;background:linear-gradient(120deg,#0E1B44,#122053);border:1px solid rgba(43,217,159,.5);border-radius:100px;padding:9px 10px 9px 18px;display:flex;gap:12px;align-items:center;box-shadow:0 14px 44px rgba(0,0,0,.5),0 0 30px rgba(43,217,159,.18);font-size:13px;color:#D6E1F8;max-width:calc(100vw - 110px);flex-wrap:wrap}
+.offerbar b{color:var(--green)}
+.offerbar a{color:#03200F;background:var(--green);padding:7px 15px;border-radius:100px;font-weight:700;font-size:12.5px;white-space:nowrap}
+.offerbar button{background:none;color:var(--muted);font-size:14px;padding:2px 6px;cursor:pointer}
+
+/* CONTACT v7 — light */
+.cx-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:26px;margin-top:52px;align-items:start}
+.cx-card{background:#fff;border:1px solid rgba(13,27,62,.12);border-radius:22px;padding:28px;box-shadow:0 10px 40px rgba(13,27,62,.08)}
+.cx-t{color:var(--text-dark);font-size:18px;margin-bottom:16px}
+.cx-card .inp{background:#F6F9FF;border:1px solid rgba(13,27,62,.14);color:var(--text-dark)}
+.cx-card .inp::placeholder{color:#7688AA}
+.cx-card .inp:focus{border-color:var(--green-d);box-shadow:0 0 0 3px rgba(29,158,117,.15)}
+.cx-note{font-size:11.5px;color:#5E6E96;margin-top:12px}
+.cx-side{display:grid;gap:14px}
+.cx-tiles{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.cx-tile{background:#fff;border:1px solid rgba(13,27,62,.12);border-radius:16px;padding:18px 16px;display:flex;flex-direction:column;gap:4px;box-shadow:0 6px 24px rgba(13,27,62,.06);transition:transform .25s,border-color .25s;color:inherit}
+.cx-tile:hover{transform:translateY(-4px);border-color:var(--green-d)}
+.cx-tile .ti{font-size:20px}
+.cx-tile b{font-size:13.5px;color:var(--text-dark)}
+.cx-tile span:last-child{font-size:12px;color:#5E6E96}
+.cx-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.cx-stats div{text-align:center;background:rgba(29,158,117,.08);border:1px solid rgba(29,158,117,.3);border-radius:14px;padding:14px 8px}
+.cx-stats b{display:block;font-family:var(--mono);font-size:15px;color:var(--green-d)}
+.cx-stats span{font-size:10.5px;color:#4A5E80}
+.cx-map{background:linear-gradient(120deg,rgba(29,158,117,.1),rgba(139,92,246,.1));border:1px dashed rgba(13,27,62,.22);border-radius:14px;padding:14px;text-align:center;font-size:12.5px;color:#3D4F70}
 
 /* LIGHT SECTION TEXTURE + AURORA */
 .sec-light{position:relative;overflow:hidden}
@@ -451,7 +485,7 @@ footer{border-top:1px solid var(--line);padding:56px 0 34px;background:#050B1D}
 .story .tstep:nth-child(3) .tbig{background:linear-gradient(120deg,#0D1B3E 25%,#6D3EE8);-webkit-background-clip:text;background-clip:text;filter:none}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}.reveal{opacity:1;transform:none}}
 @media (max-width:980px){
-  .hero-in,.ai-grid,.contact-grid{grid-template-columns:1fr}
+  .hero-in,.ai-grid,.contact-grid,.cx-grid{grid-template-columns:1fr}
   .bro,.tsteps,.flips,.who,.plans,.nudges{grid-template-columns:1fr}
   .kpis{grid-template-columns:repeat(2,1fr)}
   .dash-mid{grid-template-columns:1fr}
@@ -516,6 +550,12 @@ const PLANS_BY_DIET = {
   'Non-veg':{b:['2-egg omelette + toast','Chicken keema (80 g) + 1 paratha'],s1:['Greek curd (100 g)','1 banana + peanuts (20 g)'],l:['Grilled chicken (150 g) + 2 roti + salad','Fish curry + brown rice + veg'],s2:['Boiled egg + green tea','Roasted chana + buttermilk'],d:['Tandoori chicken (150 g) + sauteed veg','Fish tikka + dal + salad']},
   Vegan:{b:['Tofu scramble + toast','Oats + soy milk + chia'],s1:['Peanuts (25 g) + black coffee','Fruit + 6 almonds'],l:['2 roti + chana masala + salad','Tofu curry + brown rice + veg'],s2:['Sprouts bhel','Soy milk + makhana'],d:['Tofu bhurji (150 g) + 1 roti + veg','Veg soy khichdi + salad']}
 };
+const PLANS_BY_DIET_GLOBAL = {
+  Vegetarian:{b:['Overnight oats + berries + almond butter','Avocado toast + cherry tomatoes'],s1:['Greek yogurt (100 g) + honey','Apple + peanut butter (1 tbsp)'],l:['Quinoa buddha bowl + chickpeas + tahini','Whole-wheat pasta primavera + side salad'],s2:['Hummus + carrot sticks','Trail mix (30 g)'],d:['Grilled halloumi + roast vegetables','Mushroom risotto + rocket salad']},
+  Eggetarian:{b:['2-egg omelette + whole-grain toast','Scrambled eggs + spinach + feta'],s1:['Boiled egg + fruit','Cottage cheese (100 g) + cucumber'],l:['Egg salad wrap + greens','Shakshuka + pita (1)'],s2:['Protein smoothie (whey + banana)','Rice cakes + almond butter'],d:['Veggie frittata + side salad','Egg fried cauliflower rice + veg']},
+  'Non-veg':{b:['Eggs + turkey bacon + toast','Smoked salmon + cream cheese bagel (half)'],s1:['Greek yogurt (100 g)','Beef jerky (25 g) + fruit'],l:['Grilled chicken caesar salad','Salmon + quinoa + steamed greens'],s2:['Tuna + crackers','Boiled egg + green tea'],d:['Lean steak + sweet potato + broccoli','Baked cod + roast vegetables']},
+  Vegan:{b:['Oats + soy milk + chia + banana','Tofu scramble + whole-grain toast'],s1:['Roasted edamame (30 g)','Fruit + 6 walnuts'],l:['Lentil soup + quinoa salad','Buddha bowl + tofu + tahini'],s2:['Hummus + veggie sticks','Soy latte + rice cakes'],d:['Tempeh stir-fry + brown rice','Chickpea curry + cauliflower rice']}
+};
 const BOT_ANSWERS = [
   [/diet|chart|plan|meal/i,"You answer 4 questions — goal, conditions, food preference, meals per day — and Pulse AI drafts a full macro-balanced day in seconds. You can refine it in chat: \"make dinner lighter.\" Try the live demo in the Pulse AI section above! ✦"],
   [/price|cost|₹|\$|cheap|plan(s)?$/i,"Individual: Starter free trial then ₹99/mo · Plus ₹189/mo · Premium ₹449/mo. Clinic: Starter ₹499/mo · Professional ₹999/mo · Premium ₹2,499/mo. Annual = 18% off. Flip the toggle in the Pricing section."],
@@ -537,14 +577,16 @@ export default function Home() {
   const router = useRouter();
   const [checking, setChecking] = useState(true);
   const [cur, setCur] = useState('inr');
+  const [isIndia, setIsIndia] = useState(true);
   const [bill, setBill] = useState('m');
   const [aud, setAud] = useState('ind');
   const [navOpen, setNavOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [broOpen, setBroOpen] = useState(null); // brochure object or null
   const [vidOpen, setVidOpen] = useState(false);
+  const [offerOn, setOfferOn] = useState(true);
   const [chatOpen, setChatOpen] = useState(false);
-  const [aiOpts, setAiOpts] = useState({ goal:'Lose weight', diet:'Vegetarian', cond:'None', meals:'5 meals' });
+  const [aiOpts, setAiOpts] = useState({ goal:'Lose weight', diet:'Vegetarian', cond:'None', meals:'5 meals', cuisine:'Indian' });
   const planBodyRef = useRef(null);
 
   // Session redirect
@@ -562,7 +604,7 @@ export default function Home() {
   },[router]);
 
   // Currency auto-detect
-  useEffect(()=>{ if(!detectINR()) setCur('usd'); },[]);
+  useEffect(()=>{ const ind=detectINR(); setIsIndia(ind); if(!ind){ setCur('usd'); setAiOpts(s=>({...s,cuisine:'Global'})); } },[]);
 
   // Nav scroll
   useEffect(()=>{
@@ -615,55 +657,36 @@ export default function Home() {
     return ()=>cio.disconnect();
   },[checking]);
 
-  // Magnetic tilt + ripple — single delegated listener, instant from first paint
+  // Magnetics v7 — buttons pull + card spotlight + cursor glow (no card transforms = no jank)
   useEffect(()=>{
     if(checking)return;
     const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
     const hover=matchMedia('(hover:hover)').matches;
     if(reduced||!hover)return;
-    const SEL='.magcard,.who-c,.nudge,.bro-c,.c-line,.tb,.plan,.flip';
-    // Ensure every card has exactly one ripple span
-    document.querySelectorAll(SEL).forEach(c=>{
-      if(!c.querySelector(':scope > .mag-ripple')){
-        const r=document.createElement('span');r.className='mag-ripple';r.setAttribute('aria-hidden','true');c.appendChild(r);
-      }
-    });
-    let raf=0,lastCard=null,lastBtn=null,ev=null;
-    const frame=()=>{
-      raf=0;if(!ev)return;
-      const el=ev.target.closest?ev.target.closest(SEL):null;
-      if(lastCard&&lastCard!==el){lastCard.classList.remove('mag-on');}
-      lastCard=el;
-      if(el){
-        const b=el.getBoundingClientRect();
-        const x=(ev.clientX-b.left)/b.width,y=(ev.clientY-b.top)/b.height;
-        el.style.setProperty('--ry',((x-.5)*14).toFixed(2)+'deg');
-        el.style.setProperty('--rx',((.5-y)*10).toFixed(2)+'deg');
-        el.style.setProperty('--mx',(ev.clientX-b.left)+'px');
-        el.style.setProperty('--my',(ev.clientY-b.top)+'px');
-        el.classList.add('mag-on');
-      }
-      const btn=ev.target.closest?ev.target.closest('.magnet'):null;
+    document.querySelectorAll('.magcard,.who-c,.nudge,.bro-c,.tb,.plan,.flip,.tstep').forEach(c=>c.classList.add('spot'));
+    const glow=document.createElement('div');glow.id='cursorGlow';document.body.appendChild(glow);
+    let gx=innerWidth/2,gy=innerHeight/2,tx=gx,ty=gy,raf=0,lastBtn=null;
+    const loop=()=>{gx+=(tx-gx)*.18;gy+=(ty-gy)*.18;glow.style.transform=`translate(${(gx-16).toFixed(1)}px,${(gy-16).toFixed(1)}px)`;raf=requestAnimationFrame(loop);};
+    raf=requestAnimationFrame(loop);
+    const move=e=>{
+      tx=e.clientX;ty=e.clientY;
+      const card=e.target.closest?e.target.closest('.spot'):null;
+      if(card){const b=card.getBoundingClientRect();
+        card.style.setProperty('--mx',(e.clientX-b.left)+'px');
+        card.style.setProperty('--my',(e.clientY-b.top)+'px');}
+      const btn=e.target.closest?e.target.closest('.magnet'):null;
       if(lastBtn&&lastBtn!==btn){lastBtn.classList.remove('pull');lastBtn.style.transform='';}
       lastBtn=btn;
-      if(btn){
-        const r=btn.getBoundingClientRect();
-        btn.classList.add('pull');
-        btn.style.transform=`translate(${((ev.clientX-r.left-r.width/2)*.3).toFixed(1)}px,${((ev.clientY-r.top-r.height/2)*.3).toFixed(1)}px) scale(1.05)`;
-      }
+      if(btn){const r=btn.getBoundingClientRect();btn.classList.add('pull');
+        btn.style.transform=`translate(${((e.clientX-r.left-r.width/2)*.3).toFixed(1)}px,${((e.clientY-r.top-r.height/2)*.3).toFixed(1)}px) scale(1.05)`;}
+      glow.classList.toggle('on-btn',!!btn);
     };
-    const move=e=>{ev=e;if(!raf)raf=requestAnimationFrame(frame);};
-    const leave=()=>{
-      if(lastCard){lastCard.classList.remove('mag-on');lastCard=null;}
-      if(lastBtn){lastBtn.classList.remove('pull');lastBtn.style.transform='';lastBtn=null;}
-    };
+    const leave=()=>{if(lastBtn){lastBtn.classList.remove('pull');lastBtn.style.transform='';lastBtn=null;}};
     document.addEventListener('mousemove',move,{passive:true});
     document.documentElement.addEventListener('mouseleave',leave);
-    return ()=>{
+    return ()=>{cancelAnimationFrame(raf);glow.remove();
       document.removeEventListener('mousemove',move);
-      document.documentElement.removeEventListener('mouseleave',leave);
-      if(raf)cancelAnimationFrame(raf);
-    };
+      document.documentElement.removeEventListener('mouseleave',leave);};
   },[checking]);
 
   // Hero phone tilt + Holo tilt
@@ -778,7 +801,7 @@ export default function Home() {
         M.Composite.add(engine.world,[
           M.Bodies.rectangle(w/2,h+28,w,60,wall),M.Bodies.rectangle(w/2,-300,w,60,wall),
           M.Bodies.rectangle(-28,h/2,60,h*3,wall),M.Bodies.rectangle(w+28,h/2,60,h*3,wall)]);
-        const FOODS=[['Paneer 150g · 27g P','#2BD99F'],['Dal bowl · 9g P','#F5B544'],['2 Roti · 6g P','#8B5CF6'],['Egg x2 · 12g P','#3EA6FF'],['Chicken 150g · 33g P','#F4645F'],['Curd 100g · 4g P','#2BD99F'],['Almonds 10 · 3g P','#8B5CF6'],['Sprouts · 8g P','#2BD99F']];
+        const FOODS=[['Paneer 150g · 27g P','#2BD99F'],['Dal bowl · 9g P','#F5B544'],['2 Roti · 6g P','#8B5CF6'],['Egg x2 · 12g P','#3EA6FF'],['Chicken 150g · 33g P','#F4645F'],['Curd 100g · 4g P','#2BD99F'],['Almonds 10 · 3g P','#8B5CF6'],['Sprouts · 8g P','#2BD99F'],['Salmon 100g · 20g P','#3EA6FF'],['Greek yogurt · 10g P','#2BD99F'],['Tofu 100g · 8g P','#8B5CF6'],['Quinoa cup · 8g P','#F5B544'],['Oats bowl · 6g P','#F5B544'],['Avocado · 3g P','#2BD99F']];
         const makeFood=x=>{const [label,color]=FOODS[Math.floor(Math.random()*FOODS.length)];
           const wd=Math.max(96,label.length*7.4),b=M.Bodies.rectangle(x,-30,wd,40,{chamfer:{radius:19},restitution:.55,friction:.28,render:{fillStyle:'rgba(11,21,51,.95)',strokeStyle:color,lineWidth:1.6}});
           b.foodLabel=label;b.foodColor=color;return b;};
@@ -796,6 +819,9 @@ export default function Home() {
             c.fillText(b.foodLabel,0,1);c.restore();}});
         window._physDrop=()=>M.Composite.add(engine.world,makeFood(60+Math.random()*(w-120)));
         let flipped=false;window._physFlip=()=>{flipped=!flipped;engine.gravity.y=flipped?-1:1;};
+        window._physBoom=()=>{for(const b of M.Composite.allBodies(engine.world)){if(!b.foodLabel)continue;
+          M.Body.setVelocity(b,{x:(Math.random()-.5)*18,y:-(6+Math.random()*11)});
+          M.Body.setAngularVelocity(b,(Math.random()-.5)*.45);}};
       }catch(e){console.warn('physics load failed',e);}
     },{threshold:.25});
     io.observe(box);
@@ -811,10 +837,10 @@ export default function Home() {
   // AI generate diet chart
   const genPlan = useCallback(()=>{
     const body=planBodyRef.current;if(!body)return;
-    const { goal, diet, cond, meals } = aiOpts;
+    const { goal, diet, cond, meals, cuisine } = aiOpts;
     body.innerHTML=`<div class="thinking"><div class="tdots"><i></i><i></i><i></i></div>Pulse AI is drafting your day — ${goal.toLowerCase()}, ${diet.toLowerCase()}${cond!=='None'?', '+cond.toLowerCase()+'-safe':''}…</div>`;
     setTimeout(()=>{
-      const P=PLANS_BY_DIET[diet],six=meals.startsWith('6'),three=meals.startsWith('3');
+      const P=(cuisine==='Global'?PLANS_BY_DIET_GLOBAL:PLANS_BY_DIET)[diet],six=meals.startsWith('6'),three=meals.startsWith('3');
       const kcal=goal==='Gain muscle'?2100:goal==='Lose weight'?1450:1700;
       const prot=goal==='Gain muscle'?110:goal==='Lose weight'?85:75;
       const pick=a=>a[Math.floor(Math.random()*a.length)];
@@ -892,6 +918,13 @@ export default function Home() {
       </Head>
       <style dangerouslySetInnerHTML={{__html: CSS}} />
       <div className="grain" />
+      {offerOn && (
+        <div className="offerbar" role="note">
+          <span>🚀 <b>Launch offer:</b> first 100 signups get <b>3 months of Plus free</b></span>
+          <a href="/signup?offer=launch100">Claim →</a>
+          <button aria-label="Dismiss offer" onClick={()=>setOfferOn(false)}>✕</button>
+        </div>
+      )}
       <a href="#content" className="skip">Skip to content</a>
 
       {/* NAV */}
@@ -1051,6 +1084,11 @@ export default function Home() {
                 {['3 meals','5 meals','6 meals'].map(o=>
                   <button key={o} className={"opt"+(aiOpts.meals===o?' on':'')} onClick={()=>setAiOpts(s=>({...s,meals:o}))}>{o}</button>)}
               </div>
+              <span className="f-label">Cuisine style</span>
+              <div className="opts">
+                {['Indian','Global'].map(o=>
+                  <button key={o} className={"opt"+(aiOpts.cuisine===o?' on':'')} onClick={()=>setAiOpts(s=>({...s,cuisine:o}))}>{o}</button>)}
+              </div>
               <button className="btn btn-g magnet gen-btn" onClick={genPlan}>✦ Generate my AI diet chart</button>
             </div>
             <div className="card plan-out reveal">
@@ -1179,6 +1217,7 @@ export default function Home() {
             <div className="phys-btns">
               <button className="btn btn-o btn-sm" onClick={()=>window._physDrop&&window._physDrop()}>+ Drop more food</button>
               <button className="btn btn-o btn-sm" onClick={()=>window._physFlip&&window._physFlip()}>Flip gravity ⤒</button>
+              <button className="btn btn-o btn-sm" onClick={()=>window._physBoom&&window._physBoom()}>💥 Explode</button>
             </div>
           </div>
         </div>
@@ -1234,10 +1273,10 @@ export default function Home() {
                 <button className={bill==='m'?'on':''} onClick={()=>setBill('m')}>Monthly</button>
                 <button className={bill==='a'?'on':''} onClick={()=>setBill('a')}>Annually <span className="savechip">SAVE 18%</span></button>
               </div>
-              <div className="cur-tog">
+              {isIndia && <div className="cur-tog">
                 <button className={cur==='inr'?'on':''} onClick={()=>setCur('inr')}>₹ INR</button>
                 <button className={cur==='usd'?'on':''} onClick={()=>setCur('usd')}>$ USD</button>
-              </div>
+              </div>}
             </div>
           </div>
           <div className="plans reveal" style={{textAlign:'left'}}>
@@ -1263,12 +1302,14 @@ export default function Home() {
       </section>
 
       {/* BROCHURES + VIDEO */}
-      <section>
+      <section className="sec-light" style={{background:'linear-gradient(180deg,var(--light),var(--light2))'}}>
+        <div className="aurora au-b" style={{width:520,height:520,top:-170,left:-150}} />
+        <div className="aurora au-g" style={{width:460,height:460,bottom:-190,right:-130}} />
         <div className="wrap">
           <div className="reveal">
-            <span className="eyebrow">Take Pulse with you</span>
-            <h2 className="sec">Read it later. <span className="g">Watch it now.</span></h2>
-            <p className="sub">Three lead-gated PDFs and a 90-second product tour.</p>
+            <span className="eyebrow" style={{color:'var(--green-d)'}}>Take Pulse with you</span>
+            <h2 className="sec" style={{color:'var(--text-dark)'}}>Read it later. <span className="g">Watch it now.</span></h2>
+            <p className="sub" style={{color:'#3D4F70'}}>Three lead-gated PDFs and a 90-second product tour.</p>
           </div>
           <div className="bro reveal">
             {BROCHURES.map((b,i)=>(
@@ -1293,13 +1334,14 @@ export default function Home() {
       </section>
 
       {/* CONTACT */}
-      <section id="contact" style={{background:'var(--bg2)'}}>
-        {ecg(6)}
+      <section id="contact" className="sec-light" style={{background:'linear-gradient(180deg,var(--light2),var(--light))'}}>
+        <div className="aurora au-g" style={{width:500,height:500,top:-160,right:-140}} />
+        <div className="aurora au-v" style={{width:440,height:440,bottom:-180,left:-120}} />
         <div className="wrap">
           <div className="reveal">
-            <span className="eyebrow">Talk to a human</span>
-            <h2 className="sec">Questions? <span className="g">WhatsApp us.</span></h2>
-            <p className="sub">Fill this in and it opens WhatsApp with your message ready — we reply the same day.</p>
+            <span className="eyebrow" style={{color:'var(--green-d)'}}>Talk to a human</span>
+            <h2 className="sec" style={{color:'var(--text-dark)'}}>Questions? <span className="g">WhatsApp us.</span></h2>
+            <p className="sub" style={{color:'#3D4F70'}}>Fill this in and it opens WhatsApp with your message ready — we reply the same day.</p>
           </div>
           <ContactForm />
         </div>
@@ -1417,25 +1459,29 @@ function ContactForm(){
     window.open('https://wa.me/919619990313?text='+encodeURIComponent(txt),'_blank');
   };
   return (
-    <div className="contact-grid">
-      <div className="card reveal">
+    <div className="cx-grid">
+      <div className="cx-card reveal">
+        <h3 className="cx-t">Send us a message</h3>
         <input className="inp" placeholder="Your name *" value={n} onChange={e=>setN(e.target.value)} />
         <input className="inp" type="email" placeholder="Email address *" value={em} onChange={e=>setEm(e.target.value)} />
         <input className="inp" placeholder="I am a… (individual / dietitian / clinic)" value={r} onChange={e=>setR(e.target.value)} />
         <textarea className="inp" placeholder="Your question or message *" value={m} onChange={e=>setM(e.target.value)}></textarea>
         <button className="btn wa-btn magnet" onClick={send}>💬 Send on WhatsApp</button>
-        <p style={{fontSize:11.5,color:'var(--muted2)',marginTop:12}}>Your email is included in the message so we can follow up properly.</p>
+        <p className="cx-note">Your email is included in the message so we can follow up properly.</p>
       </div>
-      <div className="c-alt reveal">
-        <a className="c-line" href="https://wa.me/919619990313" target="_blank" rel="noreferrer"><div className="ci">💬</div><div><b>WhatsApp Business</b><span>+91 96199 90313 — fastest reply</span></div><span className="c-go">→</span></a>
-        <a className="c-line" href="mailto:hello@blitora.com"><div className="ci">✉️</div><div><b>hello@blitora.com</b><span>Demos, partnerships and clinics</span></div><span className="c-go">→</span></a>
-        <div className="c-line"><div className="ci">🤖</div><div><b>Pulse Assistant</b><span>Bottom-right corner — instant answers, 24/7</span></div></div>
-        <a className="c-line" href="https://blitora.com" target="_blank" rel="noreferrer"><div className="ci">🏢</div><div><b>A product of Blitora</b><span>blitora.com — Powering Progress.</span></div><span className="c-go">→</span></a>
-        <div className="c-stats">
-          <div><b>&lt; 2 hrs</b><span>avg. reply time</span></div>
-          <div><b>7 days</b><span>a week support</span></div>
+      <div className="cx-side reveal">
+        <div className="cx-tiles">
+          <a className="cx-tile" href="https://wa.me/919619990313" target="_blank" rel="noreferrer"><span className="ti">💬</span><b>WhatsApp</b><span>+91 96199 90313</span></a>
+          <a className="cx-tile" href="mailto:hello@blitora.com"><span className="ti">✉️</span><b>Email</b><span>hello@blitora.com</span></a>
+          <div className="cx-tile"><span className="ti">🤖</span><b>Pulse Assistant</b><span>Bottom-right · 24/7</span></div>
+          <a className="cx-tile" href="https://blitora.com" target="_blank" rel="noreferrer"><span className="ti">🏢</span><b>Blitora</b><span>blitora.com</span></a>
+        </div>
+        <div className="cx-stats">
+          <div><b>&lt; 2 hrs</b><span>avg. reply</span></div>
+          <div><b>7 days</b><span>a week</span></div>
           <div><b>EN · HI</b><span>languages</span></div>
         </div>
+        <div className="cx-map" aria-hidden="true"><span>🇮🇳 Mumbai · Serving India, the Gulf &amp; the world</span></div>
       </div>
     </div>
   );
