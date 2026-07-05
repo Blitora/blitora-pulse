@@ -4,7 +4,7 @@ import Head from 'next/head';
 import { getSupabase } from '../lib/supabase';
 
 /* ==========================================================
-   Blitora Pulse — marketing landing page (v4)
+   Blitora Pulse — marketing landing page (v5 — mixed light/dark)
    - Real pricing pulled from live site (as-of deploy day)
    - Session check: logged-in users → /dashboard
    - Reuses existing /api/lead-capture + /public brochures
@@ -13,10 +13,11 @@ import { getSupabase } from '../lib/supabase';
 const CSS = `
 :root{
   --bg:#060D22; --bg2:#08122E; --panel:#0B1533; --panel2:#101C42;
+  --light:#F4F7FF; --light2:#EBF0FF; --light-panel:#FFFFFF; --light-border:rgba(13,27,62,.1);
   --line:rgba(139,155,191,.16); --line2:rgba(43,217,159,.35);
-  --green:#2BD99F; --green-d:#149E71; --violet:#8B5CF6; --blue:#3EA6FF;
+  --green:#2BD99F; --green-d:#1D9E75; --violet:#8B5CF6; --blue:#3EA6FF;
   --amber:#F5B544; --red:#F4645F;
-  --text:#EAF2FF; --muted:#8B9BBF; --muted2:#5E6E96;
+  --text:#EAF2FF; --text-dark:#0D1B3E; --muted:#8B9BBF; --muted2:#5E6E96;
   --font:'Poppins',Arial,sans-serif; --mono:'IBM Plex Mono',monospace;
   --rad:18px; --wa:#25D366;
 }
@@ -122,7 +123,19 @@ h1 .grad{background:linear-gradient(92deg,var(--green) 10%,var(--violet) 90%);-w
 .reveal.in .ecg-path{stroke-dashoffset:0}
 
 /* TIME STORY */
-.story{background:linear-gradient(180deg,var(--bg),var(--bg2))}
+.story{background:linear-gradient(180deg,var(--light),var(--light2))}
+.story .eyebrow{color:var(--green-d)}
+.story h2.sec{color:var(--text-dark)}
+.story .sub{color:#3D4F70}
+.story .tcap{color:#3D4F70}
+.story .tcap b{color:var(--green-d)}
+.story .tphase{color:#5E6E96;border-color:rgba(13,27,62,.15);background:rgba(13,27,62,.04)}
+.story .tstep{background:linear-gradient(165deg,rgba(255,255,255,.95),rgba(235,240,255,.9));border:1px solid rgba(13,27,62,.12);box-shadow:0 8px 32px rgba(13,27,62,.08)}
+.story .tstep:hover{border-color:rgba(43,217,159,.5);box-shadow:0 20px 50px rgba(43,217,159,.15)}
+.story .tstep .node{background:var(--light);border-color:var(--green-d)}
+.story .tstep .node i{background:var(--green-d)}
+.story .tstep h3{color:var(--text-dark)}
+.story .tstep p{color:#4A5E80}
 .tline{position:relative;margin-top:70px}
 .pulse-track{position:absolute;left:3%;right:3%;top:0;height:2px;border-radius:2px;background:linear-gradient(90deg,rgba(43,217,159,0),var(--green) 18%,var(--blue) 50%,var(--violet) 82%,rgba(139,92,246,0));transform:scaleX(0);transform-origin:left;transition:transform 1.3s cubic-bezier(.2,.8,.2,1) .15s;box-shadow:0 0 18px rgba(62,166,255,.35)}
 .reveal.in .pulse-track{transform:scaleX(1)}
@@ -221,25 +234,29 @@ h1 .grad{background:linear-gradient(92deg,var(--green) 10%,var(--violet) 90%);-w
 .dash-hint{text-align:center;font-family:var(--mono);font-size:11px;color:var(--muted2);margin-top:38px;letter-spacing:.15em}
 
 /* FLIP CARDS */
+.flip-sec{background:linear-gradient(180deg,var(--light2),var(--light))}
+.flip-sec .eyebrow{color:var(--green-d)}
+.flip-sec h2.sec{color:var(--text-dark)}
+.flip-sec .sub{color:#3D4F70}
 .flips{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-top:56px}
 .flip{perspective:1100px;height:230px;position:relative}
 .flip-in{position:relative;width:100%;height:100%;transform-style:preserve-3d;transition:transform .7s cubic-bezier(.3,.8,.3,1)}
 .flip:hover .flip-in,.flip.tapped .flip-in{transform:rotateY(180deg)}
 .face{position:absolute;inset:0;backface-visibility:hidden;border-radius:20px;padding:26px;display:flex;flex-direction:column;justify-content:flex-end}
 .face.front{border:1px solid var(--line);transition:border-color .3s}
-.flip:nth-child(6n+1) .face.front{background:linear-gradient(145deg,#0B1A3A,#091328);border-color:rgba(43,217,159,.25)}
+.flip:nth-child(6n+1) .face.front{background:linear-gradient(145deg,#FFFFFF,#EDF5FF);border-color:rgba(43,217,159,.3)}
 .flip:nth-child(6n+1) .face.front:hover{border-color:rgba(43,217,159,.6)}
-.flip:nth-child(6n+2) .face.front{background:linear-gradient(145deg,#160E35,#0B0A25);border-color:rgba(139,92,246,.25)}
+.flip:nth-child(6n+2) .face.front{background:linear-gradient(145deg,#FFFFFF,#F3EEFF);border-color:rgba(139,92,246,.3)}
 .flip:nth-child(6n+2) .face.front:hover{border-color:rgba(139,92,246,.6)}
-.flip:nth-child(6n+3) .face.front{background:linear-gradient(145deg,#0B1A3A,#091328);border-color:rgba(43,217,159,.25)}
-.flip:nth-child(6n+4) .face.front{background:linear-gradient(145deg,#160E35,#0B0A25);border-color:rgba(139,92,246,.25)}
-.flip:nth-child(6n+5) .face.front{background:linear-gradient(145deg,#0B1A3A,#091328);border-color:rgba(43,217,159,.25)}
-.flip:nth-child(6n+6) .face.front{background:linear-gradient(145deg,#160E35,#0B0A25);border-color:rgba(139,92,246,.25)}
+.flip:nth-child(6n+3) .face.front{background:linear-gradient(145deg,#FFFFFF,#EDF5FF);border-color:rgba(43,217,159,.3)}
+.flip:nth-child(6n+4) .face.front{background:linear-gradient(145deg,#FFFFFF,#F3EEFF);border-color:rgba(139,92,246,.3)}
+.flip:nth-child(6n+5) .face.front{background:linear-gradient(145deg,#FFFFFF,#EDF5FF);border-color:rgba(43,217,159,.3)}
+.flip:nth-child(6n+6) .face.front{background:linear-gradient(145deg,#FFFFFF,#F3EEFF);border-color:rgba(139,92,246,.3)}
 .face.front .ic{width:52px;height:52px;border-radius:14px;display:grid;place-items:center;font-size:24px;margin-bottom:auto;box-shadow:0 0 22px rgba(43,217,159,.2)}
 .flip:nth-child(odd) .face.front .ic{background:linear-gradient(135deg,rgba(43,217,159,.2),rgba(43,217,159,.06));border:1px solid rgba(43,217,159,.4)}
 .flip:nth-child(even) .face.front .ic{background:linear-gradient(135deg,rgba(139,92,246,.2),rgba(139,92,246,.06));border:1px solid rgba(139,92,246,.4);box-shadow:0 0 22px rgba(139,92,246,.2)}
-.face.front h3{font-size:17px;font-weight:700;margin-top:8px}
-.face.front span{font-family:var(--mono);font-size:10px;color:var(--muted2);letter-spacing:.15em;text-transform:uppercase;margin-top:5px}
+.face.front h3{font-size:17px;font-weight:700;margin-top:8px;color:var(--text-dark)}
+.face.front span{font-family:var(--mono);font-size:10px;color:#8896B3;letter-spacing:.15em;text-transform:uppercase;margin-top:5px}
 .face.back{transform:rotateY(180deg);justify-content:center;border:1px solid}
 .flip:nth-child(odd) .face.back{background:linear-gradient(145deg,#0D2A20,#091830);border-color:rgba(43,217,159,.5)}
 .flip:nth-child(even) .face.back{background:linear-gradient(145deg,#1E1245,#0B0A2A);border-color:rgba(139,92,246,.5)}
@@ -256,45 +273,45 @@ h1 .grad{background:linear-gradient(92deg,var(--green) 10%,var(--violet) 90%);-w
 
 /* WHO */
 .who{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-top:56px}
-.who-c{padding:32px;border-radius:22px;background:var(--panel);border:1px solid var(--line);transition:.35s;position:relative;overflow:hidden}
+.who-c{padding:32px;border-radius:22px;background:#FFFFFF;border:1px solid rgba(13,27,62,.1);transition:.35s;position:relative;overflow:hidden;box-shadow:0 4px 20px rgba(13,27,62,.06)}
 .who-c::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--green),var(--violet));opacity:0;transition:.35s}
 .who-c:hover{border-color:var(--line2)}
 .who-c:hover::before{opacity:1}
-.who-c h3{font-size:19px;margin:14px 0 10px}
+.who-c h3{font-size:19px;margin:14px 0 10px;color:var(--text-dark)}
 .who-c .wic{font-size:30px}
-.who-c p{font-size:14px;color:var(--muted);margin-bottom:16px}
+.who-c p{font-size:14px;color:#4A5E80;margin-bottom:16px}
 .who-c ul{list-style:none;display:grid;gap:9px}
-.who-c li{font-size:13.5px;color:#C9D6F2;padding-left:22px;position:relative}
-.who-c li::before{content:"→";position:absolute;left:0;color:var(--green);font-family:var(--mono)}
-.who-c .trial{margin-top:18px;font-family:var(--mono);font-size:11px;color:var(--green);border-top:1px dashed var(--line);padding-top:14px}
+.who-c li{font-size:13.5px;color:#344060;padding-left:22px;position:relative}
+.who-c li::before{content:"→";position:absolute;left:0;color:var(--green-d);font-family:var(--mono)}
+.who-c .trial{margin-top:18px;font-family:var(--mono);font-size:11px;color:var(--green-d);border-top:1px dashed rgba(13,27,62,.12);padding-top:14px}
 
 /* PRICING */
-.cur-tog{display:inline-flex;border:1px solid var(--line);border-radius:100px;padding:4px;margin-top:0;background:var(--panel)}
-.cur-tog button{padding:8px 22px;border-radius:100px;background:transparent;color:var(--muted);font-weight:600;font-size:13px;transition:.25s}
-.cur-tog button.on{background:var(--green);color:#03200F}
+.cur-tog{display:inline-flex;border:1px solid rgba(13,27,62,.15);border-radius:100px;padding:4px;margin-top:0;background:#FFFFFF;box-shadow:0 2px 12px rgba(13,27,62,.08)}
+.cur-tog button{padding:8px 22px;border-radius:100px;background:transparent;color:#5E6E96;font-weight:600;font-size:13px;transition:.25s}
+.cur-tog button.on{background:var(--green-d);color:#fff}
 .savechip{display:inline-flex;align-items:center;font-family:var(--mono);font-size:10px;letter-spacing:.12em;background:linear-gradient(120deg,var(--green),#1FBE8B);color:#03200F;padding:3px 10px;border-radius:100px;margin-left:8px;font-weight:700}
 .plans{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-top:46px}
 .plans-set{display:none}
 .plans-set.on{display:grid}
-.plan{padding:32px 28px;border-radius:22px;background:var(--panel);border:1px solid var(--line);position:relative;transition:.3s;overflow:hidden}
-.plan:hover{border-color:rgba(139,155,191,.4)}
-.plan.hot{border-color:var(--green);background:linear-gradient(170deg,rgba(43,217,159,.09),var(--panel));box-shadow:0 24px 60px rgba(43,217,159,.14)}
+.plan{padding:32px 28px;border-radius:22px;background:#FFFFFF;border:1px solid rgba(13,27,62,.12);position:relative;transition:.3s;overflow:hidden;box-shadow:0 4px 24px rgba(13,27,62,.07)}
+.plan:hover{border-color:rgba(43,217,159,.4);box-shadow:0 12px 40px rgba(13,27,62,.12)}
+.plan.hot{border-color:var(--green-d);background:linear-gradient(170deg,rgba(29,158,117,.06),#FFFFFF);box-shadow:0 12px 50px rgba(29,158,117,.2)}
 .plan .best{position:absolute;top:-13px;left:50%;transform:translateX(-50%);font-family:var(--mono);font-size:10px;letter-spacing:.15em;background:var(--green);color:#03200F;padding:5px 16px;border-radius:100px;font-weight:600;z-index:2}
-.plan h4{font-size:16px;font-weight:700}
-.plan .pw{font-size:12px;color:var(--muted);margin-bottom:16px}
-.price{font-size:38px;font-weight:800;font-family:var(--mono);line-height:1}
-.price small{font-size:13px;color:var(--muted);font-family:var(--font);font-weight:500}
-.billed{font-size:11.5px;color:var(--muted);margin-top:6px;font-family:var(--font);font-weight:500}
+.plan h4{font-size:16px;font-weight:700;color:var(--text-dark)}
+.plan .pw{font-size:12px;color:#5E6E96;margin-bottom:16px}
+.price{font-size:38px;font-weight:800;font-family:var(--mono);line-height:1;color:var(--text-dark)}
+.price small{font-size:13px;color:#5E6E96;font-family:var(--font);font-weight:500}
+.billed{font-size:11.5px;color:#5E6E96;margin-top:6px;font-family:var(--font);font-weight:500}
 .plan-badge{display:inline-block;font-family:var(--mono);font-size:10px;letter-spacing:.15em;padding:4px 11px;border-radius:100px;background:rgba(62,166,255,.12);border:1px solid rgba(62,166,255,.4);color:var(--blue);margin-bottom:10px;text-transform:uppercase}
 .plan-sub{font-size:12.5px;color:var(--muted);margin:16px 0 10px}
 .plan-sub b{color:var(--text)}
 .plan ul{list-style:none;margin:14px 0 22px;display:grid;gap:10px}
-.plan li{font-size:13.5px;color:#C9D6F2;padding-left:24px;position:relative;display:flex;justify-content:space-between;gap:8px}
-.plan li::before{content:"✓";position:absolute;left:0;color:var(--green);font-weight:700}
-.plan li b{color:var(--text);font-weight:600;font-family:var(--mono);font-size:12.5px}
+.plan li{font-size:13.5px;color:#344060;padding-left:24px;position:relative;display:flex;justify-content:space-between;gap:8px}
+.plan li::before{content:"✓";position:absolute;left:0;color:var(--green-d);font-weight:700}
+.plan li b{color:var(--text-dark);font-weight:600;font-family:var(--mono);font-size:12.5px}
 .plan .btn{width:100%}
 .pricenote{font-size:11.5px;color:var(--muted);margin:10px 0 0;text-align:center}
-.pnote{text-align:center;margin-top:26px;font-size:12.5px;color:var(--muted2)}
+.pnote{text-align:center;margin-top:26px;font-size:12.5px;color:#5E6E96}
 
 /* BROCHURE / VIDEO */
 .bro{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-top:52px}
@@ -1070,7 +1087,7 @@ export default function Home() {
       </section>
 
       {/* FLIP CARDS */}
-      <section id="features">
+      <section id="features" className="flip-sec">
         {ecg(4)}
         <div className="wrap">
           <div className="reveal">
@@ -1119,11 +1136,11 @@ export default function Home() {
       </section>
 
       {/* WHO */}
-      <section>
+      <section style={{background:'linear-gradient(180deg,var(--light2),var(--light))'}}>
         <div className="wrap">
           <div className="reveal">
-            <span className="eyebrow">Built for three worlds</span>
-            <h2 className="sec">One platform. <span className="g">Three ways to win.</span></h2>
+            <span className="eyebrow" style={{color:'var(--green-d)'}}>Built for three worlds</span>
+            <h2 className="sec" style={{color:'var(--text-dark)'}}>One platform. <span className="g">Three ways to win.</span></h2>
           </div>
           <div className="who reveal">
             <div className="who-c">
@@ -1149,12 +1166,12 @@ export default function Home() {
       </section>
 
       {/* PRICING — real live numbers */}
-      <section id="pricing" style={{background:'var(--bg2)'}}>
+      <section id="pricing" style={{background:'linear-gradient(180deg,var(--light),var(--light2))'}}>
         {ecg(7)}
         <div className="wrap" style={{textAlign:'center'}}>
           <div className="reveal">
-            <span className="eyebrow" style={{justifyContent:'center'}}>Simple pricing</span>
-            <h2 className="sec">Start free. <span className="g">Upgrade when it earns it.</span></h2>
+            <span className="eyebrow" style={{justifyContent:'center',color:'var(--green-d)'}}>Simple pricing</span>
+            <h2 className="sec" style={{color:'var(--text-dark)'}}>Start free. <span className="g">Upgrade when it earns it.</span></h2>
             <div style={{display:'flex',gap:14,justifyContent:'center',flexWrap:'wrap',marginTop:22}}>
               <div className="cur-tog">
                 <button className={aud==='ind'?'on':''} onClick={()=>setAud('ind')}>🧘 Individuals</button>
