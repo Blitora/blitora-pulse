@@ -1,771 +1,1333 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import { getSupabase } from '../lib/supabase';
 
-const c = {
-  navy:'#0D1B3E', green:'#1D9E75', white:'#FFFFFF',
-  lgrey:'#F5F6FA', mgrey:'#E0E3ED', dgrey:'#4A5568', bgrey:'#718096', dkgreen:'#0D4A35',
+/* ==========================================================
+   Blitora Pulse — marketing landing page (v4)
+   - Real pricing pulled from live site (as-of deploy day)
+   - Session check: logged-in users → /dashboard
+   - Reuses existing /api/lead-capture + /public brochures
+   ========================================================== */
+
+const CSS = `
+:root{
+  --bg:#060D22; --bg2:#08122E; --panel:#0B1533; --panel2:#101C42;
+  --line:rgba(139,155,191,.16); --line2:rgba(43,217,159,.35);
+  --green:#2BD99F; --green-d:#149E71; --violet:#8B5CF6; --blue:#3EA6FF;
+  --amber:#F5B544; --red:#F4645F;
+  --text:#EAF2FF; --muted:#8B9BBF; --muted2:#5E6E96;
+  --font:'Poppins',Arial,sans-serif; --mono:'IBM Plex Mono',monospace;
+  --rad:18px; --wa:#25D366;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--font);overflow-x:hidden;line-height:1.6}
+::selection{background:var(--green);color:#04240F}
+a{color:inherit;text-decoration:none}
+button{font-family:var(--font);cursor:pointer;border:none}
+.wrap{max-width:1180px;margin:0 auto;padding:0 24px}
+section{position:relative;padding:110px 0}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--green);display:inline-flex;align-items:center;gap:10px;margin-bottom:18px}
+.eyebrow::before{content:"";width:26px;height:2px;background:linear-gradient(90deg,var(--green),transparent)}
+h2.sec{font-size:clamp(30px,4.4vw,48px);font-weight:800;line-height:1.15;letter-spacing:-.01em;margin-bottom:14px}
+.sec .g{background:linear-gradient(92deg,var(--green),var(--violet));-webkit-background-clip:text;background-clip:text;color:transparent}
+.sub{color:var(--muted);font-size:17px;max-width:640px}
+.grain{position:fixed;inset:0;pointer-events:none;opacity:.05;z-index:1;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='0.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='0.6'/%3E%3C/svg%3E")}
+.skip{position:absolute;left:-9999px;top:8px;padding:10px 16px;background:var(--green);color:#03200F;font-weight:700;border-radius:8px;z-index:999}
+.skip:focus{left:8px;outline:2px solid #fff;outline-offset:2px}
+:focus-visible{outline:2px solid var(--green);outline-offset:3px;border-radius:6px}
+.btn:focus-visible{outline-offset:4px}
+
+/* NAV */
+nav.mainnav{position:fixed;top:0;left:0;right:0;z-index:90;transition:.35s;padding:18px 0}
+nav.mainnav.scrolled{background:rgba(6,13,34,.82);backdrop-filter:blur(18px);border-bottom:1px solid var(--line);padding:11px 0}
+.nav-in{display:flex;align-items:center;justify-content:space-between}
+.logo{display:flex;align-items:center;gap:12px}
+.logo-mark{width:42px;height:42px;border-radius:11px;background:linear-gradient(145deg,#0E1B44,#091230);border:1px solid var(--line2);display:grid;place-items:center;position:relative;box-shadow:0 0 22px rgba(43,217,159,.25)}
+.logo-mark svg{width:26px;height:26px}
+.logo-word{font-weight:800;font-size:17px;letter-spacing:.04em}
+.logo-word em{font-style:normal;color:var(--green)}
+.logo-tag{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.18em;color:var(--muted2);text-transform:uppercase}
+.nav-links{display:flex;gap:30px;align-items:center}
+.nav-links a{font-size:14px;font-weight:500;color:var(--muted);transition:.25s;position:relative}
+.nav-links a:hover{color:var(--text)}
+.nav-links a::after{content:"";position:absolute;left:0;bottom:-5px;width:0;height:2px;background:var(--green);transition:.3s}
+.nav-links a:hover::after{width:100%}
+.btn{display:inline-flex;align-items:center;gap:10px;padding:14px 28px;border-radius:14px;font-weight:600;font-size:15px;position:relative;transition:transform .18s cubic-bezier(.2,.9,.3,1.4),box-shadow .25s;will-change:transform;text-align:center;justify-content:center}
+.btn-g{background:linear-gradient(120deg,var(--green),#1FBE8B);color:#03200F;box-shadow:0 6px 26px rgba(43,217,159,.35)}
+.btn-g:hover{box-shadow:0 10px 38px rgba(43,217,159,.55)}
+.btn-o{background:transparent;color:var(--text);border:1px solid var(--line);backdrop-filter:blur(6px)}
+.btn-o:hover{border-color:var(--green);color:var(--green)}
+.btn-v{background:linear-gradient(120deg,var(--violet),#6D3EE8);color:#fff;box-shadow:0 6px 26px rgba(139,92,246,.35)}
+.btn-sm{padding:10px 20px;font-size:13.5px;border-radius:11px}
+.burger{display:none;background:none;color:var(--text);font-size:26px}
+
+/* HERO */
+.hero{min-height:100vh;display:flex;align-items:center;padding:150px 0 90px;overflow:hidden}
+#field{position:absolute;inset:0;z-index:0}
+.hero-glow{position:absolute;width:640px;height:640px;border-radius:50%;filter:blur(140px);opacity:.22;pointer-events:none}
+.hg1{background:var(--green);top:-180px;right:-120px}
+.hg2{background:var(--violet);bottom:-240px;left:-160px}
+.hero-in{position:relative;z-index:3;display:grid;grid-template-columns:1.05fr .95fr;gap:56px;align-items:center;width:100%}
+.pill{display:inline-flex;align-items:center;gap:9px;padding:8px 16px;border-radius:100px;border:1px solid var(--line2);background:rgba(43,217,159,.07);font-family:var(--mono);font-size:12px;color:var(--green);margin-bottom:26px}
+.pill .dot{width:7px;height:7px;border-radius:50%;background:var(--green);animation:blink 1.6s infinite}
+@keyframes blink{50%{opacity:.25}}
+h1{font-size:clamp(38px,5.6vw,66px);font-weight:800;line-height:1.08;letter-spacing:-.02em;margin-bottom:24px}
+h1 .grad{background:linear-gradient(92deg,var(--green) 10%,var(--violet) 90%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero-sub{color:var(--muted);font-size:18px;max-width:520px;margin-bottom:34px}
+.hero-ctas{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:38px}
+.time-badges{display:flex;gap:12px;flex-wrap:wrap}
+.tb{padding:12px 18px;border-radius:14px;background:rgba(11,21,51,.7);border:1px solid var(--line);backdrop-filter:blur(8px);position:relative;overflow:hidden}
+.tb b{display:block;font-family:var(--mono);font-size:17px;color:var(--green)}
+.tb span{font-size:11.5px;color:var(--muted)}
+
+/* Hero phone */
+.hero-phone{position:relative;display:flex;justify-content:center;perspective:1200px}
+.phone-halo{position:absolute;inset:-24px;border-radius:56px;pointer-events:none;background:radial-gradient(ellipse at center,rgba(43,217,159,.22),transparent 62%);opacity:.4;animation:heartbeat 1.1s ease-in-out infinite;z-index:0}
+@keyframes heartbeat{0%,100%{transform:scale(1);opacity:.35}18%{transform:scale(1.045);opacity:.7}30%{transform:scale(1);opacity:.35}45%{transform:scale(1.055);opacity:.75}60%{transform:scale(1);opacity:.35}}
+.phone{width:300px;border-radius:42px;background:linear-gradient(160deg,#111D45,#0A1330);border:1px solid rgba(139,155,191,.28);padding:14px;box-shadow:0 40px 90px rgba(0,0,0,.6),0 0 70px rgba(43,217,159,.14);transform:rotateY(-14deg) rotateX(6deg);transition:transform .4s ease;animation:float 7s ease-in-out infinite;position:relative;z-index:1}
+@keyframes float{0%,100%{translate:0 0}50%{translate:0 -16px}}
+.phone-scr{border-radius:30px;background:#070F2B;overflow:hidden;border:1px solid var(--line)}
+.p-top{display:flex;justify-content:space-between;align-items:center;padding:14px 16px 8px;font-size:11px;color:var(--muted)}
+.p-orb{width:26px;height:26px;border-radius:50%;background:radial-gradient(circle at 30% 30%,#B79BFF,var(--violet));box-shadow:0 0 14px rgba(139,92,246,.8);animation:orb 2.4s ease-in-out infinite}
+@keyframes orb{50%{box-shadow:0 0 26px rgba(139,92,246,1)}}
+.p-hi{padding:4px 16px 10px;font-weight:700;font-size:16px}
+.p-hi span{color:var(--green)}
+.p-card{margin:0 12px 10px;padding:12px 14px;border-radius:14px;background:rgba(139,92,246,.1);border:1px solid rgba(139,92,246,.35)}
+.p-card .lab{font-family:var(--mono);font-size:9px;letter-spacing:.18em;color:var(--violet);text-transform:uppercase;margin-bottom:5px;display:flex;align-items:center;gap:6px}
+.p-card p{font-size:11.5px;color:#CFDAF5;line-height:1.5}
+.p-card p b{color:var(--green)}
+.p-rings{display:flex;justify-content:space-around;padding:6px 10px 12px}
+.ring{width:58px;text-align:center}
+.ring svg{width:52px;height:52px;transform:rotate(-90deg)}
+.ring .rl{font-size:9px;color:var(--muted);display:block;margin-top:3px}
+.ring .rv{font-family:var(--mono);font-size:10px;color:var(--text)}
+.p-row{display:flex;gap:8px;padding:0 12px 16px}
+.p-mini{flex:1;padding:10px;border-radius:12px;background:var(--panel);border:1px solid var(--line);text-align:center}
+.p-mini b{display:block;font-family:var(--mono);font-size:14px;color:var(--green)}
+.p-mini span{font-size:9px;color:var(--muted)}
+.notif{position:absolute;padding:12px 16px;border-radius:14px;background:rgba(11,21,51,.92);border:1px solid var(--line2);backdrop-filter:blur(10px);font-size:11.5px;max-width:230px;box-shadow:0 16px 40px rgba(0,0,0,.5);animation:float 6s ease-in-out infinite;z-index:2}
+.notif b{color:var(--green)}
+.n1{top:6%;left:-8%;animation-delay:-2s}
+.n2{bottom:10%;right:-6%;animation-delay:-4s}
+.n2 b{color:var(--violet)}
+.scroll-cue{position:absolute;bottom:26px;left:50%;transform:translateX(-50%);z-index:3;font-family:var(--mono);font-size:10px;letter-spacing:.3em;color:var(--muted2);text-transform:uppercase;animation:cue 2.2s infinite}
+@keyframes cue{50%{transform:translate(-50%,8px);opacity:.4}}
+
+/* SECTION ECG DIVIDER */
+.ecg-div{position:absolute;top:0;left:0;right:0;height:60px;pointer-events:none;overflow:hidden}
+.ecg-div svg{width:100%;height:100%;display:block}
+.ecg-path{fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:1600;stroke-dashoffset:1600;transition:stroke-dashoffset 1.6s cubic-bezier(.4,.1,.2,1)}
+.reveal.in .ecg-path{stroke-dashoffset:0}
+
+/* TIME STORY */
+.story{background:linear-gradient(180deg,var(--bg),var(--bg2))}
+.tline{position:relative;margin-top:70px}
+.pulse-track{position:absolute;left:3%;right:3%;top:0;height:2px;border-radius:2px;background:linear-gradient(90deg,rgba(43,217,159,0),var(--green) 18%,var(--blue) 50%,var(--violet) 82%,rgba(139,92,246,0));transform:scaleX(0);transform-origin:left;transition:transform 1.3s cubic-bezier(.2,.8,.2,1) .15s;box-shadow:0 0 18px rgba(62,166,255,.35)}
+.reveal.in .pulse-track{transform:scaleX(1)}
+.pulse-dot{position:absolute;top:50%;left:0;width:11px;height:11px;border-radius:50%;background:#fff;transform:translate(-50%,-50%);animation:travel 4.6s ease-in-out infinite;box-shadow:0 0 20px 7px rgba(43,217,159,.7)}
+@keyframes travel{0%{left:2%;box-shadow:0 0 20px 7px rgba(43,217,159,.75)}50%{left:50%;box-shadow:0 0 20px 7px rgba(62,166,255,.75)}100%{left:98%;box-shadow:0 0 20px 7px rgba(139,92,246,.75)}}
+.tsteps{display:grid;grid-template-columns:repeat(3,1fr);gap:26px;padding-top:44px}
+.tstep{position:relative;text-align:center;padding:44px 26px 32px;border-radius:22px;background:linear-gradient(165deg,rgba(17,29,69,.88),rgba(8,15,40,.92));border:1px solid var(--line);transition:border-color .3s,box-shadow .3s,transform .3s cubic-bezier(.2,.8,.3,1);overflow:hidden}
+.tstep::after{content:"";position:absolute;inset:0;border-radius:22px;background:radial-gradient(ellipse 60% 40% at 50% 0%,rgba(43,217,159,.09),transparent);pointer-events:none;opacity:0;transition:.35s}
+.tstep:hover{border-color:rgba(43,217,159,.45);box-shadow:0 26px 60px rgba(0,0,0,.5),0 0 46px rgba(43,217,159,.1)}
+.tstep:hover::after{opacity:1}
+.tstep:nth-child(2):hover{border-color:rgba(62,166,255,.45)}
+.tstep:nth-child(3):hover{border-color:rgba(139,92,246,.45)}
+.tstep .node{position:absolute;top:-59px;left:50%;transform:translateX(-50%);width:30px;height:30px;border-radius:50%;background:var(--bg);border:2px solid var(--green);display:grid;place-items:center;box-shadow:0 0 22px rgba(43,217,159,.55)}
+.tstep .node i{width:10px;height:10px;border-radius:50%;background:var(--green);animation:blink 2s infinite}
+.tstep:nth-child(2) .node{border-color:var(--blue);box-shadow:0 0 22px rgba(62,166,255,.55)}
+.tstep:nth-child(2) .node i{background:var(--blue)}
+.tstep:nth-child(3) .node{border-color:var(--violet);box-shadow:0 0 22px rgba(139,92,246,.55)}
+.tstep:nth-child(3) .node i{background:var(--violet)}
+.tphase{display:inline-block;font-family:var(--mono);font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);border:1px solid var(--line);padding:6px 15px;border-radius:100px;margin-bottom:18px;background:rgba(255,255,255,.02)}
+.tbig{font-family:var(--mono);font-size:clamp(38px,4.8vw,56px);font-weight:600;background:linear-gradient(120deg,#fff 20%,var(--green));-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 22px rgba(43,217,159,.3))}
+.tstep:nth-child(2) .tbig{background:linear-gradient(120deg,#fff 20%,var(--blue));-webkit-background-clip:text;background-clip:text;filter:drop-shadow(0 0 22px rgba(62,166,255,.3))}
+.tstep:nth-child(3) .tbig{background:linear-gradient(120deg,#fff 20%,var(--violet));-webkit-background-clip:text;background-clip:text;filter:drop-shadow(0 0 22px rgba(139,92,246,.3))}
+.tbig small{font-size:.42em}
+.tstep h3{font-size:18px;font-weight:700;margin:12px 0 9px}
+.tstep p{font-size:14px;color:var(--muted);max-width:300px;margin:0 auto}
+.tcap{text-align:center;margin-top:54px;font-size:19px;color:var(--muted)}
+.tcap b{color:var(--green)}
+
+/* AI DEMO */
+.ai-grid{display:grid;grid-template-columns:1fr 1.2fr;gap:44px;margin-top:56px;align-items:start}
+.card{background:linear-gradient(160deg,var(--panel),#0A1230);border:1px solid var(--line);border-radius:22px;padding:30px;position:relative;overflow:hidden}
+.f-label{font-family:var(--mono);font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);display:block;margin:16px 0 8px}
+.opts{display:flex;flex-wrap:wrap;gap:9px}
+.opt{padding:9px 16px;border-radius:100px;border:1px solid var(--line);background:rgba(255,255,255,.02);color:var(--muted);font-size:13px;font-weight:500;transition:.2s}
+.opt:hover{border-color:var(--green);color:var(--text)}
+.opt.on{background:rgba(43,217,159,.14);border-color:var(--green);color:var(--green)}
+.opt:focus-visible{border-color:var(--green);color:var(--text);background:rgba(43,217,159,.08)}
+.gen-btn{width:100%;margin-top:26px}
+.plan-out{min-height:420px}
+.plan-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.plan-head h4{font-size:16px}
+.plan-head .tag{font-family:var(--mono);font-size:10px;color:var(--violet);border:1px solid rgba(139,92,246,.4);border-radius:100px;padding:4px 12px}
+.meal-row{display:flex;justify-content:space-between;gap:12px;padding:13px 14px;border-radius:13px;background:rgba(255,255,255,.025);border:1px solid var(--line);margin-bottom:9px;opacity:0;transform:translateY(12px);transition:.5s}
+.meal-row.show{opacity:1;transform:none}
+.meal-row .mt{font-family:var(--mono);font-size:10px;color:var(--green);letter-spacing:.1em;text-transform:uppercase;min-width:82px;padding-top:2px}
+.meal-row .mf{flex:1;font-size:13.5px;color:#D6E1F8}
+.meal-row .mk{font-family:var(--mono);font-size:11px;color:var(--muted);white-space:nowrap}
+.mf .cursor{display:inline-block;width:7px;height:14px;background:var(--green);vertical-align:-2px;margin-left:2px;animation:tk 1s infinite}
+@keyframes tk{50%{opacity:0}}
+.plan-tot{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+.ptot{flex:1;min-width:80px;text-align:center;padding:12px 6px;border-radius:12px;background:rgba(43,217,159,.07);border:1px solid rgba(43,217,159,.25)}
+.ptot b{display:block;font-family:var(--mono);font-size:15px;color:var(--green)}
+.ptot span{font-size:10px;color:var(--muted)}
+.thinking{display:flex;align-items:center;gap:12px;color:var(--muted);font-size:14px;padding:30px 0}
+.tdots{display:flex;gap:5px}
+.tdots i{width:8px;height:8px;border-radius:50%;background:var(--violet);animation:td 1.1s infinite}
+.tdots i:nth-child(2){animation-delay:.15s}.tdots i:nth-child(3){animation-delay:.3s}
+@keyframes td{40%{transform:translateY(-7px);opacity:.5}}
+.nudges{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:70px}
+.nudge{padding:22px;border-radius:18px;background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--green);font-size:14px;color:#CFDAF5;transition:.3s;position:relative;overflow:hidden}
+.nudge:hover{border-left-color:var(--violet);box-shadow:0 16px 40px rgba(0,0,0,.4)}
+.nudge .nl{font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--green);display:block;margin-bottom:9px}
+.nudge .nl::after{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);margin-left:8px;box-shadow:0 0 8px var(--green);animation:blink 1.6s infinite;vertical-align:1px}
+.nudge b{color:var(--green)}
+
+/* 3D DASHBOARDS */
+.dash-sec{background:radial-gradient(ellipse 70% 60% at 50% 0%,rgba(139,92,246,.09),transparent),var(--bg2)}
+.stage{perspective:1600px;margin-top:64px;display:flex;justify-content:center}
+.holo{position:relative;width:min(860px,100%);transform-style:preserve-3d;transform:rotateX(14deg) rotateY(-6deg);transition:transform .25s ease-out}
+.dash{background:linear-gradient(165deg,rgba(17,29,69,.95),rgba(8,15,40,.95));border:1px solid rgba(139,155,191,.25);border-radius:22px;padding:24px;box-shadow:0 60px 120px rgba(0,0,0,.65),0 0 90px rgba(43,217,159,.12);transform:translateZ(0)}
+.dash-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;flex-wrap:wrap;gap:8px}
+.dash-top .dt{font-weight:700;font-size:15px}
+.dash-top .dd{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.kpi{padding:15px;border-radius:14px;background:rgba(255,255,255,.03);border:1px solid var(--line);transform:translateZ(30px)}
+.kpi .kv{font-family:var(--mono);font-size:21px;font-weight:600}
+.kpi .kv.g{color:var(--green)}.kpi .kv.b{color:var(--blue)}.kpi .kv.a{color:var(--amber)}.kpi .kv.v{color:var(--violet)}
+.kpi .kl{font-size:10.5px;color:var(--muted)}
+.kpi .ks{font-family:var(--mono);font-size:9.5px;color:var(--green)}
+.dash-mid{display:grid;grid-template-columns:1.5fr 1fr;gap:12px}
+.chart-card{padding:16px;border-radius:14px;background:rgba(255,255,255,.03);border:1px solid var(--line);transform:translateZ(46px)}
+.chart-card .cl{font-size:11px;color:var(--muted);margin-bottom:8px;display:flex;justify-content:space-between}
+.chart-card .cl b{color:var(--text);font-size:12px}
+.bars{display:flex;align-items:flex-end;gap:7px;height:110px}
+.bar{flex:1;border-radius:5px 5px 2px 2px;background:linear-gradient(180deg,var(--green),rgba(43,217,159,.15));position:relative;animation:grow 1.4s cubic-bezier(.2,.9,.3,1.2) both;transform-origin:bottom;transition:transform .8s ease}
+.bar:nth-child(even){background:linear-gradient(180deg,var(--violet),rgba(139,92,246,.15))}
+@keyframes grow{from{height:0!important}}
+.donut-wrap{display:flex;align-items:center;gap:14px}
+.donut{width:104px;height:104px}
+.dleg{font-size:11px;color:var(--muted);display:grid;gap:6px}
+.dleg i{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:7px;vertical-align:-1px}
+.float-chip{position:absolute;padding:13px 17px;border-radius:14px;background:rgba(11,21,51,.94);border:1px solid var(--line2);backdrop-filter:blur(8px);font-size:12px;box-shadow:0 20px 50px rgba(0,0,0,.55)}
+.fc1{top:-26px;right:-34px;transform:translateZ(90px)}
+.fc2{bottom:-24px;left:-40px;transform:translateZ(110px);border-color:rgba(139,92,246,.5)}
+.fc1 b{color:var(--green)}.fc2 b{color:var(--violet)}
+.dash-hint{text-align:center;font-family:var(--mono);font-size:11px;color:var(--muted2);margin-top:38px;letter-spacing:.15em}
+
+/* FLIP CARDS */
+.flips{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-top:56px}
+.flip{perspective:1100px;height:230px;position:relative}
+.flip-in{position:relative;width:100%;height:100%;transform-style:preserve-3d;transition:transform .7s cubic-bezier(.3,.8,.3,1)}
+.flip:hover .flip-in,.flip.tapped .flip-in{transform:rotateY(180deg)}
+.face{position:absolute;inset:0;backface-visibility:hidden;border-radius:20px;padding:26px;display:flex;flex-direction:column;justify-content:flex-end}
+.face.front{background:linear-gradient(160deg,var(--panel),#0A1230);border:1px solid var(--line)}
+.face.front .ic{width:48px;height:48px;border-radius:13px;display:grid;place-items:center;font-size:22px;background:rgba(43,217,159,.12);border:1px solid rgba(43,217,159,.3);margin-bottom:auto}
+.face.front h3{font-size:17px;font-weight:700}
+.face.front span{font-family:var(--mono);font-size:10px;color:var(--muted2);letter-spacing:.15em;text-transform:uppercase;margin-top:5px}
+.face.back{background:linear-gradient(160deg,#123A2E,#0B1533);border:1px solid var(--line2);transform:rotateY(180deg);justify-content:center}
+.face.back p{font-size:13.5px;color:#D9E4FA;line-height:1.65}
+.face.back b{color:var(--green)}
+.flip:nth-child(3n+2) .face.back{background:linear-gradient(160deg,#2A1F55,#0B1533);border-color:rgba(139,92,246,.4)}
+.flip:nth-child(3n+2) .face.front .ic{background:rgba(139,92,246,.12);border-color:rgba(139,92,246,.35)}
+.flip:nth-child(3n+2) .face.back b{color:var(--violet)}
+
+/* PHYSICS */
+.phys{background:var(--bg2)}
+#physbox{position:relative;height:420px;margin-top:52px;border-radius:24px;border:1px solid var(--line);background:radial-gradient(ellipse at 50% 120%,rgba(43,217,159,.08),transparent),#070F2B;overflow:hidden}
+#physcanvas{position:absolute;inset:0}
+.phys-hint{position:absolute;top:18px;left:0;right:0;text-align:center;font-family:var(--mono);font-size:11px;letter-spacing:.2em;color:var(--muted2);pointer-events:none;text-transform:uppercase}
+.phys-btns{position:absolute;bottom:18px;left:0;right:0;display:flex;justify-content:center;gap:12px}
+
+/* WHO */
+.who{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-top:56px}
+.who-c{padding:32px;border-radius:22px;background:var(--panel);border:1px solid var(--line);transition:.35s;position:relative;overflow:hidden}
+.who-c::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--green),var(--violet));opacity:0;transition:.35s}
+.who-c:hover{border-color:var(--line2)}
+.who-c:hover::before{opacity:1}
+.who-c h3{font-size:19px;margin:14px 0 10px}
+.who-c .wic{font-size:30px}
+.who-c p{font-size:14px;color:var(--muted);margin-bottom:16px}
+.who-c ul{list-style:none;display:grid;gap:9px}
+.who-c li{font-size:13.5px;color:#C9D6F2;padding-left:22px;position:relative}
+.who-c li::before{content:"→";position:absolute;left:0;color:var(--green);font-family:var(--mono)}
+.who-c .trial{margin-top:18px;font-family:var(--mono);font-size:11px;color:var(--green);border-top:1px dashed var(--line);padding-top:14px}
+
+/* PRICING */
+.cur-tog{display:inline-flex;border:1px solid var(--line);border-radius:100px;padding:4px;margin-top:0;background:var(--panel)}
+.cur-tog button{padding:8px 22px;border-radius:100px;background:transparent;color:var(--muted);font-weight:600;font-size:13px;transition:.25s}
+.cur-tog button.on{background:var(--green);color:#03200F}
+.savechip{display:inline-flex;align-items:center;font-family:var(--mono);font-size:10px;letter-spacing:.12em;background:linear-gradient(120deg,var(--green),#1FBE8B);color:#03200F;padding:3px 10px;border-radius:100px;margin-left:8px;font-weight:700}
+.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-top:46px}
+.plans-set{display:none}
+.plans-set.on{display:grid}
+.plan{padding:32px 28px;border-radius:22px;background:var(--panel);border:1px solid var(--line);position:relative;transition:.3s;overflow:hidden}
+.plan:hover{border-color:rgba(139,155,191,.4)}
+.plan.hot{border-color:var(--green);background:linear-gradient(170deg,rgba(43,217,159,.09),var(--panel));box-shadow:0 24px 60px rgba(43,217,159,.14)}
+.plan .best{position:absolute;top:-13px;left:50%;transform:translateX(-50%);font-family:var(--mono);font-size:10px;letter-spacing:.15em;background:var(--green);color:#03200F;padding:5px 16px;border-radius:100px;font-weight:600;z-index:2}
+.plan h4{font-size:16px;font-weight:700}
+.plan .pw{font-size:12px;color:var(--muted);margin-bottom:16px}
+.price{font-size:38px;font-weight:800;font-family:var(--mono);line-height:1}
+.price small{font-size:13px;color:var(--muted);font-family:var(--font);font-weight:500}
+.billed{font-size:11.5px;color:var(--muted);margin-top:6px;font-family:var(--font);font-weight:500}
+.plan-badge{display:inline-block;font-family:var(--mono);font-size:10px;letter-spacing:.15em;padding:4px 11px;border-radius:100px;background:rgba(62,166,255,.12);border:1px solid rgba(62,166,255,.4);color:var(--blue);margin-bottom:10px;text-transform:uppercase}
+.plan-sub{font-size:12.5px;color:var(--muted);margin:16px 0 10px}
+.plan-sub b{color:var(--text)}
+.plan ul{list-style:none;margin:14px 0 22px;display:grid;gap:10px}
+.plan li{font-size:13.5px;color:#C9D6F2;padding-left:24px;position:relative;display:flex;justify-content:space-between;gap:8px}
+.plan li::before{content:"✓";position:absolute;left:0;color:var(--green);font-weight:700}
+.plan li b{color:var(--text);font-weight:600;font-family:var(--mono);font-size:12.5px}
+.plan .btn{width:100%}
+.pricenote{font-size:11.5px;color:var(--muted);margin:10px 0 0;text-align:center}
+.pnote{text-align:center;margin-top:26px;font-size:12.5px;color:var(--muted2)}
+
+/* BROCHURE / VIDEO */
+.bro{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-top:52px}
+.bro-c{padding:30px;border-radius:22px;position:relative;overflow:hidden;border:1px solid var(--line);background:linear-gradient(150deg,rgba(43,217,159,.09),var(--panel));display:flex;flex-direction:column}
+.bro-c.mid{background:linear-gradient(150deg,rgba(62,166,255,.09),var(--panel))}
+.bro-c.vid{background:linear-gradient(150deg,rgba(139,92,246,.14),var(--panel))}
+.bro-c h3{font-size:18px;margin:14px 0 8px}
+.bro-c p{color:var(--muted);font-size:13.5px;margin-bottom:18px;flex:1}
+.bro-ic{width:52px;height:52px;border-radius:14px;display:grid;place-items:center;font-size:24px;background:rgba(255,255,255,.05);border:1px solid var(--line)}
+.bro-meta{font-family:var(--mono);font-size:10.5px;color:var(--muted2);letter-spacing:.14em;text-transform:uppercase;margin-bottom:12px}
+
+/* CONTACT */
+.contact-grid{display:grid;grid-template-columns:1fr 1fr;gap:44px;margin-top:52px;align-items:start}
+.inp{width:100%;padding:15px 18px;border-radius:13px;background:rgba(255,255,255,.035);border:1px solid var(--line);color:var(--text);font-family:var(--font);font-size:14.5px;margin-bottom:14px;transition:.25s}
+.inp:focus{outline:none;border-color:var(--green);box-shadow:0 0 0 3px rgba(43,217,159,.14)}
+.inp::placeholder{color:var(--muted2)}
+textarea.inp{min-height:110px;resize:vertical}
+.wa-btn{background:var(--wa);color:#062B14;width:100%}
+.wa-btn:hover{box-shadow:0 10px 34px rgba(37,211,102,.4)}
+.c-alt{display:grid;gap:16px}
+.c-line{display:flex;gap:16px;align-items:center;padding:20px;border-radius:16px;background:var(--panel);border:1px solid var(--line);position:relative;overflow:hidden}
+.c-line .ci{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;font-size:19px;background:rgba(43,217,159,.1);border:1px solid rgba(43,217,159,.3);flex-shrink:0}
+.c-line b{display:block;font-size:14px}
+.c-line span{font-size:12.5px;color:var(--muted)}
+
+/* FINAL CTA / FOOTER */
+.final{position:relative;text-align:center;overflow:hidden}
+#field2{position:absolute;inset:0;z-index:0}
+.final .wrap{position:relative;z-index:2}
+.final h2{font-size:clamp(32px,5vw,56px);font-weight:800;line-height:1.12;margin-bottom:16px}
+footer{border-top:1px solid var(--line);padding:56px 0 34px;background:#050B1D}
+.f-grid{display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr;gap:34px;margin-bottom:44px}
+.f-grid h5{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:16px}
+.f-grid a{display:block;font-size:13.5px;color:var(--muted);margin-bottom:10px;transition:.2s}
+.f-grid a:hover{color:var(--green)}
+.f-bot{display:flex;justify-content:space-between;align-items:center;padding-top:26px;border-top:1px solid var(--line);font-size:12px;color:var(--muted2);flex-wrap:wrap;gap:12px}
+.f-bot .parent{color:var(--muted)}
+.f-bot .parent a{color:#F0824A;font-weight:600}
+
+/* MAGNETIC PULSE RIPPLE */
+.magcard,.who-c,.nudge,.bro-c,.c-line,.tb,.plan{position:relative;overflow:hidden}
+.mag-ripple{position:absolute;width:220px;height:220px;border-radius:50%;background:radial-gradient(circle,rgba(43,217,159,.28),rgba(43,217,159,0) 60%);pointer-events:none;transform:translate(-50%,-50%);opacity:0;transition:opacity .4s;mix-blend-mode:screen;z-index:0}
+.magcard>*,.who-c>*,.nudge>*,.bro-c>*,.c-line>*,.tb>*{position:relative;z-index:1}
+.plan.hot .mag-ripple{background:radial-gradient(circle,rgba(139,92,246,.3),rgba(139,92,246,0) 60%)}
+
+/* MODALS */
+.modal{position:fixed;inset:0;z-index:200;display:none;align-items:center;justify-content:center;padding:22px}
+.modal.open{display:flex}
+.m-bg{position:absolute;inset:0;background:rgba(3,7,20,.82);backdrop-filter:blur(8px)}
+.m-card{position:relative;width:min(480px,100%);background:linear-gradient(165deg,#101C42,#0A1230);border:1px solid var(--line2);border-radius:24px;padding:36px;animation:mup .35s cubic-bezier(.2,.9,.3,1.2)}
+@keyframes mup{from{opacity:0;transform:translateY(26px) scale(.97)}}
+.m-x{position:absolute;top:16px;right:16px;width:34px;height:34px;border-radius:10px;background:rgba(255,255,255,.05);color:var(--muted);font-size:16px;border:1px solid var(--line);cursor:pointer}
+.m-card h3{font-size:21px;margin-bottom:8px}
+.m-card .msub{font-size:13.5px;color:var(--muted);margin-bottom:22px}
+.m-card.wide{width:min(880px,100%);padding:0;overflow:hidden;border-color:rgba(139,92,246,.4)}
+.vid-box{aspect-ratio:16/9;display:grid;place-items:center;background:radial-gradient(circle at 50% 50%,rgba(139,92,246,.15),#070F2B);text-align:center;padding:30px}
+.vid-box h3{margin-bottom:10px}
+.vid-box p{color:var(--muted);font-size:14px;max-width:420px}
+.play{width:74px;height:74px;border-radius:50%;background:rgba(139,92,246,.2);border:1px solid rgba(139,92,246,.6);display:grid;place-items:center;font-size:24px;color:#fff;transition:.3s;animation:mpulse 2.4s infinite;cursor:pointer;margin:0 auto 22px}
+@keyframes mpulse{0%{box-shadow:0 0 0 0 rgba(139,92,246,.45)}70%{box-shadow:0 0 0 22px rgba(139,92,246,0)}100%{box-shadow:0 0 0 0 rgba(139,92,246,0)}}
+.ok-msg{text-align:center;padding:20px 0}
+.ok-msg .okic{width:64px;height:64px;border-radius:50%;background:rgba(43,217,159,.15);border:1px solid var(--green);display:grid;place-items:center;font-size:26px;margin:0 auto 16px;color:var(--green)}
+.err{color:var(--red);font-size:12.5px;margin:-6px 0 12px}
+
+/* CHATBOT */
+#chatFab{position:fixed;bottom:24px;right:24px;z-index:150;width:60px;height:60px;border-radius:50%;background:radial-gradient(circle at 30% 30%,#B79BFF,var(--violet));box-shadow:0 10px 34px rgba(139,92,246,.5);display:grid;place-items:center;font-size:24px;color:#fff;transition:.25s;cursor:pointer}
+#chatFab:hover{transform:scale(1.08)}
+#chatFab::before{content:"";position:absolute;inset:-4px;border-radius:50%;border:2px solid rgba(139,92,246,.6);animation:fabring 2.2s ease-out infinite}
+@keyframes fabring{0%{transform:scale(1);opacity:.9}100%{transform:scale(1.4);opacity:0}}
+#chatBox{position:fixed;bottom:96px;right:24px;z-index:150;width:min(360px,calc(100vw - 40px));background:linear-gradient(170deg,#101C42,#0A1230);border:1px solid rgba(139,92,246,.4);border-radius:22px;overflow:hidden;display:none;flex-direction:column;box-shadow:0 30px 80px rgba(0,0,0,.6)}
+#chatBox.open{display:flex;animation:mup .3s ease}
+.cb-head{padding:16px 18px;background:rgba(139,92,246,.14);border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:center}
+.cb-head b{font-size:14px;display:block}
+.cb-head span{font-size:11px;color:var(--green)}
+.cb-body{padding:16px;display:flex;flex-direction:column;gap:10px;max-height:320px;overflow-y:auto}
+.msg{max-width:85%;padding:11px 14px;border-radius:14px;font-size:13px;line-height:1.55}
+.msg.bot{background:rgba(255,255,255,.05);border:1px solid var(--line);align-self:flex-start}
+.msg.me{background:rgba(43,217,159,.16);border:1px solid rgba(43,217,159,.35);align-self:flex-end}
+.cb-chips{display:flex;flex-wrap:wrap;gap:7px;padding:0 16px 12px}
+.cb-chips button{font-size:11px;padding:7px 13px;border-radius:100px;background:rgba(139,92,246,.12);border:1px solid rgba(139,92,246,.35);color:#CDBBFF;cursor:pointer}
+.cb-foot{display:flex;gap:8px;padding:12px 14px;border-top:1px solid var(--line)}
+.cb-foot input{flex:1;padding:11px 14px;border-radius:11px;background:rgba(255,255,255,.04);border:1px solid var(--line);color:var(--text);font-size:13px;font-family:var(--font)}
+.cb-foot input:focus{outline:none;border-color:var(--violet)}
+.cb-foot button{width:42px;border-radius:11px;background:var(--violet);color:#fff;font-size:16px}
+
+.reveal{opacity:0;transform:translateY(34px);transition:opacity .8s ease,transform .8s cubic-bezier(.2,.8,.3,1)}
+.reveal.in{opacity:1;transform:none}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}.reveal{opacity:1;transform:none}}
+@media (max-width:980px){
+  .hero-in,.ai-grid,.contact-grid{grid-template-columns:1fr}
+  .bro,.tsteps,.flips,.who,.plans,.nudges{grid-template-columns:1fr}
+  .kpis{grid-template-columns:repeat(2,1fr)}
+  .dash-mid{grid-template-columns:1fr}
+  .nav-links{display:none}
+  .burger{display:block}
+  .nav-links.open{display:flex;flex-direction:column;position:absolute;top:64px;left:0;right:0;background:rgba(6,13,34,.97);padding:24px;border-bottom:1px solid var(--line);gap:18px}
+  .f-grid{grid-template-columns:1fr 1fr}
+  .notif{display:none}
+  .holo{transform:none}
+  section{padding:80px 0}
+  .hero{padding-top:120px}
+  .pulse-track,.tstep .node{display:none}
+  .tsteps{padding-top:0}
+}
+`;
+
+/* ── Real pricing (pulled from live site 05 Jul 2026) ── */
+const IND_PLANS = [
+  { name:'Starter', sub:'Great to get started', priceINR_m:'₹99', priceINR_a:'₹81', priceUSD_m:'$4.99', priceUSD_a:'$4.09',
+    badge:'30-day free trial', hot:false, cta:'Start free trial', ctaHref:'/signup', ctaStyle:'o',
+    note:'Then ₹99/month · Cancel anytime',
+    intro:null,
+    features:['AI chat messages — <b>20/month</b>','AI meal plans — <b>2/month</b>','Food log history — <b>90 days</b>','Daily AI insights','Data export'] },
+  { name:'Plus', sub:'Most popular choice', priceINR_m:'₹189', priceINR_a:'₹155', priceUSD_m:'$8.99', priceUSD_a:'$7.37',
+    badge:null, hot:true, cta:'Subscribe to Plus', ctaHref:'/signup?skipTrial=1', ctaStyle:'g',
+    note:'No trial · Subscribe for 1 month to evaluate',
+    intro:'Everything in Starter +',
+    features:['AI chat messages — <b>50/month</b>','AI meal plans — <b>8/month</b>','Food log history — <b>1 year</b>','Daily AI insights','Data export — <b>PDF</b>'] },
+  { name:'Premium', sub:'For serious goals', priceINR_m:'₹449', priceINR_a:'₹368', priceUSD_m:'$12.99', priceUSD_a:'$10.65',
+    badge:null, hot:false, cta:'Subscribe to Premium', ctaHref:'/signup?skipTrial=1', ctaStyle:'o',
+    note:'No trial · Subscribe for 1 month to evaluate',
+    intro:'Everything in Plus +',
+    features:['AI chat messages — <b>100/month</b>','AI meal plans — <b>15/month</b>','Food log history — <b>3 years</b>','Daily AI insights','Data export — <b>PDF + CSV</b>'] },
+];
+const CLI_PLANS = [
+  { name:'Starter', sub:'Solo practice', priceINR_m:'₹499', priceINR_a:'₹409', priceUSD_m:'$12.99', priceUSD_a:'$10.65',
+    badge:'14-day free trial', hot:false, cta:'Start 14-day free trial', ctaHref:'/signup?type=clinic', ctaStyle:'o',
+    note:'Starter features · Then ₹499/month',
+    intro:null,
+    features:['Patients — <b>15</b>','AI patient plans — <b>15/month</b>','Dietitian AI chat — <b>30/month</b>','Compliance reports — <b>Basic</b>','Data export'] },
+  { name:'Professional', sub:'Growing clinic', priceINR_m:'₹999', priceINR_a:'₹819', priceUSD_m:'$29.99', priceUSD_a:'$24.59',
+    badge:null, hot:true, cta:'Subscribe to Professional', ctaHref:'/signup?type=clinic&skipTrial=1', ctaStyle:'g',
+    note:'No trial · Subscribe for 1 month to evaluate',
+    intro:'Everything in Starter +',
+    features:['Patients — <b>50</b>','AI patient plans — <b>40/month</b>','Dietitian AI chat — <b>100/month</b>','Compliance reports — <b>Advanced</b>','Data export — <b>PDF</b>'] },
+  { name:'Premium', sub:'Large practice', priceINR_m:'₹2,499', priceINR_a:'₹2,049', priceUSD_m:'$59.99', priceUSD_a:'$49.19',
+    badge:null, hot:false, cta:'Subscribe to Premium', ctaHref:'/signup?type=clinic&skipTrial=1', ctaStyle:'o',
+    note:'No trial · Subscribe for 1 month to evaluate',
+    intro:'Everything in Professional +',
+    features:['Patients — <b>200</b>','AI patient plans — <b>100/month</b>','Dietitian AI chat — <b>200/month</b>','Compliance reports — <b>Advanced</b>','Data export — <b>PDF + CSV</b>'] },
+];
+
+const BROCHURES = [
+  { title:'Personal Health Guide', desc:'How to use Blitora Pulse to build better habits, track nutrition and hit your goals.', meta:'8 pages · PDF', file:'/BlitoraPulse-Personal-Guide.pdf', kind:'' },
+  { title:'Clinic & Dietitian Pack', desc:'Patient management, onboarding, compliance tools and clinic pricing plans.', meta:'12 pages · PDF', file:'/BlitoraPulse-Clinic-Brochure.pdf', kind:'mid' },
+  { title:'Plan Comparison Sheet', desc:'Side-by-side of all Personal and Clinic plans — perfect for sharing with your team.', meta:'2 pages · PDF', file:'/BlitoraPulse-Plans.pdf', kind:'mid' },
+];
+
+const PLANS_BY_DIET = {
+  Vegetarian:{b:['Vegetable poha + curd','Moong dal chilla x2 + mint chutney'],s1:['Roasted chana (30 g) + green tea','1 apple + 6 almonds'],l:['2 roti + dal tadka + palak sabzi + salad','Rajma (1 bowl) + brown rice + kachumber'],s2:['Buttermilk + makhana (20 g)','Sprouts bhel (1 bowl)'],d:['Paneer bhurji (150 g) + 1 roti + sauteed veg','Veg khichdi + curd + salad']},
+  Eggetarian:{b:['2-egg omelette + 1 multigrain toast','Egg bhurji + poha'],s1:['1 boiled egg + green tea','Fruit bowl + 6 walnuts'],l:['2 roti + egg curry + salad','Dal + rice + boiled egg + sabzi'],s2:['Sprouts chaat','Buttermilk + roasted chana'],d:['Egg white bhurji (3) + 1 roti + veg','Paneer tikka (120 g) + salad']},
+  'Non-veg':{b:['2-egg omelette + toast','Chicken keema (80 g) + 1 paratha'],s1:['Greek curd (100 g)','1 banana + peanuts (20 g)'],l:['Grilled chicken (150 g) + 2 roti + salad','Fish curry + brown rice + veg'],s2:['Boiled egg + green tea','Roasted chana + buttermilk'],d:['Tandoori chicken (150 g) + sauteed veg','Fish tikka + dal + salad']},
+  Vegan:{b:['Tofu scramble + toast','Oats + soy milk + chia'],s1:['Peanuts (25 g) + black coffee','Fruit + 6 almonds'],l:['2 roti + chana masala + salad','Tofu curry + brown rice + veg'],s2:['Sprouts bhel','Soy milk + makhana'],d:['Tofu bhurji (150 g) + 1 roti + veg','Veg soy khichdi + salad']}
 };
-
-/* ── Pricing plans ── */
-const indPlans = [
-  { name:'Starter', sub:'Great to get started', priceINR:99, priceUSD:4.99, highlight:false,
-    trial:'30-day free trial', trialSub:'Then ₹99/month · Cancel anytime',
-    ctaLabel:'Start free trial', ctaStyle:'trial',
-    tag:'Includes in trial & plan:',
-    features:[{l:'AI chat messages',v:'20/month'},{l:'AI meal plans',v:'2/month'},{l:'Food log history',v:'90 days'},{l:'Daily AI insights',v:true},{l:'Data export',v:false}] },
-  { name:'Plus', sub:'Most popular choice', priceINR:189, priceUSD:8.99, highlight:true,
-    trial:null, trialSub:'No trial · Subscribe for 1 month to evaluate',
-    ctaLabel:'Subscribe to Plus', ctaStyle:'primary',
-    tag:'Everything in Starter +',
-    features:[{l:'AI chat messages',v:'50/month'},{l:'AI meal plans',v:'8/month'},{l:'Food log history',v:'1 year'},{l:'Daily AI insights',v:true},{l:'Data export',v:'PDF'}] },
-  { name:'Premium', sub:'For serious goals', priceINR:449, priceUSD:12.99, highlight:false,
-    trial:null, trialSub:'No trial · Subscribe for 1 month to evaluate',
-    ctaLabel:'Subscribe to Premium', ctaStyle:'outline',
-    tag:'Everything in Plus +',
-    features:[{l:'AI chat messages',v:'100/month'},{l:'AI meal plans',v:'15/month'},{l:'Food log history',v:'3 years'},{l:'Daily AI insights',v:true},{l:'Data export',v:'PDF + CSV'}] },
-];
-const clinicPlans = [
-  { name:'Starter', sub:'Solo practice', priceINR:499, priceUSD:12.99, highlight:false,
-    trial:'14-day free trial', trialSub:'Starter features · Then ₹499/month',
-    ctaLabel:'Start 14-day free trial', ctaStyle:'trial',
-    tag:'Includes in trial & plan:',
-    features:[{l:'Patients',v:'15'},{l:'AI patient plans',v:'15/month'},{l:'Dietitian AI chat',v:'30/month'},{l:'Compliance reports',v:'Basic'},{l:'Data export',v:false}] },
-  { name:'Professional', sub:'Growing clinic', priceINR:999, priceUSD:29.99, highlight:true,
-    trial:null, trialSub:'No trial · Subscribe for 1 month to evaluate',
-    ctaLabel:'Subscribe to Professional', ctaStyle:'primary',
-    tag:'Everything in Starter +',
-    features:[{l:'Patients',v:'50'},{l:'AI patient plans',v:'40/month'},{l:'Dietitian AI chat',v:'100/month'},{l:'Compliance reports',v:'Advanced'},{l:'Data export',v:'PDF'}] },
-  { name:'Premium', sub:'Large practice', priceINR:2499, priceUSD:59.99, highlight:false,
-    trial:null, trialSub:'No trial · Subscribe for 1 month to evaluate',
-    ctaLabel:'Subscribe to Premium', ctaStyle:'outline',
-    tag:'Everything in Professional +',
-    features:[{l:'Patients',v:'200'},{l:'AI patient plans',v:'100/month'},{l:'Dietitian AI chat',v:'200/month'},{l:'Compliance reports',v:'Advanced'},{l:'Data export',v:'PDF + CSV'}] },
+const BOT_ANSWERS = [
+  [/diet|chart|plan|meal/i,"You answer 4 questions — goal, conditions, food preference, meals per day — and Pulse AI drafts a full macro-balanced day in seconds. You can refine it in chat: \"make dinner lighter.\" Try the live demo in the Pulse AI section above! ✦"],
+  [/price|cost|₹|\$|cheap|plan(s)?$/i,"Individual: Starter free trial then ₹99/mo · Plus ₹189/mo · Premium ₹449/mo. Clinic: Starter ₹499/mo · Professional ₹999/mo · Premium ₹2,499/mo. Annual = 18% off. Flip the toggle in the Pricing section."],
+  [/trial|free/i,"Yes! Individuals get a 30-day free trial on the Starter plan. Clinics get 14 days. No credit card needed. Sign up takes under 60 seconds. 🚀"],
+  [/clinic|dietitian|patient|hospital/i,"Clinic mode lets you invite patients by email, AI-draft their meal plans and watch compliance live. WhatsApp us at +91 96199 90313 for a demo."],
+  [/whatsapp|contact|call|email|human/i,"Fastest: WhatsApp +91 96199 90313. Or email hello@blitora.com. The contact form above opens WhatsApp with your details pre-filled."],
+  [/brochure|pdf|download/i,"Head to the Resources section — three PDFs: Personal Guide, Clinic Pack, and Plan Comparison. Enter your name and email, download begins right after. 📄"],
+  [/blitora(?!.*pulse)|company|parent/i,"Blitora Pulse is the flagship product of Blitora — a multi-product platform. See blitora.com. Powering Progress. 🧡"],
+  [/.*/,"Great question! I cover features, pricing, trials and clinic mode here. For anything deeper, WhatsApp us at +91 96199 90313 — a human replies the same day. 😊"]
 ];
 
-function detectINR() {
-  try { const tz=Intl.DateTimeFormat().resolvedOptions().timeZone; return tz&&(tz.includes('Calcutta')||tz.includes('Kolkata')); } catch{return false;}
+function detectINR(){
+  try{const tz=Intl.DateTimeFormat().resolvedOptions().timeZone;return tz&&(tz.includes('Calcutta')||tz.includes('Kolkata'));}catch{return false;}
 }
 
-/* ── Lead Capture Modal ── */
-function LeadModal({ doc, onClose }) {
-  const [name, setName]   = useState('');
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [err, setErr]     = useState('');
-  const [done, setDone]   = useState(false);
-  const [loading, setLoading] = useState(false);
+/* ────── COMPONENT ────── */
 
-  async function handleSubmit(e) {
-    e.preventDefault();
-    if (!name.trim() || !email.trim()) { setErr('Please enter your name and email.'); return; }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setErr('Please enter a valid email address.'); return; }
-    setErr(''); setLoading(true);
-
-    try {
-      // Store lead (fire-and-forget — don't block download)
-      fetch('/api/lead-capture', {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ name, email, phone, document: doc.title, source:'brochure_download' }),
-      }).catch(()=>{});
-    } catch(_) {}
-
-    setLoading(false); setDone(true);
-
-    // Trigger download after short delay
-    setTimeout(() => {
-      const link = document.createElement('a');
-      link.href = doc.file;
-      link.download = doc.title + '.pdf';
-      link.click();
-      setTimeout(onClose, 500);
-    }, 800);
-  }
-
-  return (
-    <div style={{ position:'fixed', inset:0, zIndex:999, display:'flex', alignItems:'center', justifyContent:'center', padding:'20px', backgroundColor:'rgba(13,27,62,0.7)', backdropFilter:'blur(4px)' }}
-         onClick={e => { if(e.target===e.currentTarget) onClose(); }}>
-      <div style={{ background:c.white, borderRadius:20, padding:'36px', maxWidth:440, width:'100%', boxShadow:'0 24px 80px rgba(0,0,0,0.25)' }}>
-        {!done ? (
-          <>
-            <div style={{ fontSize:28, marginBottom:12 }}>{doc.icon}</div>
-            <h3 style={{ fontWeight:800, fontSize:20, color:c.navy, marginBottom:6 }}>Download {doc.title}</h3>
-            <p style={{ fontSize:14, color:c.dgrey, marginBottom:24, lineHeight:1.5 }}>
-              Enter your details and we'll send the download link to your email too.
-            </p>
-            <form onSubmit={handleSubmit}>
-              <div style={{ marginBottom:14 }}>
-                <label style={{ fontSize:13, fontWeight:600, color:c.navy, display:'block', marginBottom:6 }}>Full name *</label>
-                <input value={name} onChange={e=>setName(e.target.value)} placeholder="Your name"
-                  style={{ width:'100%', padding:'11px 14px', borderRadius:10, border:`1.5px solid ${err&&!name?'#C0392B':c.mgrey}`, fontSize:14, outline:'none', fontFamily:'inherit' }}/>
-              </div>
-              <div style={{ marginBottom:14 }}>
-                <label style={{ fontSize:13, fontWeight:600, color:c.navy, display:'block', marginBottom:6 }}>Email address *</label>
-                <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@example.com"
-                  style={{ width:'100%', padding:'11px 14px', borderRadius:10, border:`1.5px solid ${err&&!email?'#C0392B':c.mgrey}`, fontSize:14, outline:'none', fontFamily:'inherit' }}/>
-              </div>
-              <div style={{ marginBottom:20 }}>
-                <label style={{ fontSize:13, fontWeight:600, color:c.navy, display:'block', marginBottom:6 }}>
-                  Mobile number <span style={{ color:c.bgrey, fontWeight:400 }}>(optional)</span>
-                </label>
-                <input type="tel" value={phone} onChange={e=>setPhone(e.target.value)} placeholder="+91 98765 43210"
-                  style={{ width:'100%', padding:'11px 14px', borderRadius:10, border:`1.5px solid ${c.mgrey}`, fontSize:14, outline:'none', fontFamily:'inherit' }}/>
-              </div>
-              {err && <p style={{ color:'#C0392B', fontSize:13, marginBottom:12 }}>{err}</p>}
-              <button type="submit" disabled={loading}
-                style={{ width:'100%', padding:'13px', borderRadius:12, backgroundColor:c.green, color:c.white, fontWeight:700, fontSize:15, border:'none', cursor:loading?'not-allowed':'pointer', opacity:loading?0.7:1, fontFamily:'inherit', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
-                {loading ? 'Processing…' : (
-                  <>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-                    </svg>
-                    Download PDF
-                  </>
-                )}
-              </button>
-              <p style={{ fontSize:12, color:c.bgrey, textAlign:'center', marginTop:12 }}>
-                We respect your privacy. No spam, ever.
-              </p>
-            </form>
-            <button onClick={onClose} style={{ position:'absolute', top:20, right:20, background:'none', border:'none', cursor:'pointer', fontSize:22, color:c.bgrey, lineHeight:1 }} aria-label="Close">×</button>
-          </>
-        ) : (
-          <div style={{ textAlign:'center', padding:'20px 0' }}>
-            <div style={{ fontSize:48, marginBottom:16 }}>✅</div>
-            <h3 style={{ fontWeight:800, fontSize:20, color:c.navy, marginBottom:8 }}>Download starting…</h3>
-            <p style={{ fontSize:14, color:c.dgrey }}>We've also emailed a copy to {email}. Check your inbox!</p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/* ── NAV ── */
-function Nav() {
-  return (
-    <header style={{ position:'sticky', top:0, zIndex:50, backgroundColor:'rgba(255,255,255,0.96)', backdropFilter:'blur(8px)', borderBottom:`1px solid ${c.mgrey}` }}>
-      <div style={{ maxWidth:1152, margin:'0 auto', padding:'0 24px', height:66, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-        <a href="/" style={{ display:'flex', alignItems:'center', gap:10, textDecoration:'none' }}>
-          <svg width="34" height="34" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect width="200" height="200" rx="36" fill="#0D1B3E"/>
-            <path d="M48 38L48 148L112 148C134 148 152 132 152 112C152 100 146 90 136 84C144 78 150 68 150 56C150 44 138 38 112 38ZM68 58L110 58C120 58 126 64 126 72C126 80 120 86 110 86L68 86ZM68 106L112 106C124 106 132 112 132 120C132 128 124 134 112 134L68 134Z" fill="white"/>
-            <polygon points="105,46 84,90 100,90 82,136 124,80 106,80 120,46" fill="#1D9E75"/>
-            <polyline points="20,162 42,162 50,144 60,180 70,152 80,162 180,162" stroke="#1D9E75" strokeWidth="5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-          <div style={{ lineHeight:1 }}>
-            <div style={{ fontWeight:800, fontSize:15, letterSpacing:'-0.3px', color:c.navy, fontFamily:"'Poppins', Arial, sans-serif" }}>BLITORA <span style={{ color:c.green }}>PULSE</span></div>
-            <div style={{ fontWeight:500, fontSize:9.5, letterSpacing:'0.06em', color:'#718096', fontFamily:"'Poppins', Arial, sans-serif" }}>Health Made Intelligent.</div>
-          </div>
-        </a>
-        <nav style={{ display:'flex', alignItems:'center', gap:24, fontSize:14, fontWeight:500 }} className="hide-mobile">
-          {[['How AI works','#ai'],['Features','#features'],['For who','#forwho'],['Pricing','#pricing']].map(([l,h])=>(
-            <a key={l} href={h} style={{ color:c.dgrey, textDecoration:'none' }}>{l}</a>
-          ))}
-        </nav>
-        <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-          <a href="/login" style={{ fontSize:14, fontWeight:600, color:c.navy, textDecoration:'none' }} className="hide-mobile">Sign in</a>
-          <a href="/signup" style={{ padding:'10px 20px', borderRadius:50, backgroundColor:c.green, color:c.white, fontWeight:700, fontSize:14, textDecoration:'none' }}>
-            Start free trial
-          </a>
-        </div>
-      </div>
-    </header>
-  );
-}
-
-/* ── HERO ── */
-function Hero() {
-  return (
-    <section style={{ position:'relative', overflow:'hidden', background:`linear-gradient(135deg, ${c.navy} 0%, #0D2E1E 60%, ${c.dkgreen} 100%)` }}>
-      <svg style={{ position:'absolute', inset:0, width:'100%', height:'100%', opacity:0.05 }} viewBox="0 0 1200 600" preserveAspectRatio="xMidYMid slice">
-        <polyline points="0,300 200,300 280,200 360,400 440,300 520,300 560,150 600,450 640,300 720,300 760,200 800,350 860,300 1200,300" fill="none" stroke="#1D9E75" strokeWidth="2.5"/>
-      </svg>
-      <div style={{ position:'relative', maxWidth:896, margin:'0 auto', padding:'80px 24px 112px', textAlign:'center' }}>
-        <div style={{ display:'inline-flex', alignItems:'center', gap:8, padding:'8px 16px', borderRadius:50, marginBottom:28, fontSize:12, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', backgroundColor:'rgba(29,158,117,0.15)', color:c.green, border:'1px solid rgba(29,158,117,0.3)' }}>
-          ✦ AI-powered health platform
-        </div>
-        <h1 style={{ fontWeight:800, color:c.white, letterSpacing:'-1px', marginBottom:20, fontSize:'clamp(32px,6vw,64px)', lineHeight:1.05 }}>
-          Tell us your goal.<br/><span style={{ color:c.green }}>Our AI handles the rest.</span>
-        </h1>
-        <p style={{ fontSize:'clamp(16px,2.5vw,20px)', lineHeight:1.6, marginBottom:16, maxWidth:640, margin:'0 auto 16px', color:'#B8D8CC' }}>
-          No spreadsheets. No guessing. Just answer a few questions — our AI builds your complete health plan and keeps you on track automatically.
-        </p>
-        <p style={{ fontSize:13, marginBottom:32, color:'rgba(255,255,255,0.4)' }}>For individuals · dietitians · clinics</p>
-        <div style={{ display:'flex', flexWrap:'wrap', gap:16, justifyContent:'center', marginBottom:16 }}>
-          <a href="/signup" style={{ padding:'16px 32px', borderRadius:50, backgroundColor:c.green, color:c.white, fontWeight:700, fontSize:16, textDecoration:'none', boxShadow:'0 8px 32px rgba(29,158,117,0.4)' }}>
-            Start free trial →
-          </a>
-          <a href="#ai" style={{ padding:'16px 32px', borderRadius:50, color:c.white, fontWeight:600, fontSize:16, textDecoration:'none', border:'1.5px solid rgba(255,255,255,0.3)' }}>
-            ▶ See how it works
-          </a>
-        </div>
-        <p style={{ fontSize:13, color:'rgba(255,255,255,0.45)', marginBottom:28 }}>
-          Already have an account?{' '}
-          <a href="/login" style={{ color:c.green, fontWeight:600, textDecoration:'none' }}>Sign in →</a>
-        </p>
-        <div style={{ display:'flex', flexWrap:'wrap', justifyContent:'center', gap:10 }}>
-          {['Free trial included','Starter features included','No credit card','Cancel anytime'].map(s=>(
-            <span key={s} style={{ fontSize:13, padding:'6px 12px', borderRadius:50, fontWeight:500, backgroundColor:'rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.5)' }}>✓ {s}</span>
-          ))}
-        </div>
-      </div>
-      <svg viewBox="0 0 1440 60" style={{ width:'100%', display:'block', marginBottom:-1 }} preserveAspectRatio="none">
-        <path d="M0,60 L0,30 Q360,60 720,30 Q1080,0 1440,30 L1440,60 Z" fill="#fff"/>
-      </svg>
-    </section>
-  );
-}
-
-/* ── 4 ANSWERS ── */
-function FourAnswers() {
-  const steps = [
-    {icon:'🎯',you:'Your goal in one sentence',ai:'Complete meal plan + calorie targets'},
-    {icon:'🥜',you:'Your food likes & dislikes',ai:'7-day plan with zero foods you hate'},
-    {icon:'💪',you:'Any health conditions or allergies',ai:'Nutritionally safe, personalised plan'},
-    {icon:'🏃',you:'Your lifestyle (busy / active / etc.)',ai:'Realistic plans that fit your life'},
-  ];
-  return (
-    <section id="ai" style={{ backgroundColor:c.navy, padding:'56px 24px' }}>
-      <div style={{ maxWidth:896, margin:'0 auto' }}>
-        <div style={{ textAlign:'center', marginBottom:40 }}>
-          <h2 style={{ fontWeight:800, fontSize:'clamp(22px,4vw,36px)', color:c.white, marginBottom:12, letterSpacing:'-0.5px' }}>4 answers. A complete health plan.</h2>
-          <p style={{ fontSize:15, color:'#B8D8CC', maxWidth:480, margin:'0 auto' }}>Our AI does the nutrition science, planning, reminders, and tracking. You just live your life.</p>
-        </div>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(260px,1fr))', gap:14 }}>
-          {steps.map(({icon,you,ai})=>(
-            <div key={you} style={{ borderRadius:16, padding:'20px', display:'flex', alignItems:'flex-start', gap:14, backgroundColor:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)' }}>
-              <span style={{ fontSize:24, flexShrink:0, marginTop:2 }}>{icon}</span>
-              <div>
-                <div style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', padding:'2px 8px', borderRadius:50, marginBottom:6, width:'fit-content', backgroundColor:'rgba(255,255,255,0.1)', color:'rgba(255,255,255,0.55)' }}>You tell us</div>
-                <p style={{ fontSize:14, fontWeight:600, color:c.white, marginBottom:8 }}>{you}</p>
-                <div style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', padding:'2px 8px', borderRadius:50, marginBottom:4, width:'fit-content', backgroundColor:'rgba(29,158,117,0.2)', color:c.green }}>AI delivers</div>
-                <p style={{ fontSize:14, color:c.green }}>{ai}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-        <div style={{ textAlign:'center', marginTop:28 }}>
-          <a href="/signup" style={{ display:'inline-block', padding:'14px 32px', borderRadius:50, backgroundColor:c.green, color:c.white, fontWeight:700, fontSize:15, textDecoration:'none' }}>Start your free trial →</a>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-
-/* ── AI DEMO SECTION ── */
-function AISection() {
-  const [tab, setTab] = useState(0);
-  const scenarios = [
-    { label:"You say", input:"I want to lose weight, I'm vegetarian",
-      outputs:[{icon:"📋",lbl:"AI creates",val:"7-day personalised meal plan"},{icon:"🧮",lbl:"AI calculates",val:"Your exact daily calorie target"},{icon:"💊",lbl:"AI flags",val:"Nutrients you're likely missing"},{icon:"⏰",lbl:"AI schedules",val:"Daily reminders tailored to you"},{icon:"📊",lbl:"AI tracks",val:"Your progress automatically"}],
-      chat:[{role:"user",msg:"I want to lose weight. I'm vegetarian, don't like broccoli, and have 30 mins to cook each evening."},{role:"ai",msg:"Got it! I've built a 7-day vegetarian plan targeting a 500-cal daily deficit — no broccoli. Daily target: 1,650 kcal. I've also added iron and B12-rich foods since vegetarians often run low. Want a grocery list?"}] },
-    { label:"Dietitian says", input:"My patient isn't hitting protein targets",
-      outputs:[{icon:"🔍",lbl:"AI analyses",val:"7 days of patient logs instantly"},{icon:"📈",lbl:"AI identifies",val:"Exact meals causing the shortfall"},{icon:"💡",lbl:"AI suggests",val:"3 simple meal swaps to fix it"},{icon:"📩",lbl:"AI drafts",val:"A patient message explaining why"},{icon:"📅",lbl:"AI schedules",val:"A follow-up check in 5 days"}],
-      chat:[{role:"user",msg:"My patient Ramesh isn't hitting his 120g protein target. Can you check his logs?"},{role:"ai",msg:"Reviewed Ramesh's last 7 days — he's averaging 74g daily. Gap is at breakfast (17g) and snacks (0g). Quick fix: swap morning toast for eggs or Greek yoghurt (+15g), add roasted chickpeas as snack (+7g). I've drafted a message to send him — want me to update his plan too?"}] },
-    { label:"You ask", input:"Why do I feel tired after lunch every day?",
-      outputs:[{icon:"🧠",lbl:"AI reviews",val:"Your lunch meals for 2 weeks"},{icon:"📉",lbl:"AI spots",val:"Your blood sugar spike pattern"},{icon:"🍱",lbl:"AI recommends",val:"Lower-GI food swaps"},{icon:"⚡",lbl:"AI predicts",val:"Energy improvement in 3–5 days"},{icon:"📖",lbl:"AI explains",val:"Exactly why this is happening"}],
-      chat:[{role:"user",msg:"Why do I feel tired every day after lunch? It's been happening for weeks."},{role:"ai",msg:"Checked your last 14 lunches — 11 out of 14 were high-GI meals (white rice, white bread, or sugary drinks). This causes a blood sugar spike then a crash at 2–3pm — exactly what you're feeling. I've already swapped 4 meals in your plan this week to lower-GI options. Most people notice the difference in 3–5 days. I'll check in on Friday."}] },
-  ];
-  const active = scenarios[tab];
-
-  return (
-    <section style={{ padding:'64px 24px 80px', backgroundColor:c.white }}>
-      <div style={{ maxWidth:1152, margin:'0 auto' }}>
-        {/* Header */}
-        <div style={{ textAlign:'center', marginBottom:40 }}>
-          <div style={{ display:'inline-flex', alignItems:'center', gap:8, padding:'6px 16px', borderRadius:50, marginBottom:16, fontSize:12, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', backgroundColor:`rgba(29,158,117,0.1)`, color:c.green }}>✦ The AI advantage</div>
-          <h2 style={{ fontWeight:800, fontSize:'clamp(24px,4vw,40px)', letterSpacing:'-0.5px', color:c.navy, marginBottom:12 }}>
-            You give it a little.<br/><span style={{ color:c.green }}>It gives back everything.</span>
-          </h2>
-          <p style={{ fontSize:15, color:c.dgrey, maxWidth:520, margin:'0 auto' }}>Most health apps make you do all the work. Our AI reads between the lines, connects the dots, and acts — so you don't have to think about it.</p>
-        </div>
-
-        {/* Tabs */}
-        <div style={{ display:'flex', gap:10, overflowX:'auto', paddingBottom:8, marginBottom:28 }}>
-          {scenarios.map((s,i)=>(
-            <button key={i} onClick={()=>setTab(i)} style={{ padding:'10px 18px', borderRadius:50, fontSize:13, fontWeight:600, whiteSpace:'nowrap', flexShrink:0, cursor:'pointer', border:'none', fontFamily:'inherit', backgroundColor:tab===i?c.navy:c.lgrey, color:tab===i?c.white:c.dgrey }}>
-              {s.label}: "{s.input}"
-            </button>
-          ))}
-        </div>
-
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1.4fr', gap:24, alignItems:'start' }}>
-          {/* Left: input + outputs */}
-          <div>
-            <div style={{ borderRadius:16, padding:'16px', marginBottom:16, backgroundColor:c.lgrey, border:`2px solid ${c.green}40` }}>
-              <div style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', color:c.green, marginBottom:8 }}>👤 {active.label}</div>
-              <p style={{ fontSize:15, fontWeight:600, color:c.navy, margin:0 }}>"{active.input}"</p>
-            </div>
-            <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:14 }}>
-              <div style={{ flex:1, height:1, backgroundColor:c.mgrey }}/>
-              <div style={{ width:28, height:28, borderRadius:'50%', backgroundColor:c.green, display:'flex', alignItems:'center', justifyContent:'center', color:c.white, fontSize:13, fontWeight:700, flexShrink:0 }}>↓</div>
-              <div style={{ flex:1, height:1, backgroundColor:c.mgrey }}/>
-            </div>
-            <p style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', color:c.bgrey, marginBottom:12 }}>AI instantly does all of this</p>
-            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-              {active.outputs.map(({icon,lbl,val},i)=>(
-                <div key={i} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:12, backgroundColor:c.white, border:`1px solid ${c.mgrey}` }}>
-                  <span style={{ fontSize:18, flexShrink:0 }}>{icon}</span>
-                  <div>
-                    <div style={{ fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.08em', color:c.bgrey }}>{lbl}</div>
-                    <div style={{ fontSize:13, fontWeight:600, color:c.navy }}>{val}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Right: AI chat */}
-          <div style={{ borderRadius:24, overflow:'hidden', boxShadow:'0 8px 40px rgba(13,27,62,0.12)', border:`1px solid ${c.mgrey}` }}>
-            {/* Chat header */}
-            <div style={{ padding:'14px 20px', display:'flex', alignItems:'center', gap:12, backgroundColor:c.navy }}>
-              <div style={{ width:34, height:34, borderRadius:'50%', backgroundColor:c.green, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-              </div>
-              <div>
-                <div style={{ color:c.white, fontWeight:700, fontSize:14 }}>Pulse AI Coach</div>
-                <div style={{ color:'rgba(255,255,255,0.45)', fontSize:11, display:'flex', alignItems:'center', gap:4 }}>
-                  <span style={{ width:6, height:6, borderRadius:'50%', backgroundColor:c.green, display:'inline-block' }}/>
-                  AI-powered · always on
-                </div>
-              </div>
-            </div>
-            {/* Messages */}
-            <div style={{ padding:'16px', backgroundColor:'#FAFBFC', minHeight:280, display:'flex', flexDirection:'column', gap:12 }}>
-              {active.chat.map((msg,i)=>(
-                <div key={i} style={{ display:'flex', justifyContent:msg.role==='user'?'flex-end':'flex-start', alignItems:'flex-start', gap:8 }}>
-                  {msg.role==='ai' && (
-                    <div style={{ width:24, height:24, borderRadius:'50%', backgroundColor:c.green, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, marginTop:2 }}>
-                      <svg width="9" height="9" viewBox="0 0 24 24" fill="white"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-                    </div>
-                  )}
-                  <div style={{ maxWidth:'85%', borderRadius:16, padding:'10px 14px', fontSize:13, lineHeight:1.5,
-                    ...(msg.role==='user'
-                      ? { backgroundColor:c.navy, color:c.white, borderBottomRightRadius:4 }
-                      : { backgroundColor:c.white, color:c.dgrey, border:`1px solid ${c.mgrey}`, borderBottomLeftRadius:4 }) }}>
-                    {msg.msg}
-                  </div>
-                </div>
-              ))}
-              {/* Typing indicator */}
-              <div style={{ display:'flex', alignItems:'center', gap:8, paddingLeft:32 }}>
-                <div style={{ display:'flex', gap:4, padding:'10px 14px', borderRadius:16, backgroundColor:c.white, border:`1px solid ${c.mgrey}` }}>
-                  {[0,1,2].map(i=>(<div key={i} style={{ width:6, height:6, borderRadius:'50%', backgroundColor:c.bgrey, opacity:0.5 }}/>))}
-                </div>
-                <span style={{ fontSize:11, color:c.bgrey }}>AI is reviewing your data…</span>
-              </div>
-            </div>
-            {/* Input */}
-            <div style={{ padding:'10px 14px 14px', backgroundColor:'#FAFBFC', borderTop:`1px solid ${c.mgrey}` }}>
-              <div style={{ display:'flex', gap:8 }}>
-                <input readOnly type="text" placeholder="Ask your AI health coach anything…"
-                  style={{ flex:1, padding:'10px 14px', borderRadius:12, border:`1.5px solid ${c.mgrey}`, fontSize:13, outline:'none', fontFamily:'inherit', backgroundColor:c.white }}/>
-                <button style={{ width:38, height:38, borderRadius:10, backgroundColor:c.green, border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Try CTA */}
-        <div style={{ textAlign:'center', marginTop:40 }}>
-          <a href="/signup" style={{ display:'inline-block', padding:'14px 32px', borderRadius:50, backgroundColor:c.green, color:c.white, fontWeight:700, fontSize:15, textDecoration:'none' }}>
-            Try it free — this is what you get from day one →
-          </a>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ── FEATURES ── */
-function Features() {
-  const list = [
-    {icon:'🍽️',title:'Log meals in seconds',desc:'Search 2M+ foods, scan barcodes, or tell our AI what you ate. No manual counting.'},
-    {icon:'🤖',title:'Your personal AI coach',desc:'Ask anything — "Why am I not losing weight?" or "What should I eat today?" — get a real answer.'},
-    {icon:'📊',title:'Spot patterns you\'d never notice',desc:'See how sleep, mood, and lifestyle connect to your nutrition and body weight.'},
-    {icon:'🥗',title:'Meal plans made for you',desc:'Not generic — built around your preferences, allergies, schedule, and goals. Refreshes weekly.'},
-    {icon:'💊',title:'Track everything in one place',desc:'Macros, water, steps, weight, medications — one app, not ten.'},
-    {icon:'👩‍⚕️',title:'Connect with your dietitian',desc:'Share your log with one tap. They see everything, you stay in control.'},
-  ];
-  return (
-    <section id="features" style={{ padding:'64px 24px 80px', backgroundColor:c.lgrey }}>
-      <div style={{ maxWidth:1152, margin:'0 auto' }}>
-        <div style={{ textAlign:'center', marginBottom:48 }}>
-          <span style={{ fontSize:12, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.15em', color:c.green }}>Features</span>
-          <h2 style={{ fontWeight:800, fontSize:'clamp(24px,4vw,38px)', marginTop:12, letterSpacing:'-0.5px', color:c.navy }}>Everything your health needs.</h2>
-        </div>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))', gap:18 }}>
-          {list.map(({icon,title,desc})=>(
-            <div key={title} style={{ backgroundColor:c.white, borderRadius:20, padding:26, border:`1px solid ${c.mgrey}` }}>
-              <div style={{ fontSize:28, marginBottom:12 }}>{icon}</div>
-              <h3 style={{ fontWeight:700, fontSize:16, marginBottom:8, color:c.navy }}>{title}</h3>
-              <p style={{ fontSize:14, lineHeight:1.6, color:c.dgrey }}>{desc}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ── FOR WHO ── */
-function ForWho() {
-  return (
-    <section id="forwho" style={{ padding:'64px 24px 80px', backgroundColor:c.white }}>
-      <div style={{ maxWidth:1152, margin:'0 auto' }}>
-        <div style={{ textAlign:'center', marginBottom:48 }}>
-          <span style={{ fontSize:12, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.15em', color:c.green }}>Who it&apos;s for</span>
-          <h2 style={{ fontWeight:800, fontSize:'clamp(24px,4vw,38px)', marginTop:12, letterSpacing:'-0.5px', color:c.navy }}>
-            Whether you&apos;re tracking yourself<br/>or managing hundreds of patients.
-          </h2>
-        </div>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(320px,1fr))', gap:24 }}>
-          {[
-            {emoji:'🙋',label:'For Individuals',headline:'The health app that actually thinks for you.',color:c.green,cta:'Start free trial',href:'/signup',
-              points:['Log a photo — AI identifies and logs the meal','Ask why you\'re tired — AI analyses your last 2 weeks','Not losing weight? — AI tells you exactly why','Get a personalised meal plan every week automatically','Track macros, water, steps, weight in one place']},
-            {emoji:'👩‍⚕️',label:'For Dietitians & Clinics',headline:'Less admin. More impact. AI does the heavy lifting.',color:c.navy,cta:'Start free trial',href:'/signup?type=clinic',
-              points:['Patient misses a meal? — AI flags it before your session','New patient? — AI generates intake summary automatically','Compliance low? — AI drafts a personalised nudge message','Scale to 200 patients without additional overhead','AI handles the admin. You focus on care.']},
-          ].map(({emoji,label,headline,color,cta,href,points})=>(
-            <div key={label} style={{ borderRadius:28, padding:'36px', backgroundColor:c.lgrey, display:'flex', flexDirection:'column' }}>
-              <div style={{ fontSize:32, marginBottom:12 }}>{emoji}</div>
-              <span style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.15em', marginBottom:12, color }}>{label}</span>
-              <h3 style={{ fontWeight:800, fontSize:20, marginBottom:20, lineHeight:1.3, color:c.navy }}>{headline}</h3>
-              <ul style={{ listStyle:'none', padding:0, margin:'0 0 24px', flex:1 }}>
-                {points.map(p=>{const parts=p.split(' — ');return(
-                  <li key={p} style={{ display:'flex', alignItems:'flex-start', gap:10, marginBottom:12, fontSize:14 }}>
-                    <span style={{ color, marginTop:2, flexShrink:0 }}>✓</span>
-                    <span style={{ color:c.dgrey }}><strong style={{ color:c.navy }}>{parts[0]}</strong>{parts[1]?` — ${parts[1]}`:''}</span>
-                  </li>
-                );})}
-              </ul>
-              <a href={href} style={{ display:'block', textAlign:'center', padding:'14px', borderRadius:16, backgroundColor:color, color:c.white, fontWeight:700, fontSize:15, textDecoration:'none' }}>{cta}</a>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ── PRICING ── */
-function Pricing() {
-  const [audience, setAudience] = useState('individual');
-  const [billing,  setBilling]  = useState('monthly');
-  const [useINR,   setUseINR]   = useState(false);
-  useEffect(()=>{ setUseINR(detectINR()); },[]);
-
-  const plans = audience==='individual' ? indPlans : clinicPlans;
-  const disc = 0.18;
-
-  function getPrice(p) {
-    const raw = useINR ? p.priceINR : p.priceUSD;
-    return billing==='annual' ? (useINR ? Math.round(raw*(1-disc)) : +(raw*(1-disc)).toFixed(2)) : raw;
-  }
-
-  function ctaBg(style) {
-    if(style==='trial')   return c.green;
-    if(style==='primary') return c.navy;
-    return 'transparent';
-  }
-  function ctaColor(style) {
-    if(style==='outline') return c.green;
-    return c.white;
-  }
-  function ctaBorder(style) {
-    if(style==='outline') return `2px solid ${c.green}`;
-    return 'none';
-  }
-
-  return (
-    <section id="pricing" style={{ padding:'64px 24px 80px', backgroundColor:c.lgrey }}>
-      <div style={{ maxWidth:1152, margin:'0 auto' }}>
-        <div style={{ textAlign:'center', marginBottom:32 }}>
-          <span style={{ fontSize:12, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.15em', color:c.green }}>Pricing</span>
-          <h2 style={{ fontWeight:800, fontSize:'clamp(24px,4vw,38px)', marginTop:12, letterSpacing:'-0.5px', color:c.navy }}>Simple. Honest. No surprises.</h2>
-
-          {/* Trial clarity banner */}
-          <div style={{ display:'inline-flex', alignItems:'flex-start', gap:12, marginTop:18, padding:'14px 20px', borderRadius:14, backgroundColor:`${c.green}12`, border:`1px solid ${c.green}30`, maxWidth:560, textAlign:'left' }}>
-            <span style={{ fontSize:20, flexShrink:0 }}>🎁</span>
-            <div>
-              <p style={{ fontSize:14, fontWeight:700, color:c.navy, margin:'0 0 2px' }}>Free trial on Starter plans only</p>
-              <p style={{ fontSize:13, color:c.dgrey, margin:0, lineHeight:1.5 }}>
-                Individual: Free trial included with Starter features, no card needed.<br/>
-                Clinic: 14 days free with Starter features, no card needed.<br/>
-                Plus &amp; Premium: subscribe for 1 month to evaluate, cancel anytime.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Controls */}
-        <div style={{ display:'flex', flexWrap:'wrap', alignItems:'center', justifyContent:'space-between', gap:12, marginBottom:24 }}>
-          <div style={{ display:'inline-flex', borderRadius:12, overflow:'hidden', border:`1px solid ${c.mgrey}`, backgroundColor:c.white }}>
-            {[{k:'individual',l:'Individual'},{k:'clinic',l:'Clinic / Dietitian'}].map(({k,l})=>(
-              <button key={k} onClick={()=>setAudience(k)} style={{ padding:'10px 20px', fontSize:14, fontWeight:600, border:'none', cursor:'pointer', backgroundColor:audience===k?c.green:'transparent', color:audience===k?c.white:c.dgrey, fontFamily:'inherit' }}>{l}</button>
-            ))}
-          </div>
-          <div style={{ display:'flex', gap:10, flexWrap:'wrap', justifyContent:'center' }}>
-            <div style={{ display:'inline-flex', borderRadius:12, overflow:'hidden', border:`1px solid ${c.mgrey}`, backgroundColor:c.white }}>
-              {[{k:'monthly',l:'Monthly'},{k:'annual',l:'Annually'}].map(({k,l})=>(
-                <button key={k} onClick={()=>setBilling(k)} style={{ padding:'10px 16px', fontSize:13, fontWeight:600, border:'none', cursor:'pointer', display:'flex', alignItems:'center', gap:6, backgroundColor:billing===k?c.navy:'transparent', color:billing===k?c.white:c.dgrey, fontFamily:'inherit' }}>
-                  {l}
-                  {k==='annual'&&<span style={{ fontSize:10, padding:'2px 6px', borderRadius:50, fontWeight:700, backgroundColor:billing==='annual'?'rgba(255,255,255,0.2)':'rgba(29,158,117,0.12)', color:billing==='annual'?c.white:c.green }}>-18%</span>}
-                </button>
-              ))}
-            </div>
-            <div style={{ display:'inline-flex', borderRadius:12, overflow:'hidden', border:`1px solid ${c.mgrey}`, backgroundColor:c.white }}>
-              {[{k:true,l:'₹ INR'},{k:false,l:'$ USD'}].map(({k,l})=>(
-                <button key={l} onClick={()=>setUseINR(k)} style={{ padding:'10px 14px', fontSize:13, fontWeight:700, border:'none', cursor:'pointer', backgroundColor:useINR===k?c.lgrey:'transparent', color:useINR===k?c.navy:c.bgrey, fontFamily:'inherit' }}>{l}</button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {billing==='annual'&&(
-          <div style={{ textAlign:'center', marginBottom:18, padding:'10px', borderRadius:10, fontSize:13, fontWeight:600, backgroundColor:`${c.green}12`, color:c.green }}>
-            🎉 You&apos;re saving 18% with annual billing
-          </div>
-        )}
-
-        {/* Cards */}
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))', gap:16 }}>
-          {plans.map(plan=>(
-            <div key={plan.name} style={{ borderRadius:20, overflow:'hidden', backgroundColor:c.white, display:'flex', flexDirection:'column', boxShadow:plan.highlight?`0 0 0 2.5px ${c.green}`:`0 0 0 1px ${c.mgrey}` }}>
-              {plan.highlight&&<div style={{ textAlign:'center', padding:'6px', fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', backgroundColor:c.green, color:c.white }}>Most Popular</div>}
-              <div style={{ padding:'24px 24px 18px', borderBottom:`1px solid ${c.mgrey}` }}>
-                <h3 style={{ fontWeight:800, fontSize:20, marginBottom:4, color:c.navy }}>{plan.name}</h3>
-                <p style={{ fontSize:13, color:c.bgrey, marginBottom:plan.trial?10:16 }}>{plan.sub}</p>
-
-                {/* Trial badge */}
-                {plan.trial && (
-                  <div style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'5px 10px', borderRadius:8, backgroundColor:`${c.green}12`, marginBottom:12 }}>
-                    <span style={{ fontSize:12 }}>🎁</span>
-                    <span style={{ fontSize:12, fontWeight:700, color:c.green }}>{plan.trial}</span>
-                  </div>
-                )}
-
-                <div style={{ display:'flex', alignItems:'flex-start', marginBottom:2 }}>
-                  <span style={{ fontSize:16, fontWeight:700, color:c.navy, marginTop:6, marginRight:2 }}>{useINR?'₹':'$'}</span>
-                  <span style={{ fontWeight:800, fontSize:38, color:c.navy, lineHeight:1 }}>
-                    {useINR ? getPrice(plan).toLocaleString('en-IN') : getPrice(plan)}
-                  </span>
-                  <span style={{ fontSize:13, color:c.bgrey, marginTop:8, marginLeft:4 }}>/mo</span>
-                </div>
-                {billing==='annual' ? (
-                  <div style={{ marginBottom:14 }}>
-                    <span style={{ fontSize:13, fontWeight:700, color:c.green }}>
-                      {useINR
-                        ? `₹${(getPrice(plan)*12).toLocaleString('en-IN')} billed today`
-                        : `$${(getPrice(plan)*12).toFixed(2)} billed today`}
-                    </span>
-                    <span style={{ fontSize:12, color:c.bgrey, marginLeft:6 }}>
-                      · save {useINR
-                        ? `₹${(plan.priceINR*12 - getPrice(plan)*12).toLocaleString('en-IN')}`
-                        : `$${(plan.priceUSD*12 - getPrice(plan)*12).toFixed(2)}`}
-                    </span>
-                  </div>
-                ) : (
-                  <p style={{ fontSize:12, color:c.bgrey, marginBottom:14 }}>billed monthly · cancel anytime</p>
-                )}
-
-                <a href={plan.trial ? '/signup' : '/signup?skipTrial=1'} style={{ display:'block', textAlign:'center', padding:'12px', borderRadius:12, fontWeight:700, fontSize:13, textDecoration:'none', textTransform:'uppercase', letterSpacing:'0.04em', backgroundColor:ctaBg(plan.ctaStyle), color:ctaColor(plan.ctaStyle), border:ctaBorder(plan.ctaStyle) }}>
-                  {plan.ctaLabel}
-                </a>
-                {plan.trialSub && (
-                  <p style={{ fontSize:11, color:c.bgrey, textAlign:'center', marginTop:8, lineHeight:1.4 }}>{plan.trialSub}</p>
-                )}
-              </div>
-              <div style={{ padding:'18px 24px', flex:1 }}>
-                {plan.tag&&<p style={{ fontSize:12, fontWeight:700, marginBottom:12, color:plan.highlight?c.green:c.dgrey }}>{plan.tag}</p>}
-                <ul style={{ listStyle:'none', padding:0, margin:0 }}>
-                  {plan.features.map(({l,v})=>(
-                    <li key={l} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
-                      <span style={{ fontSize:13, color:c.dgrey }}>{l}</span>
-                      {v===true?(<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={c.green} strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>)
-                       :v===false?(<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={c.bgrey} strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>)
-                       :(<span style={{ fontSize:12, fontWeight:700, color:c.navy }}>{v}</span>)}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          ))}
-        </div>
-        <p style={{ textAlign:'center', marginTop:18, fontSize:12, color:c.bgrey }}>
-          {useINR?'Prices in Indian Rupees (INR). GST may apply.':'Prices in US Dollars (USD). Tax may apply.'}
-          {' '}<button onClick={()=>setUseINR(!useINR)} style={{ background:'none', border:'none', cursor:'pointer', color:c.green, textDecoration:'underline', fontSize:12, fontFamily:'inherit' }}>Switch to {useINR?'USD ($)':'INR (₹)'}</button>
-        </p>
-      </div>
-    </section>
-  );
-}
-
-/* ── BROCHURES with Lead Capture ── */
-const brochures = [
-  {icon:'📱',title:'Personal Health Guide',desc:'How to use Blitora Pulse to build better habits, track nutrition, and hit your goals.',pages:'8 pages · PDF',tag:'For individuals',color:c.green,file:'/BlitoraPulse-Personal-Guide.pdf'},
-  {icon:'🏥',title:'Clinic & Dietitian Pack',desc:'Patient management, onboarding, compliance tools, and clinic pricing plans.',pages:'12 pages · PDF',tag:'For clinics',color:c.navy,file:'/BlitoraPulse-Clinic-Brochure.pdf'},
-  {icon:'📋',title:'Plan Comparison Sheet',desc:'Side-by-side of all Personal and Clinic plans — share with your team.',pages:'2 pages · PDF',tag:'All plans',color:'#714B67',file:'/BlitoraPulse-Plans.pdf'},
-];
-
-function Brochures() {
-  const [activeDoc, setActiveDoc] = useState(null);
-  return (
-    <section id="resources" style={{ padding:'64px 24px 80px', backgroundColor:c.white }}>
-      {activeDoc && <LeadModal doc={activeDoc} onClose={()=>setActiveDoc(null)}/>}
-      <div style={{ maxWidth:1152, margin:'0 auto' }}>
-        <div style={{ textAlign:'center', marginBottom:40 }}>
-          <span style={{ fontSize:12, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.15em', color:c.green }}>Resources</span>
-          <h2 style={{ fontWeight:800, fontSize:'clamp(22px,4vw,34px)', marginTop:12, letterSpacing:'-0.5px', color:c.navy }}>Download product materials</h2>
-          <p style={{ fontSize:15, color:c.dgrey, marginTop:8 }}>Share with your team, clinic committee, or use for your own reference.</p>
-        </div>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))', gap:18 }}>
-          {brochures.map(doc=>(
-            <div key={doc.title} style={{ borderRadius:20, padding:'24px', border:`1px solid ${c.mgrey}` }}>
-              <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:14 }}>
-                <span style={{ fontSize:26 }}>{doc.icon}</span>
-                <span style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.05em', padding:'4px 10px', borderRadius:50, backgroundColor:`${doc.color}15`, color:doc.color }}>{doc.tag}</span>
-              </div>
-              <h3 style={{ fontWeight:700, fontSize:15, marginBottom:6, color:c.navy }}>{doc.title}</h3>
-              <p style={{ fontSize:13, lineHeight:1.6, marginBottom:8, color:c.dgrey }}>{doc.desc}</p>
-              <p style={{ fontSize:12, color:c.bgrey, marginBottom:16 }}>{doc.pages}</p>
-              <button onClick={()=>setActiveDoc(doc)}
-                style={{ display:'inline-flex', alignItems:'center', gap:8, padding:'10px 20px', borderRadius:50, fontWeight:600, fontSize:13, cursor:'pointer', width:'100%', justifyContent:'center', backgroundColor:c.lgrey, color:c.navy, border:`1px solid ${c.mgrey}`, fontFamily:'inherit' }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-                </svg>
-                Download PDF
-              </button>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ── CTA ── */
-function CTA() {
-  return (
-    <section style={{ padding:'64px 24px 80px', background:`linear-gradient(135deg, ${c.navy} 0%, ${c.dkgreen} 100%)`, textAlign:'center' }}>
-      <div style={{ maxWidth:640, margin:'0 auto' }}>
-        <h2 style={{ fontWeight:800, fontSize:'clamp(24px,4vw,42px)', color:c.white, marginBottom:20, letterSpacing:'-0.5px' }}>
-          Answer 4 questions.<br/>Get your health plan.
-        </h2>
-        <p style={{ fontSize:16, color:'#B8D8CC', marginBottom:32 }}>Free trial on Starter plans. No credit card.</p>
-        <div style={{ display:'flex', flexWrap:'wrap', gap:16, justifyContent:'center' }}>
-          <a href="/signup" style={{ padding:'16px 32px', borderRadius:50, backgroundColor:c.green, color:c.white, fontWeight:700, fontSize:16, textDecoration:'none' }}>Start free trial →</a>
-          <a href="mailto:hello@blitora.com" style={{ padding:'16px 32px', borderRadius:50, color:c.white, fontWeight:600, fontSize:16, textDecoration:'none', border:'1.5px solid rgba(255,255,255,0.3)' }}>Schedule a demo</a>
-        </div>
-        <p style={{ marginTop:16, fontSize:13, color:'rgba(255,255,255,0.4)' }}>
-          Already have an account?{' '}
-          <a href="/login" style={{ color:c.green, fontWeight:600, textDecoration:'none' }}>Sign in →</a>
-        </p>
-      </div>
-    </section>
-  );
-}
-
-/* ── FOOTER ── */
-function Footer() {
-  return (
-    <footer style={{ backgroundColor:c.navy, padding:'48px 24px 32px' }}>
-      <div style={{ maxWidth:1152, margin:'0 auto' }}>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))', gap:40, paddingBottom:40, borderBottom:'1px solid rgba(255,255,255,0.1)' }}>
-          <div style={{ gridColumn:'span 2' }}>
-            <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:14 }}>
-              <div style={{ width:32, height:32, backgroundColor:'rgba(255,255,255,0.1)', borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center' }}>
-                <span style={{ color:c.green, fontWeight:900, fontSize:18 }}>B</span>
-              </div>
-              <div style={{ lineHeight:1 }}>
-                <div style={{ fontWeight:800, fontSize:15, color:c.white }}>BLITORA</div>
-                <div style={{ fontWeight:700, fontSize:10, letterSpacing:'0.2em', textTransform:'uppercase', color:c.green }}>PULSE</div>
-              </div>
-            </div>
-            <p style={{ fontSize:13, lineHeight:1.6, color:'#9AA3BD', maxWidth:260, marginBottom:6 }}>AI-powered health tracking for individuals, dietitians, and clinics.</p>
-            <a href="https://blitora.com" style={{ fontSize:13, color:c.green, textDecoration:'none' }}>← blitora.com</a>
-          </div>
-          <div>
-            <h4 style={{ color:c.white, fontSize:12, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.15em', marginBottom:14 }}>Product</h4>
-            <ul style={{ listStyle:'none', padding:0, margin:0 }}>
-              {[['Features','#features'],['Pricing','#pricing'],['For individuals','#forwho'],['For clinics','#forwho'],['Sign in','/login']].map(([l,h])=>(
-                <li key={l} style={{ marginBottom:10 }}><a href={h} style={{ fontSize:13, color:'#9AA3BD', textDecoration:'none' }}>{l}</a></li>
-              ))}
-            </ul>
-          </div>
-          <div>
-            <h4 style={{ color:c.white, fontSize:12, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.15em', marginBottom:14 }}>Resources</h4>
-            <ul style={{ listStyle:'none', padding:0, margin:0 }}>
-              {[['Personal Guide','#resources'],['Clinic Brochure','#resources'],['Plan Comparison','#resources'],['Contact us','https://blitora.com/contact']].map(([l,h])=>(
-                <li key={l} style={{ marginBottom:10 }}><a href={h} style={{ fontSize:13, color:'#9AA3BD', textDecoration:'none' }}>{l}</a></li>
-              ))}
-            </ul>
-          </div>
-        </div>
-        <div style={{ paddingTop:24, display:'flex', flexWrap:'wrap', gap:8, alignItems:'center', justifyContent:'space-between', fontSize:12, color:'#6B7494' }}>
-          <span>© 2026 Blitora Technologies. All rights reserved.</span>
-          <span style={{ color:c.green, fontWeight:600 }}>Health Made Intelligent.</span>
-        </div>
-      </div>
-    </footer>
-  );
-}
-
-/* ── ROOT ── */
-export default function PulseIndex() {
+export default function Home() {
   const router = useRouter();
   const [checking, setChecking] = useState(true);
+  const [cur, setCur] = useState('inr');
+  const [bill, setBill] = useState('m');
+  const [aud, setAud] = useState('ind');
+  const [navOpen, setNavOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const [broOpen, setBroOpen] = useState(null); // brochure object or null
+  const [vidOpen, setVidOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [aiOpts, setAiOpts] = useState({ goal:'Lose weight', diet:'Vegetarian', cond:'None', meals:'5 meals' });
+  const planBodyRef = useRef(null);
 
+  // Session redirect
   useEffect(()=>{
-    const supabase = getSupabase();
-    supabase.auth.getSession().then(({data:{session}})=>{
-      if(session) { router.replace('/dashboard'); }
-      else { setChecking(false); }
-    });
+    let cancelled=false;
+    (async()=>{
+      try{
+        const supabase = getSupabase();
+        const { data:{ session } } = await supabase.auth.getSession();
+        if(session && !cancelled){ router.replace('/dashboard'); return; }
+      }catch(e){}
+      if(!cancelled) setChecking(false);
+    })();
+    return ()=>{cancelled=true};
   },[router]);
 
-  if(checking) return (
-    <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'100vh', backgroundColor:c.navy }}>
-      <div style={{ width:40, height:40, border:`3px solid ${c.green}`, borderTopColor:'transparent', borderRadius:'50%', animation:'spin 0.8s linear infinite' }}/>
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-    </div>
+  // Currency auto-detect
+  useEffect(()=>{ if(!detectINR()) setCur('usd'); },[]);
+
+  // Nav scroll
+  useEffect(()=>{
+    const on=()=>setScrolled(window.scrollY>40);
+    window.addEventListener('scroll',on,{passive:true});
+    return ()=>window.removeEventListener('scroll',on);
+  },[]);
+
+  // Reveal on scroll
+  useEffect(()=>{
+    if(checking)return;
+    const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}}),{threshold:.12});
+    document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+    return ()=>io.disconnect();
+  },[checking]);
+
+  // Counters
+  useEffect(()=>{
+    if(checking)return;
+    const cio=new IntersectionObserver(es=>es.forEach(e=>{
+      if(!e.isIntersecting)return;const el=e.target,end=+el.dataset.count,pre=el.dataset.prefix||'',suf=el.dataset.suffix||'';
+      let t0=null;cio.unobserve(el);
+      function step(ts){if(!t0)t0=ts;const p=Math.min((ts-t0)/1100,1);
+        el.innerHTML=pre+Math.round(end*(1-Math.pow(1-p,3)))+suf;if(p<1)requestAnimationFrame(step);}
+      requestAnimationFrame(step);
+    }),{threshold:.5});
+    document.querySelectorAll('.tbig').forEach(el=>cio.observe(el));
+    return ()=>cio.disconnect();
+  },[checking]);
+
+  // Magnetic tilt + ripple
+  useEffect(()=>{
+    if(checking)return;
+    const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const hover=matchMedia('(hover:hover)').matches;
+    if(reduced||!hover)return;
+    const cleanups=[];
+    document.querySelectorAll('.magnet').forEach(b=>{
+      const mm=e=>{const r=b.getBoundingClientRect();b.style.transform=`translate(${(e.clientX-r.left-r.width/2)*.22}px,${(e.clientY-r.top-r.height/2)*.28}px)`;};
+      const ml=()=>b.style.transform='';
+      b.addEventListener('mousemove',mm);b.addEventListener('mouseleave',ml);
+      cleanups.push(()=>{b.removeEventListener('mousemove',mm);b.removeEventListener('mouseleave',ml);});
+    });
+    document.querySelectorAll('.magcard,.who-c,.nudge,.bro-c,.c-line,.tb,.plan,.flip').forEach(c=>{
+      c.style.transition='transform .3s cubic-bezier(.2,.8,.3,1),border-color .3s,box-shadow .3s';
+      const r=document.createElement('span');r.className='mag-ripple';r.setAttribute('aria-hidden','true');c.appendChild(r);
+      const mm=e=>{const b=c.getBoundingClientRect();const x=(e.clientX-b.left)/b.width-.5,y=(e.clientY-b.top)/b.height-.5;
+        c.style.transform=`perspective(900px) rotateX(${(-y*5).toFixed(2)}deg) rotateY(${(x*7).toFixed(2)}deg) translateY(-6px)`;
+        r.style.left=(e.clientX-b.left)+'px';r.style.top=(e.clientY-b.top)+'px';r.style.opacity='1';};
+      const ml=()=>{c.style.transform='';r.style.opacity='0';};
+      c.addEventListener('mousemove',mm);c.addEventListener('mouseleave',ml);
+      cleanups.push(()=>{c.removeEventListener('mousemove',mm);c.removeEventListener('mouseleave',ml);if(r.parentNode)r.parentNode.removeChild(r);});
+    });
+    return ()=>cleanups.forEach(fn=>fn());
+  },[checking]);
+
+  // Hero phone tilt + Holo tilt
+  useEffect(()=>{
+    if(checking)return;
+    const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if(reduced)return;
+    const hp=document.getElementById('heroPhone'),hero=document.querySelector('.hero');
+    const heroMove=e=>{if(!hp)return;const r=hp.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;
+      hp.style.transform=`rotateY(${-14+(e.clientX-cx)/60}deg) rotateX(${6-(e.clientY-cy)/60}deg)`;};
+    hero&&hero.addEventListener('mousemove',heroMove);
+    const holo=document.getElementById('holo'),stage=holo&&holo.parentElement;
+    const holoMove=e=>{if(!holo||!stage)return;const r=stage.getBoundingClientRect();
+      const x=(e.clientX-r.left)/r.width-.5,y=(e.clientY-r.top)/r.height-.5;
+      holo.style.transform=`rotateX(${14-y*16}deg) rotateY(${-6+x*18}deg)`;};
+    const holoLeave=()=>{if(holo)holo.style.transform='rotateX(14deg) rotateY(-6deg)';};
+    stage&&stage.addEventListener('mousemove',holoMove);
+    stage&&stage.addEventListener('mouseleave',holoLeave);
+    return ()=>{
+      hero&&hero.removeEventListener('mousemove',heroMove);
+      stage&&stage.removeEventListener('mousemove',holoMove);
+      stage&&stage.removeEventListener('mouseleave',holoLeave);
+    };
+  },[checking]);
+
+  // Particle ECG field
+  useEffect(()=>{
+    if(checking)return;
+    const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const disposers=[];
+    ['field','field2'].forEach(id=>{
+      const cv=document.getElementById(id);if(!cv)return;
+      const ctx=cv.getContext('2d');const DPR=Math.min(window.devicePixelRatio||1,2);
+      let W,H,pts=[],mouse={x:-9999,y:-9999},raf;
+      function ecgY(t,H){const base=H*.52,a=H*.16,seg=(t*6)%1,cyc=Math.floor(t*6);
+        if(cyc%2)return base;
+        if(seg<.35)return base;
+        if(seg<.42)return base-a*.35*((seg-.35)/.07);
+        if(seg<.5)return base+a*((seg-.42)/.08)*1.1-a*.35;
+        if(seg<.58)return base+a*.75-a*1.9*((seg-.5)/.08);
+        if(seg<.66)return base-a*1.15+a*1.35*((seg-.58)/.08);
+        if(seg<.74)return base+a*.2-a*.2*((seg-.66)/.08);
+        return base;}
+      function init(){
+        W=cv.width=cv.offsetWidth*DPR;H=cv.height=cv.offsetHeight*DPR;
+        cv.style.width='100%';cv.style.height='100%';pts=[];
+        const n=Math.min(240,Math.floor(cv.offsetWidth/6));
+        for(let i=0;i<n;i++){const t=i/(n-1);const hx=t*W,hy=ecgY(t,H);
+          pts.push({hx,hy,x:hx,y:hy,vx:0,vy:0,r:(Math.random()*1.4+.8)*DPR,c:Math.random()<.75?'#2BD99F':'#8B5CF6',tw:Math.random()*6.28});}
+        for(let i=0;i<40;i++){const x=Math.random()*W,y=Math.random()*H;
+          pts.push({hx:x,hy:y,x,y,vx:0,vy:0,r:Math.random()*1.1*DPR+.4,c:'rgba(139,155,191,.5)',dust:1,tw:Math.random()*6.28});}
+      }
+      const rect=()=>cv.getBoundingClientRect();
+      const mm=e=>{const r=rect();mouse.x=(e.clientX-r.left)*DPR;mouse.y=(e.clientY-r.top)*DPR;};
+      const tm=e=>{const r=rect(),t=e.touches[0];mouse.x=(t.clientX-r.left)*DPR;mouse.y=(t.clientY-r.top)*DPR;};
+      window.addEventListener('mousemove',mm);window.addEventListener('touchmove',tm,{passive:true});
+      window.addEventListener('resize',init);
+      function tick(t){
+        ctx.clearRect(0,0,W,H);
+        const R=105*DPR;
+        for(const p of pts){
+          const dx=p.x-mouse.x,dy=p.y-mouse.y,d=Math.hypot(dx,dy);
+          if(d<R&&d>0){const f=(1-d/R)*(p.dust?1.4:3);p.vx+=dx/d*f;p.vy+=dy/d*f;}
+          p.vx+=(p.hx-p.x)*.06;p.vy+=(p.hy-p.y)*.06;p.vx*=.82;p.vy*=.82;
+          p.x+=p.vx;p.y+=p.vy;
+          const a=p.dust?.35:.55+.28*Math.sin(t/900+p.tw);
+          ctx.globalAlpha=a;ctx.fillStyle=p.c;
+          ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,6.28);ctx.fill();
+        }
+        ctx.globalAlpha=.2;ctx.strokeStyle='#2BD99F';ctx.lineWidth=1*DPR;
+        ctx.beginPath();let first=1;for(const p of pts){if(p.dust)continue;first?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y);first=0;}ctx.stroke();
+        ctx.globalAlpha=1;raf=requestAnimationFrame(tick);
+      }
+      init();if(reduced){for(const p of pts){ctx.fillStyle=p.c;ctx.globalAlpha=.5;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,6.28);ctx.fill();}}
+      else raf=requestAnimationFrame(tick);
+      disposers.push(()=>{cancelAnimationFrame(raf);window.removeEventListener('mousemove',mm);window.removeEventListener('touchmove',tm);window.removeEventListener('resize',init);});
+    });
+    return ()=>disposers.forEach(fn=>fn());
+  },[checking]);
+
+  // Dashboard breathing
+  useEffect(()=>{
+    if(checking)return;
+    const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if(reduced)return;
+    const holo=document.getElementById('holo');if(!holo)return;
+    const timers=[];
+    const dio=new IntersectionObserver(es=>es.forEach(e=>{
+      if(!e.isIntersecting)return;dio.unobserve(e.target);
+      const cal=e.target.querySelector('.kpi .kv.g');if(cal){let base=1460,dir=1;timers.push(setInterval(()=>{base+=dir*(Math.random()*4|0);if(base>1478)dir=-1;if(base<1452)dir=1;cal.textContent=base.toLocaleString('en-IN');},1600));}
+      e.target.querySelectorAll('.bar').forEach((b,i)=>{b.style.transitionDelay=(i*90)+'ms';timers.push(setInterval(()=>{b.style.transform=`scaleY(${(1+Math.random()*.04-.02).toFixed(3)})`;},1400+i*70));});
+    }),{threshold:.3});
+    dio.observe(holo);
+    return ()=>{timers.forEach(clearInterval);dio.disconnect();};
+  },[checking]);
+
+  // Matter.js physics — load lib dynamically
+  useEffect(()=>{
+    if(checking)return;
+    const box=document.getElementById('physbox');if(!box)return;
+    let engine,render,runner,mouseCtx;
+    const load=()=>new Promise((res,rej)=>{if(window.Matter){res(window.Matter);return;}
+      const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js';
+      s.onload=()=>res(window.Matter);s.onerror=rej;document.head.appendChild(s);});
+    const io=new IntersectionObserver(async es=>{
+      if(!es[0].isIntersecting||engine)return;io.disconnect();
+      try{const M=await load();
+        const cv=document.getElementById('physcanvas'),w=box.offsetWidth,h=box.offsetHeight;
+        engine=M.Engine.create();engine.gravity.y=1;
+        render=M.Render.create({canvas:cv,engine,options:{width:w,height:h,wireframes:false,background:'transparent',pixelRatio:window.devicePixelRatio||1}});
+        const wall={isStatic:true,render:{visible:false}};
+        M.Composite.add(engine.world,[
+          M.Bodies.rectangle(w/2,h+28,w,60,wall),M.Bodies.rectangle(w/2,-300,w,60,wall),
+          M.Bodies.rectangle(-28,h/2,60,h*3,wall),M.Bodies.rectangle(w+28,h/2,60,h*3,wall)]);
+        const FOODS=[['Paneer 150g · 27g P','#2BD99F'],['Dal bowl · 9g P','#F5B544'],['2 Roti · 6g P','#8B5CF6'],['Egg x2 · 12g P','#3EA6FF'],['Chicken 150g · 33g P','#F4645F'],['Curd 100g · 4g P','#2BD99F'],['Almonds 10 · 3g P','#8B5CF6'],['Sprouts · 8g P','#2BD99F']];
+        const makeFood=x=>{const [label,color]=FOODS[Math.floor(Math.random()*FOODS.length)];
+          const wd=Math.max(96,label.length*7.4),b=M.Bodies.rectangle(x,-30,wd,40,{chamfer:{radius:19},restitution:.55,friction:.28,render:{fillStyle:'rgba(11,21,51,.95)',strokeStyle:color,lineWidth:1.6}});
+          b.foodLabel=label;b.foodColor=color;return b;};
+        for(let i=0;i<8;i++)setTimeout(()=>M.Composite.add(engine.world,makeFood(60+Math.random()*(w-120))),i*160);
+        const mouse=M.Mouse.create(cv),mc=M.MouseConstraint.create(engine,{mouse,constraint:{stiffness:.18,render:{visible:false}}});
+        M.Composite.add(engine.world,mc);mouseCtx=mouse;
+        if(mouse.element&&mouse.mousewheel)mouse.element.removeEventListener('wheel',mouse.mousewheel);
+        M.Render.run(render);runner=M.Runner.create();M.Runner.run(runner,engine);
+        M.Events.on(render,'afterRender',()=>{const DPR=window.devicePixelRatio||1;const c=render.context;
+          c.font=`600 ${11*DPR}px Poppins`;c.textAlign='center';c.textBaseline='middle';
+          for(const b of M.Composite.allBodies(engine.world)){if(!b.foodLabel)continue;
+            c.save();c.translate(b.position.x*DPR,b.position.y*DPR);c.rotate(b.angle);
+            c.fillStyle=b.foodColor;c.fillText(b.foodLabel,0,0);c.restore();}});
+        window._physDrop=()=>M.Composite.add(engine.world,makeFood(60+Math.random()*(w-120)));
+        let flipped=false;window._physFlip=()=>{flipped=!flipped;engine.gravity.y=flipped?-1:1;};
+      }catch(e){console.warn('physics load failed',e);}
+    },{threshold:.25});
+    io.observe(box);
+    return ()=>{io.disconnect();if(runner&&window.Matter){window.Matter.Runner.stop(runner);}if(render&&window.Matter){window.Matter.Render.stop(render);}if(engine&&window.Matter){window.Matter.Engine.clear(engine);}};
+  },[checking]);
+
+  // Escape key closes modals
+  useEffect(()=>{
+    const on=e=>{if(e.key==='Escape'){setBroOpen(null);setVidOpen(false);}};
+    window.addEventListener('keydown',on);return ()=>window.removeEventListener('keydown',on);
+  },[]);
+
+  // AI generate diet chart
+  const genPlan = useCallback(()=>{
+    const body=planBodyRef.current;if(!body)return;
+    const { goal, diet, cond, meals } = aiOpts;
+    body.innerHTML=`<div class="thinking"><div class="tdots"><i></i><i></i><i></i></div>Pulse AI is drafting your day — ${goal.toLowerCase()}, ${diet.toLowerCase()}${cond!=='None'?', '+cond.toLowerCase()+'-safe':''}…</div>`;
+    setTimeout(()=>{
+      const P=PLANS_BY_DIET[diet],six=meals.startsWith('6'),three=meals.startsWith('3');
+      const kcal=goal==='Gain muscle'?2100:goal==='Lose weight'?1450:1700;
+      const prot=goal==='Gain muscle'?110:goal==='Lose weight'?85:75;
+      const pick=a=>a[Math.floor(Math.random()*a.length)];
+      let rows=[['Breakfast',pick(P.b),'~320 kcal · 18 g P']];
+      if(!three)rows.push(['Mid-morning',pick(P.s1),'~140 kcal · 7 g P']);
+      rows.push(['Lunch',pick(P.l),'~460 kcal · 26 g P']);
+      if(!three)rows.push(['Evening',pick(P.s2),'~150 kcal · 8 g P']);
+      if(six)rows.push(['Pre-dinner','Clear veg soup (1 bowl)','~80 kcal · 3 g P']);
+      rows.push(['Dinner',pick(P.d),'~380 kcal · 26 g P']);
+      body.innerHTML=rows.map(r=>`<div class="meal-row show"><span class="mt">${r[0]}</span><span class="mf" data-full="${r[1].replace(/"/g,'&quot;')}"><span class="typed"></span><span class="cursor"></span>${cond==='Diabetes T2'?' <span style="color:var(--blue);font-size:11px;opacity:0" class="lowgi">· low-GI</span>':''}</span><span class="mk" style="opacity:0">${r[2]}</span></div>`).join('')
+        +`<div class="plan-tot" id="ptot" style="opacity:0;transform:translateY(8px);transition:.5s"><div class="ptot"><b>~${kcal.toLocaleString('en-IN')}</b><span>kcal target</span></div><div class="ptot"><b>${prot} g</b><span>protein</span></div><div class="ptot"><b>8</b><span>glasses water</span></div><div class="ptot"><b>3</b><span>walks</span></div></div>
+        <p id="prefine" style="font-size:11.5px;color:var(--muted2);margin-top:14px;opacity:0;transition:.5s .3s">✦ In the app you can refine this in chat — "make dinner lighter", "no mushrooms" — and it re-drafts instantly.</p>`;
+      const rowsEl=[...body.querySelectorAll('.meal-row')];let ri=0;
+      function typeRow(){
+        if(ri>=rowsEl.length){const pt=document.getElementById('ptot'),pr=document.getElementById('prefine');if(pt){pt.style.opacity='1';pt.style.transform='none';}if(pr)pr.style.opacity='1';return;}
+        const row=rowsEl[ri],mf=row.querySelector('.typed'),cur=row.querySelector('.cursor'),full=row.querySelector('.mf').dataset.full,mk=row.querySelector('.mk'),lg=row.querySelector('.lowgi');
+        let ci=0;const t=setInterval(()=>{
+          if(ci>=full.length){clearInterval(t);cur.style.display='none';mk.style.transition='opacity .35s';mk.style.opacity='1';if(lg)lg.style.opacity='1';ri++;setTimeout(typeRow,110);return;}
+          mf.textContent=full.slice(0,++ci);
+        },16);
+      }
+      setTimeout(typeRow,180);
+    },1400);
+  },[aiOpts]);
+
+  const priceFor=(p)=> cur==='inr'? (bill==='m'?p.priceINR_m:p.priceINR_a) : (bill==='m'?p.priceUSD_m:p.priceUSD_a);
+  const currentPlans = aud==='ind'?IND_PLANS:CLI_PLANS;
+  const billedTxt = bill==='a'?'billed annually · save 18%':'billed monthly · cancel anytime';
+  const noteCurrency = cur==='usd'?'Prices in US Dollars (USD). Tax may apply.':'Prices in Indian Rupees (INR). GST may apply.';
+
+  if(checking){
+    return <div style={{minHeight:'100vh',background:'#060D22',display:'grid',placeItems:'center',color:'#8B9BBF',fontFamily:"'Poppins',sans-serif"}}>Loading…</div>;
+  }
+
+  const LogoSVG = ()=> (
+    <svg viewBox="0 0 40 40" fill="none">
+      <rect x="1" y="1" width="38" height="38" rx="9" fill="#0D1B3E"/>
+      <text x="9" y="27" fontFamily="Poppins,Arial" fontWeight="800" fontSize="22" fill="#EAF2FF">B</text>
+      <path d="M24 8 L19 19 L24 19 L20 30 L29 16 L24 16 Z" fill="#2BD99F"/>
+      <path d="M6 33 h8 l2-4 3 7 2-5 h13" stroke="#2BD99F" strokeWidth="1.6" fill="none" strokeLinecap="round"/>
+    </svg>
+  );
+
+  const ecg = (seed)=> (
+    <div className="ecg-div reveal" aria-hidden="true"><svg viewBox="0 0 1400 60" preserveAspectRatio="none">
+      <defs><linearGradient id={`ecgG${seed}`} x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stopColor="#2BD99F" stopOpacity="0"/>
+        <stop offset=".3" stopColor="#2BD99F" stopOpacity=".8"/>
+        <stop offset=".7" stopColor="#8B5CF6" stopOpacity=".8"/>
+        <stop offset="1" stopColor="#8B5CF6" stopOpacity="0"/>
+      </linearGradient></defs>
+      <path className="ecg-path" stroke={`url(#ecgG${seed})`} d="M0 30 L280 30 L305 30 L318 12 L332 48 L346 8 L360 52 L374 22 L390 30 L680 30 L705 30 L718 14 L732 46 L746 10 L760 50 L774 24 L790 30 L1080 30 L1105 30 L1118 12 L1132 48 L1146 8 L1160 52 L1174 22 L1190 30 L1400 30"/>
+    </svg></div>
   );
 
   return (
     <>
       <Head>
-        <title>Blitora Pulse — Health Made Intelligent</title>
-        <meta name="description" content="AI-powered health tracking and patient management. 30-day free trial, no credit card."/>
-        <meta name="viewport" content="width=device-width, initial-scale=1"/>
-        <meta property="og:title" content="Blitora Pulse — Health Made Intelligent"/>
-        <meta property="og:description" content="Tell us your goal. Our AI handles the rest."/>
-        <meta property="og:url" content="https://pulse.blitora.com"/>
-        <meta name="twitter:card" content="summary_large_image"/>
-        <link rel="canonical" href="https://pulse.blitora.com"/>
+        <title>Blitora Pulse — AI Health Tracking for Individuals, Dietitians &amp; Clinics | Health Made Intelligent</title>
+        <meta name="description" content="Blitora Pulse is an AI-powered health platform. Sign up in under 60 seconds, get your first AI diet chart in 3 minutes, and spend just seconds a day logging. For individuals, dietitians and clinics across India and the Gulf." />
+        <meta name="keywords" content="AI health tracking, diet chart AI, dietitian software India, clinic patient management, calorie tracker India, Blitora Pulse" />
+        <meta name="geo.region" content="IN-MH" />
+        <meta name="geo.placename" content="Mumbai" />
+        <meta property="og:title" content="Blitora Pulse — Health Made Intelligent." />
+        <meta property="og:description" content="AI diet charts, daily insights and smart nudges. 60 seconds to sign up. Seconds a day to stay on track." />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://pulse.blitora.com" />
+        <meta property="og:site_name" content="Blitora Pulse" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <link rel="canonical" href="https://pulse.blitora.com" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+        <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{__html: JSON.stringify({"@context":"https://schema.org","@type":"SoftwareApplication","name":"Blitora Pulse","applicationCategory":"HealthApplication","operatingSystem":"Web, iOS, Android (PWA)","description":"AI-powered health tracking and patient management platform for individuals, dietitians and clinics.","url":"https://pulse.blitora.com","brand":{"@type":"Brand","name":"Blitora","url":"https://blitora.com"},"offers":{"@type":"AggregateOffer","priceCurrency":"INR","lowPrice":"99","offerCount":"6"},"publisher":{"@type":"Organization","name":"Blitora","url":"https://blitora.com","email":"hello@blitora.com"}}) }} />
       </Head>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');
-        *{box-sizing:border-box;margin:0;padding:0;font-family:'Poppins',Arial,sans-serif}
-        body{background:#fff;-webkit-font-smoothing:antialiased}
-        a{transition:opacity 0.15s} a:hover{opacity:0.8}
-        button{transition:all 0.15s}
-        @media(max-width:768px){.hide-mobile{display:none!important}}
-      `}</style>
-      <Nav/>
-      <Hero/>
-      <FourAnswers/>
-      <AISection/>
-      <Features/>
-      <ForWho/>
-      <Pricing/>
-      <Brochures/>
-      <CTA/>
-      <Footer/>
+      <style dangerouslySetInnerHTML={{__html: CSS}} />
+      <div className="grain" />
+      <a href="#content" className="skip">Skip to content</a>
+
+      {/* NAV */}
+      <nav className={"mainnav "+(scrolled?'scrolled':'')} id="nav">
+        <div className="wrap nav-in">
+          <a className="logo" href="#top" aria-label="Blitora Pulse home">
+            <div className="logo-mark"><LogoSVG/></div>
+            <div>
+              <span className="logo-word">BLITORA <em>PULSE</em></span>
+              <span className="logo-tag">Health Made Intelligent.</span>
+            </div>
+          </a>
+          <div className={"nav-links"+(navOpen?' open':'')}>
+            <a href="#ai" onClick={()=>setNavOpen(false)}>Pulse AI</a>
+            <a href="#dash" onClick={()=>setNavOpen(false)}>Product</a>
+            <a href="#features" onClick={()=>setNavOpen(false)}>Features</a>
+            <a href="#pricing" onClick={()=>setNavOpen(false)}>Pricing</a>
+            <a href="#contact" onClick={()=>setNavOpen(false)}>Contact</a>
+            <a href="https://blitora.com" target="_blank" rel="noreferrer" style={{color:'#F0824A'}}>← Blitora</a>
+          </div>
+          <div style={{display:'flex',gap:10,alignItems:'center'}}>
+            <a className="btn btn-o btn-sm magnet" href="/login">Sign in</a>
+            <a className="btn btn-g btn-sm magnet" href="/signup">Start free trial</a>
+            <button className="burger" aria-label="Menu" onClick={()=>setNavOpen(o=>!o)}>☰</button>
+          </div>
+        </div>
+      </nav>
+
+      {/* HERO */}
+      <header className="hero" id="top">
+        <canvas id="field" />
+        <div className="hero-glow hg1"></div>
+        <div className="hero-glow hg2"></div>
+        <div className="wrap hero-in">
+          <div>
+            <div className="pill"><span className="dot"></span> PULSE AI · LIVE ON EVERY PLAN</div>
+            <h1>Your health, tracked by AI.<br/><span className="grad">Your effort: seconds a day.</span></h1>
+            <p className="hero-sub">Blitora Pulse turns meals, water, walks, weight, BP and sugar into an AI-built diet plan, a daily insight card, and nudges so specific they name the food and the grams.</p>
+            <div className="hero-ctas">
+              <a className="btn btn-g magnet" href="/signup">Start free trial <span style={{display:'inline-block',transition:'transform .3s'}}>→</span></a>
+              <button className="btn btn-v magnet" onClick={()=>setVidOpen(true)}>▶ Watch 90-sec video</button>
+              <button className="btn btn-o magnet" onClick={()=>setBroOpen(BROCHURES[0])}>↓ Download brochure</button>
+            </div>
+            <div className="time-badges">
+              <div className="tb"><b>&lt; 60 sec</b><span>to sign up</span></div>
+              <div className="tb"><b>~ 3 min</b><span>to your first AI diet chart</span></div>
+              <div className="tb"><b>20 sec/day</b><span>is all logging takes</span></div>
+            </div>
+          </div>
+          <div className="hero-phone">
+            <div className="phone-halo" aria-hidden="true"></div>
+            <div className="phone" id="heroPhone" role="img" aria-label="Blitora Pulse app preview">
+              <div className="phone-scr">
+                <div className="p-top"><span style={{fontFamily:'var(--mono)'}}>09:41</span><div className="p-orb"></div></div>
+                <div className="p-hi">Good morning, <span>Azeem</span> ⚡ 12-day streak</div>
+                <div className="p-card">
+                  <span className="lab">✦ Pulse AI — Today's insight</span>
+                  <p>Protein was low yesterday. Add <b>150 g paneer bhurji</b> at dinner tonight for <b>+27 g protein</b> — you'll hit your target.</p>
+                </div>
+                <div className="p-rings">
+                  <div className="ring"><svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="16" stroke="rgba(255,255,255,.08)" strokeWidth="5" fill="none"/><circle cx="20" cy="20" r="16" stroke="#2BD99F" strokeWidth="5" fill="none" strokeLinecap="round" strokeDasharray="100" strokeDashoffset="28" pathLength="100"/></svg><span className="rv">1,460</span><span className="rl">kcal</span></div>
+                  <div className="ring"><svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="16" stroke="rgba(255,255,255,.08)" strokeWidth="5" fill="none"/><circle cx="20" cy="20" r="16" stroke="#3EA6FF" strokeWidth="5" fill="none" strokeLinecap="round" strokeDasharray="100" strokeDashoffset="46" pathLength="100"/></svg><span className="rv">62 g</span><span className="rl">protein</span></div>
+                  <div className="ring"><svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="16" stroke="rgba(255,255,255,.08)" strokeWidth="5" fill="none"/><circle cx="20" cy="20" r="16" stroke="#F5B544" strokeWidth="5" fill="none" strokeLinecap="round" strokeDasharray="100" strokeDashoffset="18" pathLength="100"/></svg><span className="rv">168 g</span><span className="rl">carbs</span></div>
+                </div>
+                <div className="p-row">
+                  <div className="p-mini"><b>6/8</b><span>glasses</span></div>
+                  <div className="p-mini"><b>2/3</b><span>walks</span></div>
+                  <div className="p-mini"><b>72.4</b><span>kg</span></div>
+                </div>
+              </div>
+            </div>
+            <div className="notif n1">✦ <b>Pulse AI:</b> Your BP log looks stable this week — great consistency.</div>
+            <div className="notif n2">✦ <b>Dr. Meera</b> updated your dinner plan · tap to review</div>
+          </div>
+        </div>
+        <div className="scroll-cue">Scroll — gravity does the rest ↓</div>
+      </header>
+
+      <main id="content">
+
+      {/* TIME STORY */}
+      <section className="story" id="story">
+        {ecg(1)}
+        <div className="wrap">
+          <div className="reveal">
+            <span className="eyebrow">The whole journey, timed</span>
+            <h2 className="sec">Health tracking that respects <span className="g">your time.</span></h2>
+            <p className="sub">Most health apps demand your day. Pulse asks for moments — and the AI does the heavy lifting in between.</p>
+          </div>
+          <div className="tline reveal">
+            <div className="pulse-track"><span className="pulse-dot"></span></div>
+            <div className="tsteps">
+              <div className="tstep magcard">
+                <div className="node"><i></i></div>
+                <span className="tphase">Once · Minute 1</span>
+                <div className="tbig" data-count="60" data-prefix="&lt; " data-suffix=" sec">0</div>
+                <h3>Create your account</h3>
+                <p>Email or Google. No credit card. You're in before your chai cools.</p>
+              </div>
+              <div className="tstep magcard">
+                <div className="node"><i></i></div>
+                <span className="tphase">Once · Minute 4</span>
+                <div className="tbig" data-count="3" data-prefix="~ " data-suffix=" min">0</div>
+                <h3>First AI diet chart</h3>
+                <p>Answer 4 questions — goal, conditions, food preference, meals per day. Pulse AI builds your personal plan.</p>
+              </div>
+              <div className="tstep magcard">
+                <div className="node"><i></i></div>
+                <span className="tphase">Daily · Forever</span>
+                <div className="tbig" data-count="20" data-suffix=" sec<small>/day</small>">0</div>
+                <h3>Stay on track daily</h3>
+                <p>Tap what you ate, tap your water. AI reads the data and nudges you — you just live your life.</p>
+              </div>
+            </div>
+          </div>
+          <p className="tcap reveal">That's it. <b>Under 5 minutes once</b> — then seconds a day, forever.</p>
+        </div>
+      </section>
+
+      {/* AI DEMO */}
+      <section id="ai">
+        {ecg(2)}
+        <div className="wrap">
+          <div className="reveal">
+            <span className="eyebrow">Try it right here</span>
+            <h2 className="sec">Watch Pulse AI build <span className="g">a diet chart</span> in front of you.</h2>
+            <p className="sub">This is the exact flow inside the app. Pick your answers — the AI drafts a full day, macro-balanced, in seconds.</p>
+          </div>
+          <div className="ai-grid">
+            <div className="card reveal">
+              <span className="f-label">Your goal</span>
+              <div className="opts">
+                {['Lose weight','Gain muscle','Manage diabetes','Maintain'].map(o=>
+                  <button key={o} className={"opt"+(aiOpts.goal===o?' on':'')} onClick={()=>setAiOpts(s=>({...s,goal:o}))}>{o}</button>)}
+              </div>
+              <span className="f-label">Food preference</span>
+              <div className="opts">
+                {['Vegetarian','Eggetarian','Non-veg','Vegan'].map(o=>
+                  <button key={o} className={"opt"+(aiOpts.diet===o?' on':'')} onClick={()=>setAiOpts(s=>({...s,diet:o}))}>{o}</button>)}
+              </div>
+              <span className="f-label">Health condition</span>
+              <div className="opts">
+                {['None','Diabetes T2','High BP','Thyroid / PCOD'].map(o=>
+                  <button key={o} className={"opt"+(aiOpts.cond===o?' on':'')} onClick={()=>setAiOpts(s=>({...s,cond:o}))}>{o}</button>)}
+              </div>
+              <span className="f-label">Meals per day</span>
+              <div className="opts">
+                {['3 meals','5 meals','6 meals'].map(o=>
+                  <button key={o} className={"opt"+(aiOpts.meals===o?' on':'')} onClick={()=>setAiOpts(s=>({...s,meals:o}))}>{o}</button>)}
+              </div>
+              <button className="btn btn-g magnet gen-btn" onClick={genPlan}>✦ Generate my AI diet chart</button>
+            </div>
+            <div className="card plan-out reveal">
+              <div className="plan-head"><h4>Your day, drafted by Pulse AI</h4><span className="tag">✦ AI GENERATED</span></div>
+              <div ref={planBodyRef}>
+                <div className="thinking">Pick your answers and hit generate — the AI responds like it does in the app.</div>
+              </div>
+            </div>
+          </div>
+          <div className="nudges reveal">
+            <div className="nudge"><span className="nl">Nudge · 7:42 PM</span>You took low protein today — add protein at dinner. Try <b>150 g paneer bhurji (+27 g)</b> or <b>2 boiled eggs (+12 g)</b>.</div>
+            <div className="nudge"><span className="nl">Nudge · 3:15 PM</span>You're <b>2 glasses</b> behind on water. One now, one at 5 PM and you'll hit your 8-glass goal.</div>
+            <div className="nudge"><span className="nl">Insight · 8:00 AM</span>Your fasting sugar has stayed under <b>110 mg/dL</b> for 6 days straight. Whatever you're doing at dinner — keep it.</div>
+          </div>
+        </div>
+      </section>
+
+      {/* 3D DASHBOARD */}
+      <section className="dash-sec" id="dash">
+        {ecg(3)}
+        <div className="wrap">
+          <div className="reveal" style={{textAlign:'center',maxWidth:700,margin:'0 auto'}}>
+            <span className="eyebrow" style={{justifyContent:'center'}}>The command centre</span>
+            <h2 className="sec">A dashboard that feels <span className="g">holographic.</span></h2>
+            <p className="sub" style={{margin:'0 auto'}}>Move your cursor over it. Every layer floats at its own depth — KPIs, charts and AI alerts hovering above the glass.</p>
+          </div>
+          <div className="stage reveal">
+            <div className="holo" id="holo">
+              <div className="dash">
+                <div className="dash-top">
+                  <span className="dt">⚡ Pulse Dashboard — This week</span>
+                  <span className="dd">LIVE</span>
+                </div>
+                <div className="kpis">
+                  <div className="kpi"><div className="kv g">1,460</div><div className="kl">kcal today</div><div className="ks">▲ on target</div></div>
+                  <div className="kpi"><div className="kv b">62 g</div><div className="kl">protein</div><div className="ks">72% of goal</div></div>
+                  <div className="kpi"><div className="kv a">118/78</div><div className="kl">blood pressure</div><div className="ks">normal</div></div>
+                  <div className="kpi"><div className="kv v">104</div><div className="kl">fasting sugar</div><div className="ks">▼ 6-day best</div></div>
+                </div>
+                <div className="dash-mid">
+                  <div className="chart-card">
+                    <div className="cl"><b>Calories · 7 days</b><span>goal 1,500</span></div>
+                    <div className="bars">
+                      <div className="bar" style={{height:'62%'}}></div><div className="bar" style={{height:'78%'}}></div>
+                      <div className="bar" style={{height:'55%'}}></div><div className="bar" style={{height:'88%'}}></div>
+                      <div className="bar" style={{height:'70%'}}></div><div className="bar" style={{height:'95%'}}></div>
+                      <div className="bar" style={{height:'82%'}}></div>
+                    </div>
+                  </div>
+                  <div className="chart-card">
+                    <div className="cl"><b>Macro split</b><span>today</span></div>
+                    <div className="donut-wrap">
+                      <svg className="donut" viewBox="0 0 42 42">
+                        <circle cx="21" cy="21" r="15.9" fill="none" stroke="rgba(255,255,255,.07)" strokeWidth="6"/>
+                        <circle cx="21" cy="21" r="15.9" fill="none" stroke="#2BD99F" strokeWidth="6" strokeDasharray="46 54" strokeDashoffset="25" pathLength="100" strokeLinecap="round"/>
+                        <circle cx="21" cy="21" r="15.9" fill="none" stroke="#3EA6FF" strokeWidth="6" strokeDasharray="24 76" strokeDashoffset="-21" pathLength="100" strokeLinecap="round"/>
+                        <circle cx="21" cy="21" r="15.9" fill="none" stroke="#F5B544" strokeWidth="6" strokeDasharray="22 78" strokeDashoffset="-46" pathLength="100" strokeLinecap="round"/>
+                      </svg>
+                      <div className="dleg">
+                        <span><i style={{background:'#2BD99F'}}></i>Carbs 46%</span>
+                        <span><i style={{background:'#3EA6FF'}}></i>Protein 24%</span>
+                        <span><i style={{background:'#F5B544'}}></i>Fat 22%</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="float-chip fc1">✦ <b>Pulse AI:</b> 4 of 12 patients haven't logged today</div>
+              <div className="float-chip fc2">✦ <b>Dinner idea:</b> paneer bhurji · +27 g protein</div>
+            </div>
+          </div>
+          <div className="dash-hint reveal">HOVER / TILT — THE DASHBOARD FOLLOWS YOUR CURSOR</div>
+        </div>
+      </section>
+
+      {/* FLIP CARDS */}
+      <section id="features">
+        {ecg(4)}
+        <div className="wrap">
+          <div className="reveal">
+            <span className="eyebrow">Everything inside</span>
+            <h2 className="sec">Flip a card. <span className="g">Meet a feature.</span></h2>
+            <p className="sub">Hover (or tap) to turn each card over.</p>
+          </div>
+          <div className="flips reveal">
+            {[
+              ['✦','AI Diet Chart','Answer <b>4 questions</b> and Pulse AI drafts a full macro-balanced day — dal, roti, paneer level detail, tuned to your condition and food preference.'],
+              ['☀','Daily Insight Card','Every morning, one card: what went well yesterday and the <b>single most useful action</b> for today. No dashboards to decode.'],
+              ['⚡','Smart Nudges','Nudges name the food and the grams — <b>"add 150 g paneer bhurji, +27 g protein."</b> Specific enough to act on immediately.'],
+              ['💬','Pulse AI Chat','Ask anything — goal timelines, food swaps, bedtime advice. The AI already knows <b>your profile, plan and today\'s log.</b>'],
+              ['📈','Full Health Log','Meals, water, 3 daily walks, weight, <b>BP and blood sugar</b> — rings, streaks and 7-day trends in one place.'],
+              ['🏥','Clinic Mode','Invite patients in one email. AI drafts their plan, you refine and send. <b>Compliance badges</b> show who logged today at a glance.'],
+            ].map(([ic,ttl,body],i)=>(
+              <div key={i} className="flip" onClick={e=>e.currentTarget.classList.toggle('tapped')}>
+                <div className="flip-in">
+                  <div className="face front"><div className="ic">{ic}</div><h3>{ttl}</h3><span>Flip to see how</span></div>
+                  <div className="face back"><p dangerouslySetInnerHTML={{__html: body}} /></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* PHYSICS */}
+      <section className="phys">
+        {ecg(5)}
+        <div className="wrap">
+          <div className="reveal">
+            <span className="eyebrow">A little gravity, because we can</span>
+            <h2 className="sec">Your plate, with <span className="g">real physics.</span></h2>
+            <p className="sub">Drag the foods around. Each chip carries its real protein count — this is the same food database inside Pulse.</p>
+          </div>
+          <div id="physbox" className="reveal">
+            <canvas id="physcanvas"></canvas>
+            <div className="phys-hint">Drag · Throw · Stack — Matter.js live</div>
+            <div className="phys-btns">
+              <button className="btn btn-o btn-sm" onClick={()=>window._physDrop&&window._physDrop()}>+ Drop more food</button>
+              <button className="btn btn-o btn-sm" onClick={()=>window._physFlip&&window._physFlip()}>Flip gravity ⤒</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* WHO */}
+      <section>
+        <div className="wrap">
+          <div className="reveal">
+            <span className="eyebrow">Built for three worlds</span>
+            <h2 className="sec">One platform. <span className="g">Three ways to win.</span></h2>
+          </div>
+          <div className="who reveal">
+            <div className="who-c">
+              <div className="wic">🧘</div><h3>Individuals</h3>
+              <p>Self-track with an AI companion that actually coaches you.</p>
+              <ul><li>AI diet chart from 4 answers</li><li>Daily insight + smart nudges</li><li>Water, walks, weight, BP, sugar</li><li>Streaks that keep you honest</li></ul>
+              <div className="trial">30-DAY FREE TRIAL · NO CARD</div>
+            </div>
+            <div className="who-c">
+              <div className="wic">🥗</div><h3>Solo Dietitians</h3>
+              <p>Manage 5–50 patients digitally instead of on WhatsApp and paper.</p>
+              <ul><li>Invite patients by email</li><li>AI drafts the plan — you refine</li><li>See any patient's day, any date</li><li>Send notes and plan updates</li></ul>
+              <div className="trial">14-DAY FREE TRIAL · FULL ACCESS</div>
+            </div>
+            <div className="who-c">
+              <div className="wic">🏥</div><h3>Clinics &amp; Hospitals</h3>
+              <p>Multi-dietitian teams with org-level control and reporting.</p>
+              <ul><li>Assign patients to dietitians</li><li>Compliance dashboard, live</li><li>Org-wide reports &amp; export</li><li>Role-based access built in</li></ul>
+              <div className="trial">14-DAY FREE TRIAL · TEAM READY</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* PRICING — real live numbers */}
+      <section id="pricing" style={{background:'var(--bg2)'}}>
+        {ecg(7)}
+        <div className="wrap" style={{textAlign:'center'}}>
+          <div className="reveal">
+            <span className="eyebrow" style={{justifyContent:'center'}}>Simple pricing</span>
+            <h2 className="sec">Start free. <span className="g">Upgrade when it earns it.</span></h2>
+            <div style={{display:'flex',gap:14,justifyContent:'center',flexWrap:'wrap',marginTop:22}}>
+              <div className="cur-tog">
+                <button className={aud==='ind'?'on':''} onClick={()=>setAud('ind')}>🧘 Individuals</button>
+                <button className={aud==='cli'?'on':''} onClick={()=>setAud('cli')}>🏥 Dietitians &amp; Clinics</button>
+              </div>
+              <div className="cur-tog">
+                <button className={bill==='m'?'on':''} onClick={()=>setBill('m')}>Monthly</button>
+                <button className={bill==='a'?'on':''} onClick={()=>setBill('a')}>Annually <span className="savechip">SAVE 18%</span></button>
+              </div>
+              <div className="cur-tog">
+                <button className={cur==='inr'?'on':''} onClick={()=>setCur('inr')}>₹ INR</button>
+                <button className={cur==='usd'?'on':''} onClick={()=>setCur('usd')}>$ USD</button>
+              </div>
+            </div>
+          </div>
+          <div className="plans reveal" style={{textAlign:'left'}}>
+            {currentPlans.map(p=>(
+              <div key={p.name} className={"plan magcard"+(p.hot?' hot':'')}>
+                {p.hot && <span className="best">MOST POPULAR</span>}
+                {p.badge && <span className="plan-badge">{p.badge}</span>}
+                <h4>{p.name}</h4>
+                <div className="pw">{p.sub}</div>
+                <div className="price"><span>{priceFor(p)}</span><small>/mo</small></div>
+                <div className="billed">{billedTxt}</div>
+                {p.intro && <p className="plan-sub"><b>{p.intro}</b></p>}
+                <ul>
+                  {p.features.map((f,i)=><li key={i} dangerouslySetInnerHTML={{__html: f}} />)}
+                </ul>
+                <a className={"btn magnet "+(p.ctaStyle==='g'?'btn-g':'btn-o')} href={p.ctaHref}>{p.cta}</a>
+                <p className="pricenote">{p.note}</p>
+              </div>
+            ))}
+          </div>
+          <p className="pnote">{noteCurrency} Free trial on Starter plans only · Individual: 30 days · Clinic: 14 days. Billed via Razorpay. Cancel anytime.</p>
+        </div>
+      </section>
+
+      {/* BROCHURES + VIDEO */}
+      <section>
+        <div className="wrap">
+          <div className="reveal">
+            <span className="eyebrow">Take Pulse with you</span>
+            <h2 className="sec">Read it later. <span className="g">Watch it now.</span></h2>
+            <p className="sub">Three lead-gated PDFs and a 90-second product tour.</p>
+          </div>
+          <div className="bro reveal">
+            {BROCHURES.map((b,i)=>(
+              <div key={i} className={"bro-c "+(b.kind||'')}>
+                <div className="bro-ic">📄</div>
+                <div className="bro-meta" style={{marginTop:12}}>{b.meta}</div>
+                <h3>{b.title}</h3>
+                <p>{b.desc}</p>
+                <button className={"btn magnet "+(i===1?'btn-g':'btn-o')} onClick={()=>setBroOpen(b)}>↓ Download PDF</button>
+              </div>
+            ))}
+          </div>
+          <div style={{marginTop:32}} className="reveal">
+            <div className="bro-c vid" style={{textAlign:'center',padding:'46px 30px'}}>
+              <div className="play magnet" role="button" aria-label="Watch video" onClick={()=>setVidOpen(true)}>▶</div>
+              <h3 style={{fontSize:22}}>Watch the 90-second tour</h3>
+              <p style={{margin:'0 auto 22px'}}>See the AI diet chart, the daily insight card and clinic mode — in less time than it takes to boil water.</p>
+              <button className="btn btn-v magnet" onClick={()=>setVidOpen(true)}>▶ Watch video</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* CONTACT */}
+      <section id="contact" style={{background:'var(--bg2)'}}>
+        {ecg(6)}
+        <div className="wrap">
+          <div className="reveal">
+            <span className="eyebrow">Talk to a human</span>
+            <h2 className="sec">Questions? <span className="g">WhatsApp us.</span></h2>
+            <p className="sub">Fill this in and it opens WhatsApp with your message ready — we reply the same day.</p>
+          </div>
+          <ContactForm />
+        </div>
+      </section>
+
+      </main>
+
+      {/* FINAL CTA */}
+      <section className="final">
+        <canvas id="field2"></canvas>
+        <div className="wrap">
+          <div className="reveal">
+            <h2>Your first AI diet chart is<br/><span style={{background:'linear-gradient(92deg,var(--green),var(--violet))',WebkitBackgroundClip:'text',backgroundClip:'text',color:'transparent'}}>3 minutes away.</span></h2>
+            <p className="sub" style={{margin:'0 auto 34px'}}>Sign up in under a minute. No credit card. Cancel anytime.</p>
+            <div style={{display:'flex',gap:14,justifyContent:'center',flexWrap:'wrap'}}>
+              <a className="btn btn-g magnet" href="/signup" style={{padding:'18px 40px',fontSize:17}}>Start free trial →</a>
+              <button className="btn btn-o magnet" onClick={()=>setBroOpen(BROCHURES[0])} style={{padding:'18px 40px',fontSize:17}}>↓ Brochure</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* FOOTER */}
+      <footer>
+        <div className="wrap">
+          <div className="f-grid">
+            <div>
+              <div className="logo" style={{marginBottom:16}}>
+                <div className="logo-mark"><LogoSVG/></div>
+                <div><span className="logo-word">BLITORA <em>PULSE</em></span><span className="logo-tag">Health Made Intelligent.</span></div>
+              </div>
+              <p style={{fontSize:13,color:'var(--muted)',maxWidth:300}}>AI-powered health tracking and patient management for individuals, dietitians and clinics across India and the Gulf.</p>
+            </div>
+            <div><h5>Product</h5><a href="#ai">Pulse AI</a><a href="#dash">Dashboard</a><a href="#features">Features</a><a href="#pricing">Pricing</a></div>
+            <div><h5>Company</h5><a href="https://blitora.com" target="_blank" rel="noreferrer">Blitora</a><a href="https://blitora.com/products" target="_blank" rel="noreferrer">All products</a><a href="#contact">Contact</a></div>
+            <div><h5>Get started</h5><a href="/signup">Sign up free</a><a href="/login">Log in</a><a href="#" onClick={e=>{e.preventDefault();setBroOpen(BROCHURES[0]);}}>Brochure</a></div>
+          </div>
+          <div className="f-bot">
+            <span>© 2026 Blitora Technologies. All rights reserved.</span>
+            <span className="parent">A product of <a href="https://blitora.com" target="_blank" rel="noreferrer">BLITORA</a> — Powering Progress.</span>
+          </div>
+        </div>
+      </footer>
+
+      {/* BROCHURE MODAL (lead capture) */}
+      {broOpen && <BroModal doc={broOpen} onClose={()=>setBroOpen(null)} />}
+
+      {/* VIDEO MODAL */}
+      {vidOpen && (
+        <div className="modal open" role="dialog" aria-modal="true">
+          <div className="m-bg" onClick={()=>setVidOpen(false)}></div>
+          <div className="m-card wide">
+            <button className="m-x" onClick={()=>setVidOpen(false)} aria-label="Close" style={{zIndex:5}}>✕</button>
+            <div className="vid-box">
+              <div>
+                <div className="play">▶</div>
+                <h3>Product tour — 90 seconds</h3>
+                <p>Video coming at launch. In the meantime, try the AI diet chart demo above — it&apos;s live.</p>
+                <a className="btn btn-g magnet" href="/signup" style={{marginTop:22}}>Or just try it live →</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CHATBOT */}
+      <ChatBot open={chatOpen} setOpen={setChatOpen} />
     </>
+  );
+}
+
+/* ────── CHATBOT ────── */
+function ChatBot({ open, setOpen }){
+  const [msgs, setMsgs] = useState([{who:'bot',text:"Hi! 👋 I'm the Pulse Assistant. Ask me about features, pricing or trials — or tap a question below."}]);
+  const [val, setVal] = useState('');
+  const bodyRef = useRef(null);
+  useEffect(()=>{if(bodyRef.current)bodyRef.current.scrollTop=bodyRef.current.scrollHeight;},[msgs]);
+  const ask=q=>{q=(q||'').trim();if(!q)return;
+    setMsgs(m=>[...m,{who:'me',text:q}]);
+    setTimeout(()=>{const a=BOT_ANSWERS.find(b=>b[0].test(q))[1];setMsgs(m=>[...m,{who:'bot',text:a}]);},600);
+    setVal('');
+  };
+  return <>
+    <button id="chatFab" onClick={()=>setOpen(o=>!o)} aria-label="Chat with Pulse Assistant">✦</button>
+    <div id="chatBox" className={open?'open':''}>
+      <div className="cb-head">
+        <div className="p-orb" style={{width:34,height:34}}></div>
+        <div><b>Pulse Assistant</b><span>● Online — instant answers</span></div>
+      </div>
+      <div className="cb-body" ref={bodyRef}>
+        {msgs.map((m,i)=><div key={i} className={"msg "+m.who}>{m.text}</div>)}
+      </div>
+      <div className="cb-chips">
+        <button onClick={()=>ask('How does the AI diet chart work?')}>AI diet chart?</button>
+        <button onClick={()=>ask('What does it cost?')}>Pricing?</button>
+        <button onClick={()=>ask('Is there a free trial?')}>Free trial?</button>
+        <button onClick={()=>ask('I run a clinic')}>For clinics?</button>
+      </div>
+      <div className="cb-foot">
+        <input value={val} onChange={e=>setVal(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')ask(val);}} placeholder="Type a question…" />
+        <button onClick={()=>ask(val)} aria-label="Send">➤</button>
+      </div>
+    </div>
+  </>;
+}
+
+/* ────── CONTACT FORM ────── */
+function ContactForm(){
+  const [n,setN]=useState('');const [em,setEm]=useState('');const [r,setR]=useState('');const [m,setM]=useState('');
+  const send=async()=>{
+    if(!n.trim()||!/^\S+@\S+\.\S+$/.test(em)||!m.trim()){alert('Please fill your name, a valid email and your message.');return;}
+    // Log the lead too (fire-and-forget)
+    try{fetch('/api/lead-capture',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:n,email:em,phone:'',document:'WhatsApp contact',source:'contact_form',message:`Role: ${r} | ${m}`})}).catch(()=>{});}catch(_){}
+    const txt=`Hi Blitora Pulse 👋\nName: ${n}\nEmail: ${em}${r?'\nI am a: '+r:''}\nMessage: ${m}`;
+    window.open('https://wa.me/919619990313?text='+encodeURIComponent(txt),'_blank');
+  };
+  return (
+    <div className="contact-grid">
+      <div className="card reveal">
+        <input className="inp" placeholder="Your name *" value={n} onChange={e=>setN(e.target.value)} />
+        <input className="inp" type="email" placeholder="Email address *" value={em} onChange={e=>setEm(e.target.value)} />
+        <input className="inp" placeholder="I am a… (individual / dietitian / clinic)" value={r} onChange={e=>setR(e.target.value)} />
+        <textarea className="inp" placeholder="Your question or message *" value={m} onChange={e=>setM(e.target.value)}></textarea>
+        <button className="btn wa-btn magnet" onClick={send}>💬 Send on WhatsApp</button>
+        <p style={{fontSize:11.5,color:'var(--muted2)',marginTop:12}}>Your email is included in the message so we can follow up properly.</p>
+      </div>
+      <div className="c-alt reveal">
+        <div className="c-line"><div className="ci">💬</div><div><b>WhatsApp Business</b><span>+91 96199 90313 — fastest reply</span></div></div>
+        <div className="c-line"><div className="ci">✉️</div><div><b>hello@blitora.com</b><span>For demos, partnerships and clinics</span></div></div>
+        <div className="c-line"><div className="ci">🤖</div><div><b>Pulse Assistant</b><span>Bottom-right corner — instant answers, 24/7</span></div></div>
+        <div className="c-line"><div className="ci">🏢</div><div><b>A product of Blitora</b><span>blitora.com — Powering Progress.</span></div></div>
+      </div>
+    </div>
+  );
+}
+
+/* ────── BROCHURE MODAL (lead capture then download) ────── */
+function BroModal({ doc, onClose }){
+  const [name,setName]=useState('');const [email,setEmail]=useState('');const [phone,setPhone]=useState('');
+  const [err,setErr]=useState('');const [loading,setLoading]=useState(false);const [done,setDone]=useState(false);
+  const submit=async e=>{
+    e && e.preventDefault();
+    if(!name.trim()||!email.trim()){setErr('Please enter your name and email.');return;}
+    if(!/^\S+@\S+\.\S+$/.test(email)){setErr('Please enter a valid email address.');return;}
+    setErr('');setLoading(true);
+    try{fetch('/api/lead-capture',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,email,phone,document:doc.title,source:'brochure_download'})}).catch(()=>{});}catch(_){}
+    setLoading(false);setDone(true);
+    setTimeout(()=>{const a=document.createElement('a');a.href=doc.file;a.download=doc.file.replace('/','');document.body.appendChild(a);a.click();a.remove();},400);
+  };
+  return (
+    <div className="modal open" role="dialog" aria-modal="true">
+      <div className="m-bg" onClick={onClose}></div>
+      <div className="m-card">
+        <button className="m-x" onClick={onClose} aria-label="Close">✕</button>
+        {!done ? (
+          <>
+            <h3>📄 {doc.title}</h3>
+            <p className="msub">Tell us where to send updates — your download starts immediately after.</p>
+            <form onSubmit={submit}>
+              <input className="inp" placeholder="Full name *" value={name} onChange={e=>setName(e.target.value)} autoFocus />
+              <input className="inp" type="email" placeholder="Email address *" value={email} onChange={e=>setEmail(e.target.value)} />
+              <input className="inp" placeholder="WhatsApp number (optional)" value={phone} onChange={e=>setPhone(e.target.value)} />
+              {err && <p className="err">{err}</p>}
+              <button type="submit" className="btn btn-g magnet" style={{width:'100%'}} disabled={loading}>{loading?'Preparing…':`↓ Download ${doc.meta}`}</button>
+              <p style={{fontSize:11,color:'var(--muted2)',marginTop:12}}>We&apos;ll email you the launch pricing. No spam — one email, maybe two.</p>
+            </form>
+          </>
+        ) : (
+          <div className="ok-msg">
+            <div className="okic">✓</div>
+            <h3>Downloading…</h3>
+            <p className="msub">Thanks <b style={{color:'var(--green)'}}>{name.split(' ')[0]}</b> — <b>{doc.title}</b> is on its way. Check your downloads folder.</p>
+            <button className="btn btn-o btn-sm" onClick={onClose}>Done</button>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
