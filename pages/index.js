@@ -4,7 +4,7 @@ import Head from 'next/head';
 import { getSupabase } from '../lib/supabase';
 
 /* ==========================================================
-   Blitora Pulse — marketing landing page (v7 — cursor glow + spotlight, location-aware content, light contact/resources, launch offer)
+   Blitora Pulse — marketing landing page (v8 — plate builder replaces physics, strict dark/light alternation, 1-month offer)
    - Real pricing pulled from live site (as-of deploy day)
    - Session check: logged-in users → /dashboard
    - Reuses existing /api/lead-capture + /public brochures
@@ -315,15 +315,13 @@ h1 .grad{background:linear-gradient(92deg,var(--green) 10%,var(--violet) 90%);-w
 
 /* BROCHURE / VIDEO */
 .bro{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-top:52px}
-.bro-c{padding:30px;border-radius:22px;position:relative;overflow:hidden;border:1px solid rgba(29,158,117,.3);background:linear-gradient(150deg,#FFFFFF,#EDF7F2);display:flex;flex-direction:column;box-shadow:0 8px 30px rgba(13,27,62,.07)}
-.bro-c.mid{border-color:rgba(62,166,255,.35);background:linear-gradient(150deg,#FFFFFF,#EAF3FF)}
-.bro-c.vid{border-color:rgba(139,92,246,.35);background:linear-gradient(150deg,#FFFFFF,#F3EEFF)}
-.bro-c h3{font-size:18px;margin:14px 0 8px;color:var(--text-dark)}
-.bro-c p{color:#4A5E80;font-size:13.5px;margin-bottom:18px;flex:1}
-.bro-c .btn-o{color:var(--text-dark);border-color:rgba(13,27,62,.28)}
-.bro-c .btn-o:hover{border-color:var(--green-d);color:var(--green-d)}
-.bro-ic{width:52px;height:52px;border-radius:14px;display:grid;place-items:center;font-size:24px;background:rgba(13,27,62,.05);border:1px solid rgba(13,27,62,.12)}
-.bro-meta{font-family:var(--mono);font-size:10.5px;color:#8896B3;letter-spacing:.14em;text-transform:uppercase;margin-bottom:12px}
+.bro-c{padding:30px;border-radius:22px;position:relative;overflow:hidden;border:1px solid var(--line);background:linear-gradient(150deg,rgba(43,217,159,.09),var(--panel));display:flex;flex-direction:column}
+.bro-c.mid{background:linear-gradient(150deg,rgba(62,166,255,.09),var(--panel))}
+.bro-c.vid{background:linear-gradient(150deg,rgba(139,92,246,.14),var(--panel))}
+.bro-c h3{font-size:18px;margin:14px 0 8px}
+.bro-c p{color:var(--muted);font-size:13.5px;margin-bottom:18px;flex:1}
+.bro-ic{width:52px;height:52px;border-radius:14px;display:grid;place-items:center;font-size:24px;background:rgba(255,255,255,.05);border:1px solid var(--line)}
+.bro-meta{font-family:var(--mono);font-size:10.5px;color:var(--muted2);letter-spacing:.14em;text-transform:uppercase;margin-bottom:12px}
 
 /* CONTACT */
 .contact-grid{display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-top:52px;align-items:start}
@@ -451,6 +449,25 @@ footer{border-top:1px solid rgba(43,217,159,.25);padding:60px 0 36px;background:
 .cx-stats b{display:block;font-family:var(--mono);font-size:15px;color:var(--green-d)}
 .cx-stats span{font-size:10.5px;color:#4A5E80}
 .cx-map{background:linear-gradient(120deg,rgba(29,158,117,.1),rgba(139,92,246,.1));border:1px dashed rgba(13,27,62,.22);border-radius:14px;padding:14px;text-align:center;font-size:12.5px;color:#3D4F70}
+
+/* PLATE BUILDER */
+.plate-wrap{display:grid;grid-template-columns:1.25fr .75fr;gap:26px;margin-top:52px;align-items:start}
+.plate-chips{display:flex;flex-wrap:wrap;gap:12px}
+.pchip{padding:12px 18px;border-radius:100px;border:1.5px solid var(--line);background:rgba(11,21,51,.85);color:#C9D6F2;font-size:13.5px;font-weight:600;display:inline-flex;align-items:center;gap:8px;transition:.25s;cursor:pointer}
+.pchip em{font-style:normal;font-family:var(--mono);font-size:11px;color:var(--muted)}
+.pchip:hover{border-color:rgba(43,217,159,.5);transform:translateY(-3px)}
+.pchip.on{background:rgba(43,217,159,.16);border-color:var(--green);color:#EAFFF6;box-shadow:0 0 18px rgba(43,217,159,.25)}
+.pchip.on em{color:var(--green)}
+.plate-side{background:linear-gradient(160deg,var(--panel),#0A1230);border:1px solid var(--line);border-radius:22px;padding:26px}
+.plate-tot{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+.plate-tot div{text-align:center;padding:12px 6px;border-radius:12px;background:rgba(43,217,159,.07);border:1px solid rgba(43,217,159,.25)}
+.plate-tot b{display:block;font-family:var(--mono);font-size:17px;color:var(--green)}
+.plate-tot span{font-size:10px;color:var(--muted)}
+.plate-bar{height:8px;border-radius:100px;background:rgba(255,255,255,.06);overflow:hidden;margin-bottom:14px}
+.plate-bar i{display:block;height:100%;border-radius:100px;background:linear-gradient(90deg,var(--green),var(--violet));transition:width .5s cubic-bezier(.2,.8,.3,1)}
+.plate-verdict{font-size:14px;color:#EAF2FF;margin-bottom:10px}
+.plate-note{font-size:12px;color:var(--muted)}
+@media (max-width:980px){.plate-wrap{grid-template-columns:1fr}}
 
 /* LIGHT SECTION TEXTURE + AURORA */
 .sec-light{position:relative;overflow:hidden}
@@ -783,51 +800,6 @@ export default function Home() {
     return ()=>{timers.forEach(clearInterval);dio.disconnect();};
   },[checking]);
 
-  // Matter.js physics — load lib dynamically
-  useEffect(()=>{
-    if(checking)return;
-    const box=document.getElementById('physbox');if(!box)return;
-    let engine,render,runner,mouseCtx;
-    const load=()=>new Promise((res,rej)=>{if(window.Matter){res(window.Matter);return;}
-      const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js';
-      s.onload=()=>res(window.Matter);s.onerror=rej;document.head.appendChild(s);});
-    const io=new IntersectionObserver(async es=>{
-      if(!es[0].isIntersecting||engine)return;io.disconnect();
-      try{const M=await load();
-        const cv=document.getElementById('physcanvas'),w=box.offsetWidth,h=box.offsetHeight;
-        engine=M.Engine.create();engine.gravity.y=1;
-        render=M.Render.create({canvas:cv,engine,options:{width:w,height:h,wireframes:false,background:'transparent',pixelRatio:window.devicePixelRatio||1}});
-        const wall={isStatic:true,render:{visible:false}};
-        M.Composite.add(engine.world,[
-          M.Bodies.rectangle(w/2,h+28,w,60,wall),M.Bodies.rectangle(w/2,-300,w,60,wall),
-          M.Bodies.rectangle(-28,h/2,60,h*3,wall),M.Bodies.rectangle(w+28,h/2,60,h*3,wall)]);
-        const FOODS=[['Paneer 150g · 27g P','#2BD99F'],['Dal bowl · 9g P','#F5B544'],['2 Roti · 6g P','#8B5CF6'],['Egg x2 · 12g P','#3EA6FF'],['Chicken 150g · 33g P','#F4645F'],['Curd 100g · 4g P','#2BD99F'],['Almonds 10 · 3g P','#8B5CF6'],['Sprouts · 8g P','#2BD99F'],['Salmon 100g · 20g P','#3EA6FF'],['Greek yogurt · 10g P','#2BD99F'],['Tofu 100g · 8g P','#8B5CF6'],['Quinoa cup · 8g P','#F5B544'],['Oats bowl · 6g P','#F5B544'],['Avocado · 3g P','#2BD99F']];
-        const makeFood=x=>{const [label,color]=FOODS[Math.floor(Math.random()*FOODS.length)];
-          const wd=Math.max(96,label.length*7.4),b=M.Bodies.rectangle(x,-30,wd,40,{chamfer:{radius:19},restitution:.55,friction:.28,render:{fillStyle:'rgba(11,21,51,.95)',strokeStyle:color,lineWidth:1.6}});
-          b.foodLabel=label;b.foodColor=color;return b;};
-        for(let i=0;i<8;i++)setTimeout(()=>M.Composite.add(engine.world,makeFood(60+Math.random()*(w-120))),i*160);
-        const mouse=M.Mouse.create(cv),mc=M.MouseConstraint.create(engine,{mouse,constraint:{stiffness:.18,render:{visible:false}}});
-        M.Composite.add(engine.world,mc);mouseCtx=mouse;
-        if(mouse.element&&mouse.mousewheel)mouse.element.removeEventListener('wheel',mouse.mousewheel);
-        M.Render.run(render);runner=M.Runner.create();M.Runner.run(runner,engine);
-        M.Events.on(render,'afterRender',()=>{const c=render.context;
-          c.font='600 12px Poppins,Arial,sans-serif';c.textAlign='center';c.textBaseline='middle';
-          for(const b of M.Composite.allBodies(engine.world)){if(!b.foodLabel)continue;
-            c.save();c.translate(b.position.x,b.position.y);c.rotate(b.angle);
-            c.fillStyle=b.foodColor;
-            c.shadowColor=b.foodColor;c.shadowBlur=6;
-            c.fillText(b.foodLabel,0,1);c.restore();}});
-        window._physDrop=()=>M.Composite.add(engine.world,makeFood(60+Math.random()*(w-120)));
-        let flipped=false;window._physFlip=()=>{flipped=!flipped;engine.gravity.y=flipped?-1:1;};
-        window._physBoom=()=>{for(const b of M.Composite.allBodies(engine.world)){if(!b.foodLabel)continue;
-          M.Body.setVelocity(b,{x:(Math.random()-.5)*18,y:-(6+Math.random()*11)});
-          M.Body.setAngularVelocity(b,(Math.random()-.5)*.45);}};
-      }catch(e){console.warn('physics load failed',e);}
-    },{threshold:.25});
-    io.observe(box);
-    return ()=>{io.disconnect();if(runner&&window.Matter){window.Matter.Runner.stop(runner);}if(render&&window.Matter){window.Matter.Render.stop(render);}if(engine&&window.Matter){window.Matter.Engine.clear(engine);}};
-  },[checking]);
-
   // Escape key closes modals
   useEffect(()=>{
     const on=e=>{if(e.key==='Escape'){setBroOpen(null);setVidOpen(false);}};
@@ -920,7 +892,7 @@ export default function Home() {
       <div className="grain" />
       {offerOn && (
         <div className="offerbar" role="note">
-          <span>🚀 <b>Launch offer:</b> first 100 signups get <b>3 months of Plus free</b></span>
+          <span>🚀 <b>Launch offer:</b> first 100 signups get <b>1 month of Plus free</b></span>
           <a href="/signup?offer=launch100">Claim →</a>
           <button aria-label="Dismiss offer" onClick={()=>setOfferOn(false)}>✕</button>
         </div>
@@ -1203,23 +1175,15 @@ export default function Home() {
       </section>
 
       {/* PHYSICS */}
-      <section className="phys">
-        {ecg(5)}
+      <section className="phys" id="plate">
+        {ecg(12)}
         <div className="wrap">
           <div className="reveal">
-            <span className="eyebrow">A little gravity, because we can</span>
-            <h2 className="sec">Your plate, with <span className="g">real physics.</span></h2>
-            <p className="sub">Drag the foods around. Each chip carries its real protein count — this is the same food database inside Pulse.</p>
+            <span className="eyebrow">Try the food database</span>
+            <h2 className="sec">Build a plate. <span className="g">Watch the macros move.</span></h2>
+            <p className="sub">Tap foods on and off your plate — calories and protein update live, and Pulse AI judges the plate exactly like it does in the app.</p>
           </div>
-          <div id="physbox" className="reveal">
-            <canvas id="physcanvas"></canvas>
-            <div className="phys-hint">Drag · Throw · Stack — Matter.js live</div>
-            <div className="phys-btns">
-              <button className="btn btn-o btn-sm" onClick={()=>window._physDrop&&window._physDrop()}>+ Drop more food</button>
-              <button className="btn btn-o btn-sm" onClick={()=>window._physFlip&&window._physFlip()}>Flip gravity ⤒</button>
-              <button className="btn btn-o btn-sm" onClick={()=>window._physBoom&&window._physBoom()}>💥 Explode</button>
-            </div>
-          </div>
+          <PlateBuilder/>
         </div>
       </section>
 
@@ -1302,14 +1266,12 @@ export default function Home() {
       </section>
 
       {/* BROCHURES + VIDEO */}
-      <section className="sec-light" style={{background:'linear-gradient(180deg,var(--light),var(--light2))'}}>
-        <div className="aurora au-b" style={{width:520,height:520,top:-170,left:-150}} />
-        <div className="aurora au-g" style={{width:460,height:460,bottom:-190,right:-130}} />
+      <section>
         <div className="wrap">
           <div className="reveal">
-            <span className="eyebrow" style={{color:'var(--green-d)'}}>Take Pulse with you</span>
-            <h2 className="sec" style={{color:'var(--text-dark)'}}>Read it later. <span className="g">Watch it now.</span></h2>
-            <p className="sub" style={{color:'#3D4F70'}}>Three lead-gated PDFs and a 90-second product tour.</p>
+            <span className="eyebrow">Take Pulse with you</span>
+            <h2 className="sec">Read it later. <span className="g">Watch it now.</span></h2>
+            <p className="sub">Three lead-gated PDFs and a 90-second product tour.</p>
           </div>
           <div className="bro reveal">
             {BROCHURES.map((b,i)=>(
@@ -1448,6 +1410,44 @@ function ChatBot({ open, setOpen }){
   </>;
 }
 
+/* ────── PLATE BUILDER ────── */
+function PlateBuilder(){
+  const FOODS=[
+    ['Paneer 150g',265,27],['Dal bowl',180,9],['2 Roti',200,6],['Egg x2',156,12],
+    ['Chicken 150g',248,33],['Curd 100g',60,4],['Almonds 10',70,3],['Sprouts bowl',110,8],
+    ['Salmon 100g',208,20],['Greek yogurt',97,10],['Tofu 100g',76,8],['Quinoa cup',222,8],
+    ['Oats bowl',150,6],['Avocado ½',120,2]
+  ];
+  const [sel,setSel]=useState([0,4,7]);
+  const toggle=i=>setSel(s=>s.includes(i)?s.filter(x=>x!==i):[...s,i]);
+  const kcal=sel.reduce((a,i)=>a+FOODS[i][1],0);
+  const prot=sel.reduce((a,i)=>a+FOODS[i][2],0);
+  const verdict= prot>=45?'💪 Excellent protein — this plate works hard for you.'
+    : prot>=25?'✦ Decent plate. One more protein source would make it great.'
+    : '⚠ Protein is light here — add paneer, eggs, chicken or tofu.';
+  return (
+    <div className="plate-wrap reveal">
+      <div className="plate-chips">
+        {FOODS.map((f,i)=>(
+          <button key={f[0]} className={'pchip'+(sel.includes(i)?' on':'')} onClick={()=>toggle(i)}>
+            {f[0]}<em>{f[2]}g P</em>
+          </button>
+        ))}
+      </div>
+      <div className="plate-side">
+        <div className="plate-tot">
+          <div><b>{kcal.toLocaleString('en-IN')}</b><span>kcal on plate</span></div>
+          <div><b>{prot} g</b><span>protein</span></div>
+          <div><b>{sel.length}</b><span>items</span></div>
+        </div>
+        <div className="plate-bar"><i style={{width:Math.min(100,Math.round(prot/60*100))+'%'}}></i></div>
+        <p className="plate-verdict">{verdict}</p>
+        <p className="plate-note">Same food database that powers Pulse — every log updates your macros instantly.</p>
+      </div>
+    </div>
+  );
+}
+
 /* ────── CONTACT FORM ────── */
 function ContactForm(){
   const [n,setN]=useState('');const [em,setEm]=useState('');const [r,setR]=useState('');const [m,setM]=useState('');
@@ -1481,7 +1481,7 @@ function ContactForm(){
           <div><b>7 days</b><span>a week</span></div>
           <div><b>EN · HI</b><span>languages</span></div>
         </div>
-        <div className="cx-map" aria-hidden="true"><span>🇮🇳 Mumbai · Serving India, the Gulf &amp; the world</span></div>
+        <div className="cx-map" aria-hidden="true"><span>🔒 Private by design — your health data is encrypted and never sold.</span></div>
       </div>
     </div>
   );
