@@ -1,5 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!-- Navy background -->
   <rect width="32" height="32" rx="7" fill="#0D1B3E"/>
-  <text x="5" y="23" font-family="Arial Black,Arial" font-weight="900" font-size="19" fill="#EAF2FF">B</text>
-  <polygon points="20,4 15.5,15 19.5,15 16,28 25,13 20.5,13" fill="#2BD99F"/>
+  <!-- Letter B: vertical bar -->
+  <rect x="5.5" y="5.5" width="4.5" height="21" rx="1" fill="#FFFFFF"/>
+  <!-- Letter B: top bump -->
+  <path d="M10 5.5 Q19 5.5 19 11 Q19 16.5 10 16.5Z" fill="#FFFFFF"/>
+  <!-- Letter B: bottom bump -->
+  <path d="M10 15.5 Q20 15.5 20 21 Q20 26.5 10 26.5Z" fill="#FFFFFF"/>
+  <!-- Green lightning bolt -->
+  <polygon points="22,4 16.5,15 20,15 14,28 25.5,14.5 21.5,14.5 26,4" fill="#2AE8A4"/>
 </svg>
