@@ -18,6 +18,7 @@ const WALKS=[{k:"morning_walk",l:"Morning",icon:"🌅",target:40,max:60},{k:"pos
 const MEAL_DEFS=[{id:"morning",label:"Morning",time:"7:00 AM",icon:"☀️"},{id:"breakfast",label:"Breakfast",time:"8:00 AM",icon:"🍳"},{id:"midmorning",label:"Mid-morning",time:"11:00 AM",icon:"☕"},{id:"lunch",label:"Lunch",time:"1:00 PM",icon:"🍽️"},{id:"evening",label:"Evening snack",time:"4:30 PM",icon:"🌆"},{id:"dinner",label:"Dinner",time:"7:30 PM",icon:"🌙"}];
 
 const fmt=d=>d.toISOString().split("T")[0];
+function useResponsive(){const[w,setW]=useState(1400);useEffect(()=>{if(typeof window==='undefined')return;setW(window.innerWidth);const h=()=>setW(window.innerWidth);window.addEventListener('resize',h);return()=>window.removeEventListener('resize',h);},[]);return{isMobile:w<768,isTablet:w<1100};}
 const today=()=>fmt(new Date());
 function dayLabel(dk){const t=today(),y=fmt(new Date(Date.now()-86400000));if(dk===t)return"Today";if(dk===y)return"Yesterday";return new Date(dk).toLocaleDateString("en-IN",{day:"numeric",month:"short"});}
 function calcBMR(p){if(!p)return 1800;const w=parseFloat(p.weight_current)||parseFloat(p.weight_start)||70,h=parseFloat(p.height_cm)||165,age=p.dob?Math.floor((Date.now()-new Date(p.dob))/(365.25*864e5)):parseInt(p.age)||30,base=Math.round(10*w+6.25*h-5*age);return p.gender==="Female"?base-161:base+5;}
@@ -88,7 +89,7 @@ function VitalsCard({vitals,profile,router}){
           <div style={{fontSize:11}}>Log your weight, blood pressure & blood sugar from the Log tab</div>
         </div>
       ):(
-        <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10}}>
+        <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"repeat(2,1fr)",gap:10}}>
           {/* Weight */}
           <div style={{padding:13,background:"rgba(255,255,255,.04)",borderRadius:13,border:`1px solid ${BRD}`}}>
             <div style={{fontSize:10,fontWeight:600,color:BGY,marginBottom:6,letterSpacing:".5px"}}>⚖️ WEIGHT</div>
@@ -176,6 +177,7 @@ export default function Dashboard(){
   const [tomorrowPlan,setTomorrowPlan]=useState(null);
   const [tomorrowLoading,setTomorrowLoading]=useState(false);
   const [showTomorrow,setShowTomorrow]=useState(false);
+  const {isMobile,isTablet}=useResponsive();
 
   // Orb animation
   useEffect(()=>{
@@ -232,7 +234,7 @@ export default function Dashboard(){
     if(!profile)return;setTomorrowLoading(true);setShowTomorrow(true);
     try{
       const macNow=allFoodsCalFromLog(log,foods);
-      const res=await fetch('/api/ai/tomorrow-plan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:profile.id,plan:profile.plan||'trial',profile:{dietaryPref:profile.diet_type||'Mixed',healthConditions:profile.conditions?Object.keys(profile.conditions).filter(k=>k!=='none'):[],mealPlanType:profile.meals_per_day||5,dailyCalorieTarget:profile.calorie_target||1600,proteinTarget:profile.protein_target||100,carbTarget:profile.carb_target||130,fatTarget:profile.fat_target||55},todayLog:{totalCalories:macNow},country:profile.country||null})});
+      const res=await fetch('/api/ai/tomorrow-plan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:profile.id,plan:(!profile.plan||profile.plan==='trial')?'individual_pro':profile.plan,profile:{dietaryPref:profile.diet_type||'Mixed',healthConditions:profile.conditions?Object.keys(profile.conditions).filter(k=>k!=='none'):[],mealPlanType:profile.meals_per_day||5,dailyCalorieTarget:profile.calorie_target||1600,proteinTarget:profile.protein_target||100,carbTarget:profile.carb_target||130,fatTarget:profile.fat_target||55},todayLog:{totalCalories:macNow},country:profile.country||null})});
       const data=await res.json();
       setTomorrowPlan(data.error==='not_available'?{notAvailable:true}:(data.plan||null));
     }catch(e){console.error(e);}finally{setTomorrowLoading(false);}
@@ -313,7 +315,7 @@ export default function Dashboard(){
           </div>
 
           {/* MAIN GRID */}
-          <div style={{display:"grid",gridTemplateColumns:"min(340px,38%) 1fr",gap:20,alignItems:"start"}}>
+          <div style={{display:"grid",gridTemplateColumns:isTablet?"1fr":"min(340px,38%) 1fr",gap:20,alignItems:"start"}}>
 
             {/* LEFT: VITALITY ORB */}
             <div style={{background:GLS,border:`1px solid ${BRD}`,borderRadius:20,padding:"26px 20px",backdropFilter:"blur(16px)",textAlign:"center",overflow:"hidden"}}>
@@ -375,7 +377,7 @@ export default function Dashboard(){
             <div style={{display:"grid",gap:18}}>
 
               {/* KPI ROW 1: Nutrition */}
-              <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14}}>
+              <div style={{display:"grid",gridTemplateColumns:isMobile?"repeat(2,1fr)":"repeat(4,1fr)",gap:14}}>
                 <KPICard icon="🔥" value={mac.cal} unit={`/ ${calTarget}`} label="Calories eaten" sub={mac.cal>=calTarget*.8?"On track":`${calTarget-mac.cal} to go`} subColor={mac.cal>=calTarget*.8?G:AMB}/>
                 <KPICard icon="⚡" value={mac.cal>0?BMR+walkBurn:"—"} unit={mac.cal>0?"kcal burned":""} label="Total burn" sub={walkBurn>0?`+${walkBurn} from walks`:null}/>
                 <KPICard icon="💪" value={`${mac.pro}g`} unit={`/ ${proTarget}g`} label="Protein" sub={mac.pro>=proTarget?"✓ Goal met":null} subColor={G}/>
@@ -383,7 +385,7 @@ export default function Dashboard(){
               </div>
 
               {/* KPI ROW 2: Vitals */}
-              <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14}}>
+              <div style={{display:"grid",gridTemplateColumns:isMobile?"repeat(2,1fr)":"repeat(4,1fr)",gap:14}}>
                 <KPICard icon="⚖️" value={vitals.weight_kg?Number(vitals.weight_kg).toFixed(1):"—"} unit={vitals.weight_kg?"kg":""} label="Weight today" sub={vitals.weight_kg&&profile?.weight_target?`Goal: ${profile.weight_target}kg`:null}/>
                 <KPICard icon="💓" value={vitals.bp_systolic?`${vitals.bp_systolic}/${vitals.bp_diastolic}`:"—"} unit={vitals.bp_systolic?"mmHg":""} label="Blood pressure" sub={bpStatus(vitals.bp_systolic,vitals.bp_diastolic)?.t} subColor={bpStatus(vitals.bp_systolic,vitals.bp_diastolic)?.c}/>
                 <KPICard icon="🩸" value={vitals.sugar_fasting||"—"} unit={vitals.sugar_fasting?"mg/dL":""} label="Sugar (fasting)" sub={sugarStatus(vitals.sugar_fasting,"fasting")?.t} subColor={sugarStatus(vitals.sugar_fasting,"fasting")?.c}/>
@@ -393,7 +395,7 @@ export default function Dashboard(){
               {/* MACROS */}
               <div style={{background:GLS,border:`1px solid ${BRD}`,borderRadius:20,padding:20,backdropFilter:"blur(16px)"}}>
                 <h3 style={{fontSize:13,fontWeight:600,color:"#DCE3F0",display:"flex",alignItems:"center",gap:8,marginBottom:16}}><span style={{width:7,height:7,borderRadius:"50%",background:GL,boxShadow:`0 0 8px ${GL}`,display:"inline-block"}}/>MACROS TODAY</h3>
-                <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:4}}>
+                <div style={{display:"grid",gridTemplateColumns:isMobile?"repeat(3,1fr)":"repeat(5,1fr)",gap:4}}>
                   <MacroRing value={mac.cal} max={calTarget} color={G} label="Calories" sub={`${mac.cal}/${calTarget}`}/>
                   <MacroRing value={mac.pro} max={proTarget} color={BLU} label="Protein" sub={`${mac.pro}/${proTarget}g`}/>
                   <MacroRing value={mac.carb} max={profile?.carb_target||130} color={AMB} label="Carbs" sub={`${mac.carb}/${profile?.carb_target||130}g`}/>
@@ -419,7 +421,7 @@ export default function Dashboard(){
               <span style={{display:"flex",alignItems:"center",gap:8}}><span style={{width:7,height:7,borderRadius:"50%",background:GL,boxShadow:`0 0 8px ${GL}`,display:"inline-block"}}/>DAILY HABITS</span>
               <span style={{fontSize:12,fontWeight:700,color:habDone===HABITS.length?GL:BGY}}>{habDone}/{HABITS.length}</span>
             </h3>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:8}}>
+            <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"repeat(auto-fill,minmax(200px,1fr))",gap:8}}>
               {HABITS.map(h=>(
                 <div key={h} onClick={()=>persist({habits:{...log.habits,[h]:!log.habits[h]}})} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderRadius:13,background:log.habits[h]?"rgba(29,158,117,.12)":"rgba(255,255,255,.03)",border:`1px solid ${log.habits[h]?"rgba(42,232,164,.3)":BRD}`,cursor:"pointer",transition:".2s"}}>
                   <div style={{width:20,height:20,borderRadius:"50%",border:`2px solid ${log.habits[h]?GL:BRD}`,background:log.habits[h]?GL:"transparent",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:"#fff",fontWeight:900,flexShrink:0,transition:".2s"}}>{log.habits[h]?"✓":""}</div>
