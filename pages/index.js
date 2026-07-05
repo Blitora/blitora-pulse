@@ -4,7 +4,7 @@ import Head from 'next/head';
 import { getSupabase } from '../lib/supabase';
 
 /* ==========================================================
-   Blitora Pulse — marketing landing page (v8 — plate builder replaces physics, strict dark/light alternation, 1-month offer)
+   Blitora Pulse — marketing landing page (v9 — crisp ECG line replaces particle field in hero & final CTA)
    - Real pricing pulled from live site (as-of deploy day)
    - Session check: logged-in users → /dashboard
    - Reuses existing /api/lead-capture + /public brochures
@@ -70,6 +70,10 @@ nav.mainnav.scrolled{background:rgba(6,13,34,.82);backdrop-filter:blur(18px);bor
 .hero-glow{position:absolute;width:640px;height:640px;border-radius:50%;filter:blur(140px);opacity:.22;pointer-events:none}
 .hg1{background:var(--green);top:-180px;right:-120px}
 .hg2{background:var(--violet);bottom:-240px;left:-160px}
+.heroline{position:absolute;left:0;right:0;top:52%;height:120px;transform:translateY(-50%);pointer-events:none;z-index:0;opacity:.45;filter:drop-shadow(0 0 8px rgba(43,217,159,.35))}
+.heroline svg{width:100%;height:100%}
+.hl-path{fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:2900;stroke-dashoffset:2900;animation:hldraw 8s linear infinite}
+@keyframes hldraw{0%{stroke-dashoffset:2900}72%{stroke-dashoffset:0}100%{stroke-dashoffset:0}}
 .hero-in{position:relative;z-index:3;display:grid;grid-template-columns:1.05fr .95fr;gap:56px;align-items:center;width:100%}
 .pill{display:inline-flex;align-items:center;gap:9px;padding:8px 16px;border-radius:100px;border:1px solid var(--line2);background:rgba(43,217,159,.07);font-family:var(--mono);font-size:12px;color:var(--green);margin-bottom:26px}
 .pill .dot{width:7px;height:7px;border-radius:50%;background:var(--green);animation:blink 1.6s infinite}
@@ -729,61 +733,6 @@ export default function Home() {
     };
   },[checking]);
 
-  // Particle ECG field
-  useEffect(()=>{
-    if(checking)return;
-    const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const disposers=[];
-    ['field','field2'].forEach(id=>{
-      const cv=document.getElementById(id);if(!cv)return;
-      const ctx=cv.getContext('2d');const DPR=Math.min(window.devicePixelRatio||1,2);
-      let W,H,pts=[],mouse={x:-9999,y:-9999},raf;
-      function ecgY(t,H){const base=H*.52,a=H*.16,seg=(t*6)%1,cyc=Math.floor(t*6);
-        if(cyc%2)return base;
-        if(seg<.35)return base;
-        if(seg<.42)return base-a*.35*((seg-.35)/.07);
-        if(seg<.5)return base+a*((seg-.42)/.08)*1.1-a*.35;
-        if(seg<.58)return base+a*.75-a*1.9*((seg-.5)/.08);
-        if(seg<.66)return base-a*1.15+a*1.35*((seg-.58)/.08);
-        if(seg<.74)return base+a*.2-a*.2*((seg-.66)/.08);
-        return base;}
-      function init(){
-        W=cv.width=cv.offsetWidth*DPR;H=cv.height=cv.offsetHeight*DPR;
-        cv.style.width='100%';cv.style.height='100%';pts=[];
-        const n=Math.min(240,Math.floor(cv.offsetWidth/6));
-        for(let i=0;i<n;i++){const t=i/(n-1);const hx=t*W,hy=ecgY(t,H);
-          pts.push({hx,hy,x:hx,y:hy,vx:0,vy:0,r:(Math.random()*1.4+.8)*DPR,c:Math.random()<.75?'#2BD99F':'#8B5CF6',tw:Math.random()*6.28});}
-        for(let i=0;i<40;i++){const x=Math.random()*W,y=Math.random()*H;
-          pts.push({hx:x,hy:y,x,y,vx:0,vy:0,r:Math.random()*1.1*DPR+.4,c:'rgba(139,155,191,.5)',dust:1,tw:Math.random()*6.28});}
-      }
-      const rect=()=>cv.getBoundingClientRect();
-      const mm=e=>{const r=rect();mouse.x=(e.clientX-r.left)*DPR;mouse.y=(e.clientY-r.top)*DPR;};
-      const tm=e=>{const r=rect(),t=e.touches[0];mouse.x=(t.clientX-r.left)*DPR;mouse.y=(t.clientY-r.top)*DPR;};
-      window.addEventListener('mousemove',mm);window.addEventListener('touchmove',tm,{passive:true});
-      window.addEventListener('resize',init);
-      function tick(t){
-        ctx.clearRect(0,0,W,H);
-        const R=105*DPR;
-        for(const p of pts){
-          const dx=p.x-mouse.x,dy=p.y-mouse.y,d=Math.hypot(dx,dy);
-          if(d<R&&d>0){const f=(1-d/R)*(p.dust?1.4:3);p.vx+=dx/d*f;p.vy+=dy/d*f;}
-          p.vx+=(p.hx-p.x)*.06;p.vy+=(p.hy-p.y)*.06;p.vx*=.82;p.vy*=.82;
-          p.x+=p.vx;p.y+=p.vy;
-          const a=p.dust?.35:.55+.28*Math.sin(t/900+p.tw);
-          ctx.globalAlpha=a;ctx.fillStyle=p.c;
-          ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,6.28);ctx.fill();
-        }
-        ctx.globalAlpha=.2;ctx.strokeStyle='#2BD99F';ctx.lineWidth=1*DPR;
-        ctx.beginPath();let first=1;for(const p of pts){if(p.dust)continue;first?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y);first=0;}ctx.stroke();
-        ctx.globalAlpha=1;raf=requestAnimationFrame(tick);
-      }
-      init();if(reduced){for(const p of pts){ctx.fillStyle=p.c;ctx.globalAlpha=.5;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,6.28);ctx.fill();}}
-      else raf=requestAnimationFrame(tick);
-      disposers.push(()=>{cancelAnimationFrame(raf);window.removeEventListener('mousemove',mm);window.removeEventListener('touchmove',tm);window.removeEventListener('resize',init);});
-    });
-    return ()=>disposers.forEach(fn=>fn());
-  },[checking]);
-
   // Dashboard breathing
   useEffect(()=>{
     if(checking)return;
@@ -854,6 +803,15 @@ export default function Home() {
       <path d="M24 8 L19 19 L24 19 L20 30 L29 16 L24 16 Z" fill="#2BD99F"/>
       <path d="M6 33 h8 l2-4 3 7 2-5 h13" stroke="#2BD99F" strokeWidth="1.6" fill="none" strokeLinecap="round"/>
     </svg>
+  );
+
+  const HeroLine = ({seed})=> (
+    <div className="heroline" aria-hidden="true"><svg viewBox="0 0 1400 120" preserveAspectRatio="none">
+      <defs><linearGradient id={`hlg${seed}`} x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stopColor="#2BD99F" stopOpacity="0"/><stop offset=".25" stopColor="#2BD99F"/><stop offset=".75" stopColor="#8B5CF6"/><stop offset="1" stopColor="#8B5CF6" stopOpacity="0"/>
+      </linearGradient></defs>
+      <path className="hl-path" stroke={`url(#hlg${seed})`} d="M0 60 L240 60 L262 60 L274 34 L288 88 L302 18 L316 100 L330 44 L344 60 L620 60 L642 60 L654 32 L668 90 L682 16 L696 102 L710 42 L724 60 L1000 60 L1022 60 L1034 34 L1048 88 L1062 18 L1076 100 L1090 44 L1104 60 L1400 60"/>
+    </svg></div>
   );
 
   const ecg = (seed)=> (
@@ -927,7 +885,7 @@ export default function Home() {
 
       {/* HERO */}
       <header className="hero" id="top">
-        <canvas id="field" />
+        <HeroLine seed="A"/>
         <div className="hero-glow hg1"></div>
         <div className="hero-glow hg2"></div>
         <div className="wrap hero-in">
@@ -1313,7 +1271,7 @@ export default function Home() {
 
       {/* FINAL CTA */}
       <section className="final">
-        <canvas id="field2"></canvas>
+        <HeroLine seed="B"/>
         <div className="wrap">
           <div className="reveal">
             <h2>Your first AI diet chart is<br/><span style={{background:'linear-gradient(92deg,var(--green),var(--violet))',WebkitBackgroundClip:'text',backgroundClip:'text',color:'transparent'}}>3 minutes away.</span></h2>
