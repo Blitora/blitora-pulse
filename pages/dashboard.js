@@ -266,6 +266,123 @@ function KPI({label,value,sub,color,icon}){
   );
 }
 
+// ── BP & sugar classifiers ─────────────────────────────────────────────────
+function bpLabel(s,d){
+  if(!s||!d)return null;
+  if(s<120&&d<80)return{text:"Normal",color:"#1D9E75",bg:"#e1f5ee"};
+  if(s<130&&d<80)return{text:"Elevated",color:"#EF9F27",bg:"#faeeda"};
+  return{text:"High — see doctor",color:"#E24B4A",bg:"#fef2f2"};
+}
+function sugarLabel(v,type){
+  if(!v)return null;
+  if(type==="fasting"){
+    if(v<100)return{text:"Normal",color:"#1D9E75",bg:"#e1f5ee"};
+    if(v<126)return{text:"Pre-diabetic",color:"#EF9F27",bg:"#faeeda"};
+    return{text:"Diabetic range",color:"#E24B4A",bg:"#fef2f2"};
+  }
+  if(v<140)return{text:"Normal",color:"#1D9E75",bg:"#e1f5ee"};
+  if(v<200)return{text:"Pre-diabetic",color:"#EF9F27",bg:"#faeeda"};
+  return{text:"Diabetic range",color:"#E24B4A",bg:"#fef2f2"};
+}
+
+// ── Vitals Card ────────────────────────────────────────────────────────────
+function VitalsCard({vitals,profile,onLog}){
+  const hasAny=vitals.weight_kg||vitals.bp_systolic||vitals.sugar_fasting||vitals.sugar_post_meal;
+  const bp=bpLabel(vitals.bp_systolic,vitals.bp_diastolic);
+  const sf=sugarLabel(vitals.sugar_fasting,"fasting");
+  const sp=sugarLabel(vitals.sugar_post_meal,"post");
+  const CARD="#fff",BORDER="#E0E3ED",TXT="#0D1B3E",TXT2="#718096",G="#1D9E75";
+  const goalW=parseFloat(profile?.weight_target)||null;
+  const startW=parseFloat(profile?.weight_start)||null;
+  const curW=parseFloat(vitals.weight_kg)||null;
+  const lostKg=startW&&curW?((startW-curW).toFixed(1)):null;
+  const toGoKg=goalW&&curW?(curW-goalW).toFixed(1):null;
+
+  return(
+    <div style={{background:CARD,borderRadius:14,border:`1px solid ${BORDER}`,padding:"16px",marginBottom:12}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
+        <div style={{fontSize:11,fontWeight:700,color:TXT2,textTransform:"uppercase",letterSpacing:".06em"}}>
+          ❤️ Vitals — today
+        </div>
+        <button onClick={onLog}
+          style={{fontSize:11,fontWeight:700,color:G,background:"none",border:`1.5px solid ${G}`,borderRadius:20,padding:"4px 12px",cursor:"pointer",fontFamily:"'Poppins',Arial,sans-serif"}}>
+          {hasAny?"Update vitals":"Log vitals →"}
+        </button>
+      </div>
+
+      {!hasAny&&(
+        <div style={{textAlign:"center",padding:"18px 0",color:TXT2,fontSize:12}}>
+          <div style={{fontSize:28,marginBottom:6}}>📊</div>
+          <div style={{fontWeight:600,marginBottom:4}}>No vitals logged yet today</div>
+          <div style={{fontSize:11}}>Tap <b>Log vitals</b> to record your weight, blood pressure & blood sugar</div>
+        </div>
+      )}
+
+      {hasAny&&(
+        <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10}}>
+
+          {/* Weight */}
+          <div style={{padding:"12px",background:"#F5F6FA",borderRadius:12,border:`1px solid ${BORDER}`}}>
+            <div style={{fontSize:10,fontWeight:700,color:TXT2,marginBottom:5,textTransform:"uppercase",letterSpacing:".05em"}}>⚖️ Weight</div>
+            {vitals.weight_kg?(
+              <>
+                <div style={{fontSize:22,fontWeight:800,color:TXT}}>{Number(vitals.weight_kg).toFixed(1)}<span style={{fontSize:12,color:TXT2,fontWeight:500}}> kg</span></div>
+                {lostKg!==null&&parseFloat(lostKg)>0&&<div style={{fontSize:10,color:G,fontWeight:600,marginTop:3}}>▼ {lostKg}kg lost so far</div>}
+                {toGoKg!==null&&parseFloat(toGoKg)>0&&<div style={{fontSize:10,color:TXT2,marginTop:1}}>{toGoKg}kg to goal ({goalW}kg)</div>}
+                {toGoKg!==null&&parseFloat(toGoKg)<=0&&<div style={{fontSize:10,color:G,fontWeight:700,marginTop:3}}>🎯 Goal reached!</div>}
+              </>
+            ):(
+              <div style={{fontSize:13,color:TXT2}}>Not logged</div>
+            )}
+          </div>
+
+          {/* Blood Pressure */}
+          <div style={{padding:"12px",background:bp?bp.bg:"#F5F6FA",borderRadius:12,border:`1px solid ${bp?bp.color+"55":BORDER}`}}>
+            <div style={{fontSize:10,fontWeight:700,color:TXT2,marginBottom:5,textTransform:"uppercase",letterSpacing:".05em"}}>🩺 Blood Pressure</div>
+            {vitals.bp_systolic?(
+              <>
+                <div style={{fontSize:22,fontWeight:800,color:bp?bp.color:TXT}}>{vitals.bp_systolic}<span style={{fontSize:14,fontWeight:500}}>/{vitals.bp_diastolic}</span><span style={{fontSize:11,color:TXT2,fontWeight:500}}> mmHg</span></div>
+                {bp&&<div style={{fontSize:10,fontWeight:700,color:bp.color,marginTop:3}}>{bp.text}</div>}
+              </>
+            ):(
+              <div style={{fontSize:13,color:TXT2}}>Not logged</div>
+            )}
+          </div>
+
+          {/* Blood Sugar Fasting */}
+          <div style={{padding:"12px",background:sf?sf.bg:"#F5F6FA",borderRadius:12,border:`1px solid ${sf?sf.color+"55":BORDER}`}}>
+            <div style={{fontSize:10,fontWeight:700,color:TXT2,marginBottom:5,textTransform:"uppercase",letterSpacing:".05em"}}>🩸 Sugar — Fasting</div>
+            {vitals.sugar_fasting?(
+              <>
+                <div style={{fontSize:22,fontWeight:800,color:sf?sf.color:TXT}}>{vitals.sugar_fasting}<span style={{fontSize:11,color:TXT2,fontWeight:500}}> mg/dL</span></div>
+                {sf&&<div style={{fontSize:10,fontWeight:700,color:sf.color,marginTop:3}}>{sf.text}</div>}
+                <div style={{fontSize:9,color:TXT2,marginTop:2}}>Normal: below 100 mg/dL</div>
+              </>
+            ):(
+              <div style={{fontSize:13,color:TXT2}}>Not logged</div>
+            )}
+          </div>
+
+          {/* Blood Sugar Post-Meal */}
+          <div style={{padding:"12px",background:sp?sp.bg:"#F5F6FA",borderRadius:12,border:`1px solid ${sp?sp.color+"55":BORDER}`}}>
+            <div style={{fontSize:10,fontWeight:700,color:TXT2,marginBottom:5,textTransform:"uppercase",letterSpacing:".05em"}}>🩸 Sugar — Post-meal</div>
+            {vitals.sugar_post_meal?(
+              <>
+                <div style={{fontSize:22,fontWeight:800,color:sp?sp.color:TXT}}>{vitals.sugar_post_meal}<span style={{fontSize:11,color:TXT2,fontWeight:500}}> mg/dL</span></div>
+                {sp&&<div style={{fontSize:10,fontWeight:700,color:sp.color,marginTop:3}}>{sp.text}</div>}
+                <div style={{fontSize:9,color:TXT2,marginTop:2}}>Normal: below 140 mg/dL</div>
+              </>
+            ):(
+              <div style={{fontSize:13,color:TXT2}}>Not logged</div>
+            )}
+          </div>
+
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Dashboard(){
   const router=useRouter();
   const [profile,setProfile]=useState(null);
@@ -280,6 +397,8 @@ export default function Dashboard(){
   const [tomorrowPlan,setTomorrowPlan]=useState(null);         // AI tomorrow plan
   const [tomorrowLoading,setTomorrowLoading]=useState(false);  // tomorrow plan loading
   const [showTomorrow,setShowTomorrow]=useState(false);        // toggle visibility
+  const [vitals,setVitals]=useState({weight_kg:null,bp_systolic:null,bp_diastolic:null,sugar_fasting:null,sugar_post_meal:null});
+  const [vitalityScore,setVitalityScore]=useState(null);
 
   useEffect(()=>{
     async function init(){
@@ -404,8 +523,20 @@ export default function Dashboard(){
     if(!profile)return;
     const{data}=await getSupabase().from("health_logs").select("*")
       .eq("user_id",profile.id).eq("log_date",dk).single();
-    if(data) setLog({foods:data.foods||{},activity:data.activity||{},water:data.water||0,habits:data.habits||{},weight:data.weight||null});
-    else setLog({foods:{},activity:{},water:0,habits:{},weight:null});
+    if(data) {
+      setLog({foods:data.foods||{},activity:data.activity||{},water:data.water||0,habits:data.habits||{},weight:data.weight||null});
+      const v={
+        weight_kg: data.weight_kg||null,
+        bp_systolic: data.bp_systolic||null,
+        bp_diastolic: data.bp_diastolic||null,
+        sugar_fasting: data.sugar_fasting||null,
+        sugar_post_meal: data.sugar_post_meal||null,
+      };
+      setVitals(v);
+    } else {
+      setLog({foods:{},activity:{},water:0,habits:{},weight:null});
+      setVitals({weight_kg:null,bp_systolic:null,bp_diastolic:null,sugar_fasting:null,sugar_post_meal:null});
+    }
   },[profile]);
 
   useEffect(()=>{if(profile)loadLog(dateKey);},[profile,dateKey]);
@@ -492,6 +623,11 @@ export default function Dashboard(){
             </div>
             <div style={{fontSize:12,color:TXT2,marginTop:2}}>
               {profile?.weight_target ? `Goal: ${profile.weight_start||'?'}kg → ${profile.weight_target}kg` : 'Track your health today'}
+            {(vitals.bp_systolic||vitals.sugar_fasting)&&(
+              <span style={{marginLeft:8,fontSize:11,background:"#e1f5ee",color:"#1D9E75",borderRadius:20,padding:"2px 8px",fontWeight:700}}>
+                Vitals logged ✓
+              </span>
+            )}
             </div>
           </div>
 
@@ -572,6 +708,9 @@ export default function Dashboard(){
             <MacroBar label="Calories" val={mac.cal} max={calTarget} color={G} unit=" kcal"/>
             <MacroBar label="Protein"  val={mac.pro} max={proTarget} color={T} unit="g"/>
           </div>
+
+          {/* ── Vitals Card — weight, BP, blood sugar ──────────────── */}
+          <VitalsCard vitals={vitals} profile={profile} onLog={()=>router.push("/log")} />
 
           {/* ── Meal summary (read-only, tap → go to Meals page) ─────── */}
           <div className="card">
@@ -721,3 +860,4 @@ export default function Dashboard(){
     </RoleGuard>
   );
 }
+
