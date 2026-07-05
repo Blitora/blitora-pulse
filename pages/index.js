@@ -4,7 +4,7 @@ import Head from 'next/head';
 import { getSupabase } from '../lib/supabase';
 
 /* ==========================================================
-   Blitora Pulse — marketing landing page (v5 — mixed light/dark)
+   Blitora Pulse — marketing landing page (v6 — polished mixed theme, delegated magnetics, aurora, clinic 3D panel)
    - Real pricing pulled from live site (as-of deploy day)
    - Session check: logged-in users → /dashboard
    - Reuses existing /api/lead-capture + /public brochures
@@ -303,14 +303,14 @@ h1 .grad{background:linear-gradient(92deg,var(--green) 10%,var(--violet) 90%);-w
 .price small{font-size:13px;color:#5E6E96;font-family:var(--font);font-weight:500}
 .billed{font-size:11.5px;color:#5E6E96;margin-top:6px;font-family:var(--font);font-weight:500}
 .plan-badge{display:inline-block;font-family:var(--mono);font-size:10px;letter-spacing:.15em;padding:4px 11px;border-radius:100px;background:rgba(62,166,255,.12);border:1px solid rgba(62,166,255,.4);color:var(--blue);margin-bottom:10px;text-transform:uppercase}
-.plan-sub{font-size:12.5px;color:var(--muted);margin:16px 0 10px}
-.plan-sub b{color:var(--text)}
+.plan-sub{font-size:12.5px;color:#4A5E80;margin:16px 0 10px}
+.plan-sub b{color:var(--text-dark)}
 .plan ul{list-style:none;margin:14px 0 22px;display:grid;gap:10px}
 .plan li{font-size:13.5px;color:#344060;padding-left:24px;position:relative;display:flex;justify-content:space-between;gap:8px}
 .plan li::before{content:"✓";position:absolute;left:0;color:var(--green-d);font-weight:700}
 .plan li b{color:var(--text-dark);font-weight:600;font-family:var(--mono);font-size:12.5px}
 .plan .btn{width:100%}
-.pricenote{font-size:11.5px;color:var(--muted);margin:10px 0 0;text-align:center}
+.pricenote{font-size:11.5px;color:#5E6E96;margin:10px 0 0;text-align:center}
 .pnote{text-align:center;margin-top:26px;font-size:12.5px;color:#5E6E96}
 
 /* BROCHURE / VIDEO */
@@ -324,7 +324,7 @@ h1 .grad{background:linear-gradient(92deg,var(--green) 10%,var(--violet) 90%);-w
 .bro-meta{font-family:var(--mono);font-size:10.5px;color:var(--muted2);letter-spacing:.14em;text-transform:uppercase;margin-bottom:12px}
 
 /* CONTACT */
-.contact-grid{display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-top:52px;align-items:stretch}
+.contact-grid{display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-top:52px;align-items:start}
 .inp{width:100%;padding:15px 18px;border-radius:13px;background:rgba(255,255,255,.035);border:1px solid var(--line);color:var(--text);font-family:var(--font);font-size:14.5px;margin-bottom:14px;transition:.25s}
 .inp:focus{outline:none;border-color:var(--green);box-shadow:0 0 0 3px rgba(43,217,159,.14)}
 .inp::placeholder{color:var(--muted2)}
@@ -402,6 +402,53 @@ footer{border-top:1px solid var(--line);padding:56px 0 34px;background:#050B1D}
 
 .reveal{opacity:0;transform:translateY(34px);transition:opacity .8s ease,transform .8s cubic-bezier(.2,.8,.3,1)}
 .reveal.in{opacity:1;transform:none}
+
+/* MAG v6 — variable-driven, instant */
+.magcard,.who-c,.nudge,.bro-c,.c-line,.tb,.plan,.flip{will-change:transform;transition:transform .35s cubic-bezier(.2,.8,.3,1)}
+.mag-on{transform:perspective(800px) rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg)) translateY(-8px) scale(1.02)!important;transition:transform .05s linear!important}
+.magcard>.mag-ripple,.who-c>.mag-ripple,.nudge>.mag-ripple,.bro-c>.mag-ripple,.c-line>.mag-ripple,.tb>.mag-ripple,.plan>.mag-ripple,.flip>.mag-ripple{left:var(--mx,50%);top:var(--my,50%)}
+.mag-on>.mag-ripple{opacity:1;transform:translate(-50%,-50%) scale(1)}
+.magnet{transition:transform .35s cubic-bezier(.2,.9,.3,1.5)}
+.magnet.pull{transition:transform .09s ease-out}
+
+/* METRICS TICKER */
+.tickerwrap{overflow:hidden;background:linear-gradient(90deg,#071031,#0C1738,#071031);border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:15px 0}
+.ticker{display:flex;gap:48px;white-space:nowrap;width:max-content;animation:tick 28s linear infinite}
+.ticker span{font-family:var(--mono);font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:#9FB0D6}
+.ticker span::first-letter{color:var(--green)}
+@keyframes tick{to{transform:translateX(-50%)}}
+
+/* LIGHT SECTION TEXTURE + AURORA */
+.sec-light{position:relative;overflow:hidden}
+.sec-light::before{content:"";position:absolute;inset:0;background-image:radial-gradient(rgba(13,27,62,.08) 1px,transparent 1px);background-size:26px 26px;pointer-events:none;mask-image:linear-gradient(180deg,transparent,#000 18%,#000 82%,transparent)}
+.aurora{position:absolute;border-radius:50%;filter:blur(90px);pointer-events:none;opacity:.55;z-index:0}
+.au-g{background:rgba(43,217,159,.32)}
+.au-v{background:rgba(139,92,246,.26)}
+.au-b{background:rgba(62,166,255,.26)}
+.sec-light .wrap{position:relative;z-index:1}
+
+/* MINI CLINIC 3D PANEL */
+.mini-dash{position:absolute;right:-84px;top:-52px;width:218px;padding:16px;border-radius:16px;background:linear-gradient(160deg,rgba(20,32,74,.97),rgba(9,17,44,.97));border:1px solid rgba(62,166,255,.4);transform:translateZ(130px) rotateY(-10deg);box-shadow:0 30px 70px rgba(0,0,0,.55),0 0 40px rgba(62,166,255,.14)}
+.md-t{font-family:var(--mono);font-size:9px;letter-spacing:.2em;color:var(--blue);margin-bottom:10px}
+.md-r{display:flex;align-items:center;gap:8px;font-size:11.5px;color:#D6E1F8;padding:6px 0;border-bottom:1px dashed rgba(139,155,191,.15)}
+.md-r:last-child{border-bottom:none}
+.md-r i{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.md-r b{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--green)}
+
+/* CONTACT extras */
+.c-line .c-go{margin-left:auto;color:var(--green);font-size:16px;opacity:0;transform:translateX(-6px);transition:.25s;flex-shrink:0}
+.c-line:hover .c-go{opacity:1;transform:none}
+.c-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:4px}
+.c-stats div{text-align:center;padding:14px 8px;border-radius:14px;background:rgba(43,217,159,.07);border:1px solid rgba(43,217,159,.25)}
+.c-stats b{display:block;font-family:var(--mono);font-size:15px;color:var(--green)}
+.c-stats span{font-size:10.5px;color:var(--muted)}
+
+/* LIGHT-SECTION color corrections */
+.plan .btn-o{color:var(--text-dark);border-color:rgba(13,27,62,.28)}
+.plan .btn-o:hover{border-color:var(--green-d);color:var(--green-d)}
+.story .tbig{background:linear-gradient(120deg,#0D1B3E 25%,#149E71);-webkit-background-clip:text;background-clip:text;filter:none}
+.story .tstep:nth-child(2) .tbig{background:linear-gradient(120deg,#0D1B3E 25%,#2B6CB0);-webkit-background-clip:text;background-clip:text;filter:none}
+.story .tstep:nth-child(3) .tbig{background:linear-gradient(120deg,#0D1B3E 25%,#6D3EE8);-webkit-background-clip:text;background-clip:text;filter:none}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}.reveal{opacity:1;transform:none}}
 @media (max-width:980px){
   .hero-in,.ai-grid,.contact-grid{grid-template-columns:1fr}
@@ -412,7 +459,7 @@ footer{border-top:1px solid var(--line);padding:56px 0 34px;background:#050B1D}
   .burger{display:block}
   .nav-links.open{display:flex;flex-direction:column;position:absolute;top:64px;left:0;right:0;background:rgba(6,13,34,.97);padding:24px;border-bottom:1px solid var(--line);gap:18px}
   .f-grid{grid-template-columns:1fr 1fr}
-  .notif{display:none}
+  .notif,.mini-dash{display:none}
   .holo{transform:none}
   section{padding:80px 0}
   .hero{padding-top:120px}
@@ -568,71 +615,55 @@ export default function Home() {
     return ()=>cio.disconnect();
   },[checking]);
 
-  // Magnetic tilt + ripple — sharp, clear, strong
+  // Magnetic tilt + ripple — single delegated listener, instant from first paint
   useEffect(()=>{
     if(checking)return;
     const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
     const hover=matchMedia('(hover:hover)').matches;
     if(reduced||!hover)return;
-    const cleanups=[];
-
-    // Magnetic buttons — strong pull effect
-    document.querySelectorAll('.magnet').forEach(b=>{
-      const mm=e=>{
-        const r=b.getBoundingClientRect();
-        const x=(e.clientX-r.left-r.width/2)*.35;
-        const y=(e.clientY-r.top-r.height/2)*.35;
-        b.style.transform=`translate(${x}px,${y}px) scale(1.04)`;
-        b.style.transition='transform .15s cubic-bezier(.2,.9,.3,1.4)';
-      };
-      const ml=()=>{b.style.transform='';b.style.transition='transform .4s cubic-bezier(.2,.9,.3,1.4)';};
-      b.addEventListener('mousemove',mm);b.addEventListener('mouseleave',ml);
-      cleanups.push(()=>{b.removeEventListener('mousemove',mm);b.removeEventListener('mouseleave',ml);});
+    const SEL='.magcard,.who-c,.nudge,.bro-c,.c-line,.tb,.plan,.flip';
+    // Ensure every card has exactly one ripple span
+    document.querySelectorAll(SEL).forEach(c=>{
+      if(!c.querySelector(':scope > .mag-ripple')){
+        const r=document.createElement('span');r.className='mag-ripple';r.setAttribute('aria-hidden','true');c.appendChild(r);
+      }
     });
-
-    // Cards — 3D tilt + SHARP bright ripple
-    document.querySelectorAll('.magcard,.who-c,.nudge,.bro-c,.c-line,.tb,.plan,.flip').forEach(c=>{
-      // Create ripple element
-      const ripple=document.createElement('span');
-      ripple.className='mag-ripple';
-      ripple.setAttribute('aria-hidden','true');
-      c.appendChild(ripple);
-
-      let rafId=null;
-      const mm=e=>{
-        const b=c.getBoundingClientRect();
-        const xPct=(e.clientX-b.left)/b.width;
-        const yPct=(e.clientY-b.top)/b.height;
-        const xRot=(yPct-.5)*-10;
-        const yRot=(xPct-.5)*14;
-
-        if(rafId)cancelAnimationFrame(rafId);
-        rafId=requestAnimationFrame(()=>{
-          c.style.transform=`perspective(800px) rotateX(${xRot.toFixed(2)}deg) rotateY(${yRot.toFixed(2)}deg) translateY(-8px) scale(1.02)`;
-          c.style.transition='transform .08s ease-out';
-          // Position ripple exactly at cursor
-          ripple.style.left=(e.clientX-b.left)+'px';
-          ripple.style.top=(e.clientY-b.top)+'px';
-          ripple.style.opacity='1';
-          ripple.style.transform='translate(-50%,-50%) scale(1)';
-        });
-      };
-      const ml=()=>{
-        if(rafId)cancelAnimationFrame(rafId);
-        c.style.transform='';
-        c.style.transition='transform .5s cubic-bezier(.2,.8,.3,1)';
-        ripple.style.opacity='0';
-        ripple.style.transform='translate(-50%,-50%) scale(0)';
-      };
-      c.addEventListener('mousemove',mm);
-      c.addEventListener('mouseleave',ml);
-      cleanups.push(()=>{
-        c.removeEventListener('mousemove',mm);
-        c.removeEventListener('mouseleave',ml);
-        if(ripple.parentNode)ripple.parentNode.removeChild(ripple);
-      });
-    });
-    return ()=>cleanups.forEach(fn=>fn());
+    let raf=0,lastCard=null,lastBtn=null,ev=null;
+    const frame=()=>{
+      raf=0;if(!ev)return;
+      const el=ev.target.closest?ev.target.closest(SEL):null;
+      if(lastCard&&lastCard!==el){lastCard.classList.remove('mag-on');}
+      lastCard=el;
+      if(el){
+        const b=el.getBoundingClientRect();
+        const x=(ev.clientX-b.left)/b.width,y=(ev.clientY-b.top)/b.height;
+        el.style.setProperty('--ry',((x-.5)*14).toFixed(2)+'deg');
+        el.style.setProperty('--rx',((.5-y)*10).toFixed(2)+'deg');
+        el.style.setProperty('--mx',(ev.clientX-b.left)+'px');
+        el.style.setProperty('--my',(ev.clientY-b.top)+'px');
+        el.classList.add('mag-on');
+      }
+      const btn=ev.target.closest?ev.target.closest('.magnet'):null;
+      if(lastBtn&&lastBtn!==btn){lastBtn.classList.remove('pull');lastBtn.style.transform='';}
+      lastBtn=btn;
+      if(btn){
+        const r=btn.getBoundingClientRect();
+        btn.classList.add('pull');
+        btn.style.transform=`translate(${((ev.clientX-r.left-r.width/2)*.3).toFixed(1)}px,${((ev.clientY-r.top-r.height/2)*.3).toFixed(1)}px) scale(1.05)`;
+      }
+    };
+    const move=e=>{ev=e;if(!raf)raf=requestAnimationFrame(frame);};
+    const leave=()=>{
+      if(lastCard){lastCard.classList.remove('mag-on');lastCard=null;}
+      if(lastBtn){lastBtn.classList.remove('pull');lastBtn.style.transform='';lastBtn=null;}
+    };
+    document.addEventListener('mousemove',move,{passive:true});
+    document.documentElement.addEventListener('mouseleave',leave);
+    return ()=>{
+      document.removeEventListener('mousemove',move);
+      document.documentElement.removeEventListener('mouseleave',leave);
+      if(raf)cancelAnimationFrame(raf);
+    };
   },[checking]);
 
   // Hero phone tilt + Holo tilt
@@ -941,8 +972,17 @@ export default function Home() {
 
       <main id="content">
 
+      {/* METRICS TICKER */}
+      <div className="tickerwrap" aria-hidden="true">
+        <div className="ticker">
+          {['AI diet charts','Smart nudges','BP & sugar logs','Clinic mode','PDF reports','WhatsApp support','Daily insights','Streaks & habits','AI diet charts','Smart nudges','BP & sugar logs','Clinic mode','PDF reports','WhatsApp support','Daily insights','Streaks & habits'].map((t,i)=>(<span key={i}>✦ {t}</span>))}
+        </div>
+      </div>
+
       {/* TIME STORY */}
-      <section className="story" id="story">
+      <section className="story sec-light" id="story">
+        <div className="aurora au-g" style={{width:540,height:540,top:-180,left:-160}} />
+        <div className="aurora au-v" style={{width:460,height:460,bottom:-200,right:-140}} />
         {ecg(1)}
         <div className="wrap">
           <div className="reveal">
@@ -1078,6 +1118,13 @@ export default function Home() {
                   </div>
                 </div>
               </div>
+              <div className="mini-dash" aria-hidden="true">
+                <div className="md-t">CLINIC VIEW · LIVE</div>
+                <div className="md-r"><i style={{background:'var(--green)'}}></i>Ravi S.<b>92%</b></div>
+                <div className="md-r"><i style={{background:'var(--amber)'}}></i>Priya M.<b>61%</b></div>
+                <div className="md-r"><i style={{background:'var(--green)'}}></i>Arjun K.<b>88%</b></div>
+                <div className="md-r"><i style={{background:'var(--red)'}}></i>Neha T.<b>—</b></div>
+              </div>
               <div className="float-chip fc1">✦ <b>Pulse AI:</b> 4 of 12 patients haven't logged today</div>
               <div className="float-chip fc2">✦ <b>Dinner idea:</b> paneer bhurji · +27 g protein</div>
             </div>
@@ -1087,7 +1134,9 @@ export default function Home() {
       </section>
 
       {/* FLIP CARDS */}
-      <section id="features" className="flip-sec">
+      <section id="features" className="flip-sec sec-light">
+        <div className="aurora au-v" style={{width:520,height:520,top:-160,right:-140}} />
+        <div className="aurora au-b" style={{width:440,height:440,bottom:-180,left:-120}} />
         {ecg(4)}
         <div className="wrap">
           <div className="reveal">
@@ -1136,7 +1185,9 @@ export default function Home() {
       </section>
 
       {/* WHO */}
-      <section style={{background:'linear-gradient(180deg,var(--light2),var(--light))'}}>
+      <section className="sec-light" style={{background:'linear-gradient(180deg,var(--light2),var(--light))'}}>
+        <div className="aurora au-b" style={{width:500,height:500,top:-160,left:-140}} />
+        <div className="aurora au-g" style={{width:440,height:440,bottom:-180,right:-120}} />
         <div className="wrap">
           <div className="reveal">
             <span className="eyebrow" style={{color:'var(--green-d)'}}>Built for three worlds</span>
@@ -1166,7 +1217,9 @@ export default function Home() {
       </section>
 
       {/* PRICING — real live numbers */}
-      <section id="pricing" style={{background:'linear-gradient(180deg,var(--light),var(--light2))'}}>
+      <section id="pricing" className="sec-light" style={{background:'linear-gradient(180deg,var(--light),var(--light2))'}}>
+        <div className="aurora au-g" style={{width:560,height:560,top:-200,right:-160}} />
+        <div className="aurora au-v" style={{width:480,height:480,bottom:-200,left:-140}} />
         {ecg(7)}
         <div className="wrap" style={{textAlign:'center'}}>
           <div className="reveal">
@@ -1374,10 +1427,15 @@ function ContactForm(){
         <p style={{fontSize:11.5,color:'var(--muted2)',marginTop:12}}>Your email is included in the message so we can follow up properly.</p>
       </div>
       <div className="c-alt reveal">
-        <div className="c-line"><div className="ci">💬</div><div><b>WhatsApp Business</b><span>+91 96199 90313 — fastest reply</span></div></div>
-        <div className="c-line"><div className="ci">✉️</div><div><b>hello@blitora.com</b><span>For demos, partnerships and clinics</span></div></div>
+        <a className="c-line" href="https://wa.me/919619990313" target="_blank" rel="noreferrer"><div className="ci">💬</div><div><b>WhatsApp Business</b><span>+91 96199 90313 — fastest reply</span></div><span className="c-go">→</span></a>
+        <a className="c-line" href="mailto:hello@blitora.com"><div className="ci">✉️</div><div><b>hello@blitora.com</b><span>Demos, partnerships and clinics</span></div><span className="c-go">→</span></a>
         <div className="c-line"><div className="ci">🤖</div><div><b>Pulse Assistant</b><span>Bottom-right corner — instant answers, 24/7</span></div></div>
-        <div className="c-line"><div className="ci">🏢</div><div><b>A product of Blitora</b><span>blitora.com — Powering Progress.</span></div></div>
+        <a className="c-line" href="https://blitora.com" target="_blank" rel="noreferrer"><div className="ci">🏢</div><div><b>A product of Blitora</b><span>blitora.com — Powering Progress.</span></div><span className="c-go">→</span></a>
+        <div className="c-stats">
+          <div><b>&lt; 2 hrs</b><span>avg. reply time</span></div>
+          <div><b>7 days</b><span>a week support</span></div>
+          <div><b>EN · HI</b><span>languages</span></div>
+        </div>
       </div>
     </div>
   );
