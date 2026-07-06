@@ -31,7 +31,9 @@ export default async function handler(req, res) {
     // Patch detailed profile fields (base row already exists via trigger)
     const profileUpdate = {
       country: profile?.country || clinicData?.country || null,
+      account_type: type, // ensures Google users who choose a type post-verify get it persisted
     }
+    if (name) profileUpdate.full_name = name
 
     if (type === 'individual' && profile) {
       Object.assign(profileUpdate, {
@@ -60,13 +62,36 @@ export default async function handler(req, res) {
 
     // Patch clinic name on the trigger-created org
     if (type === 'clinic' && clinicData?.clinicName) {
-      const { data: membership } = await supabaseAdmin
+      let { data: membership } = await supabaseAdmin
         .from('organisation_members')
         .select('org_id')
         .eq('user_id', userId)
         .eq('role', 'org_admin')
         .limit(1)
-        .single()
+        .maybeSingle()
+
+      // Google OAuth clinic users have no trigger-created org — create one now
+      if (!membership?.org_id) {
+        const { data: newOrg, error: orgErr } = await supabaseAdmin
+          .from('organisations')
+          .insert({
+            name: clinicData.clinicName,
+            plan: 'trial',
+            trial_ends_at: new Date(Date.now() + 14 * 864e5).toISOString(),
+            max_patients: 50,
+            is_active: true,
+          })
+          .select('id')
+          .single()
+        if (!orgErr && newOrg?.id) {
+          await supabaseAdmin.from('organisation_members').insert({
+            org_id: newOrg.id, user_id: userId, role: 'org_admin', is_active: true,
+          })
+          membership = { org_id: newOrg.id }
+        } else if (orgErr) {
+          console.warn('Org create warning:', orgErr.message)
+        }
+      }
 
       if (membership?.org_id) {
         await supabaseAdmin
