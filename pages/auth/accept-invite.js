@@ -113,6 +113,22 @@ export default function AcceptInvitePage() {
         }, { onConflict: 'org_id,patient_id' });
       }
 
+      // Apply Dr's meal plan if available
+      if (inv.meal_plan) {
+        await supabase.from('user_meal_plans').upsert({
+          user_id: userId, plan_data: inv.meal_plan, is_active: true, active: true,
+          created_by: inv.invited_by, generated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id' }).catch(()=>{});
+      }
+      if (inv.patient_profile) {
+        const pp = inv.patient_profile;
+        await supabase.from('profiles').update({
+          conditions: pp.conditions||null, diet_type: pp.dietaryPref||null,
+          primary_goal: pp.goal||null, weight_current: pp.weight||null,
+          weight_target: pp.goalWeight||null, height_cm: pp.height||null,
+          setup_complete: true, account_type:'individual', user_type:'individual',
+        }).eq('id', userId).catch(()=>{});
+      }
       // Auto-confirm email for invited users (they were invited by a verified Dr)
       // Sign in immediately after signup
       if (mode === 'signup') {
