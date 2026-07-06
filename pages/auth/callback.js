@@ -1,6 +1,12 @@
 // pages/auth/callback.js
 // Handles post-email-verification redirect AND Google OAuth callback
 // Waits for Supabase to process token, then routes by role/setup state
+//
+// IMPORTANT: never run supabase queries directly inside the
+// onAuthStateChange callback — supabase-js holds an internal auth lock
+// during that callback and any query inside it deadlocks forever
+// (this was the "Email verified! Loading your dashboard…" stuck screen).
+// All routing work is deferred out of the callback via setTimeout.
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
@@ -20,65 +26,60 @@ export default function AuthCallback() {
       if (redirected) return;
       redirected = true;
 
-      setStatus('Email verified! Loading your dashboard…');
+      setStatus('Email verified! Setting things up…');
 
-      // ── Org membership check (clinic users) ──────────────────────────
-      const { data: member } = await supabase
-        .from('organisation_members')
-        .select('role, org_id')
-        .eq('user_id', session.user.id)
-        .eq('is_active', true)
-        .order('joined_at', { ascending: true })
-        .limit(1)
-        .maybeSingle();
+      try {
+        // ── Org membership check (clinic users) ────────────────────────
+        const { data: member } = await supabase
+          .from('organisation_members')
+          .select('role, org_id')
+          .eq('user_id', session.user.id)
+          .eq('is_active', true)
+          .order('joined_at', { ascending: true })
+          .limit(1)
+          .maybeSingle();
 
-      if (member?.role === 'org_admin' || member?.role === 'dietitian') {
-        router.replace('/clinic/patients');
-        return;
-      }
+        if (member?.role === 'org_admin' || member?.role === 'dietitian') {
+          router.replace('/clinic/patients');
+          return;
+        }
 
-      // ── Profile check ─────────────────────────────────────────────────
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('setup_complete, account_type')   // ← correct column name
-        .eq('id', session.user.id)
-        .maybeSingle();
+        // ── Profile check ───────────────────────────────────────────────
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('setup_complete, account_type')
+          .eq('id', session.user.id)
+          .maybeSingle();
 
-      if (profile?.setup_complete) {
-        // Setup is fully done — go straight to dashboard
-        router.replace('/dashboard');
-        return;
-      }
+        if (profile?.setup_complete) {
+          router.replace('/dashboard');
+          return;
+        }
 
-      // Check if this is a Google OAuth user who hasn't chosen account type yet
-      const provider = session.user.app_metadata?.provider;
-      const isGoogle  = provider === 'google';
-
-      if (isGoogle && !profile?.account_type) {
-        // Google OAuth new user — needs to choose clinic vs individual
+        // Setup not complete — everyone (email-verified individuals AND
+        // new Google users) goes to /signup, which detects the session
+        // and shows the health-profile questions directly.
         router.replace('/signup');
-        return;
+      } catch (err) {
+        console.warn('Callback routing error — falling back to /signup:', err);
+        router.replace('/signup');
       }
-
-      // Email signup users have already filled in all their details.
-      // Send them to /setup which will either complete setup or go to /dashboard.
-      router.replace('/setup');
     }
 
-    // ── Strategy 1: listen for auth state change (most reliable) ─────
+    // ── Strategy 1: listen for auth state change ──────────────────────
+    // setTimeout(…, 0) breaks out of the supabase auth lock — do NOT
+    // await queries directly inside this callback.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
         if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session) {
-          await doRedirect(session);
+          setTimeout(() => doRedirect(session), 0);
         } else if (event === 'PASSWORD_RECOVERY') {
           router.replace('/auth/reset-password');
         }
       }
     );
 
-    // ── Strategy 2: poll getSession (fallback for implicit flow) ──────
-    // If the user lands here with an existing session (e.g. token already in hash)
-    // the onAuthStateChange might not fire — poll to catch it
+    // ── Strategy 2: poll getSession (fallback) ────────────────────────
     let attempts = 0;
     const poll = setInterval(async () => {
       attempts++;
@@ -86,9 +87,9 @@ export default function AuthCallback() {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
         clearInterval(poll);
-        await doRedirect(session);
+        doRedirect(session);
+        return;
       }
-      // After 8 seconds with no session, something went wrong
       if (attempts >= 8) {
         clearInterval(poll);
         if (!redirected) {
@@ -98,9 +99,18 @@ export default function AuthCallback() {
       }
     }, 1000);
 
+    // ── Strategy 3: hard safety net — never leave the user stuck ──────
+    const safety = setTimeout(() => {
+      if (!redirected) {
+        redirected = true;
+        router.replace('/signup');
+      }
+    }, 12000);
+
     return () => {
       subscription.unsubscribe();
       clearInterval(poll);
+      clearTimeout(safety);
     };
   }, [router]);
 
