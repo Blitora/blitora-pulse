@@ -58,9 +58,11 @@ export default function Setup() {
     getSupabase().auth.getSession().then(({ data: { session } }) => {
       if (!session) { router.push("/"); return; }
       setUserId(session.user.id);
-      getSupabase().from("profiles").select("full_name,setup_complete").eq("id", session.user.id).single()
+      getSupabase().from("profiles").select("full_name,setup_complete,account_type").eq("id", session.user.id).single()
         .then(({ data }) => {
           if (data?.setup_complete) { router.push("/dashboard"); return; }
+          // Individual users: redirect to /signup which handles the post-verify question flow
+          if (data?.account_type === "individual" || !data?.account_type) { router.replace("/signup"); return; }
           if (data?.full_name) setForm(f => ({ ...f, full_name: data.full_name }));
         });
     });
