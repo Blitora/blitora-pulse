@@ -28,12 +28,16 @@ function PatientsView(){
   const[loading,setLoading]=useState(true);
   const[search,setSearch]=useState('');
   const[filter,setFilter]=useState('all');
-  const[stats,setStats]=useState({total:0,logged:0,compliance:0,silent:0});
+  const[stats,setStats]=useState({total:0,logged:0,compliance:0,silent:0,critical:0});
+  const[pendingInvites,setPendingInvites]=useState([]);
+  const[resending,setResending]=useState(null);
 
   useEffect(()=>{if(orgId)loadPatients();},[orgId]);
 
   async function loadPatients(){
     const sb=getSupabase();setLoading(true);
+    const{data:invites}=await sb.from('invitations').select('id,email,role,created_at,token,accepted,expires_at,patient_profile').eq('org_id',orgId).eq('accepted',false).order('created_at',{ascending:false});
+    setPendingInvites(invites||[]);
     const{data:members}=await sb.from('organisation_members').select('user_id,role,joined_at').eq('org_id',orgId).eq('role','patient').eq('is_active',true);
     if(!members||!members.length){setLoading(false);return;}
     const ids=members.map(m=>m.user_id);
@@ -54,14 +58,24 @@ function PatientsView(){
     setPatients(list);
     const logged=list.filter(p=>p.status==='logged').length;
     const silent=list.filter(p=>p.status==='silent').length;
-    setStats({total:list.length,logged,compliance:list.length?Math.round((logged/list.length)*100):0,silent});
+    setStats({total:list.length,logged,compliance:list.length?Math.round((logged/list.length)*100):0,silent,critical:silent});
     setLoading(false);
+  }
+
+  async function resendInvite(inv){
+    setResending(inv.id);try{const sb=getSupabase();const tk=crypto.randomUUID();
+      const ex=new Date();ex.setDate(ex.getDate()+7);
+      await sb.from('invitations').update({token:tk,expires_at:ex.toISOString()}).eq('id',inv.id);
+      await fetch('/api/ai/send-patient-invite',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({email:inv.email,name:inv.patient_profile?.full_name||inv.email,token:tk,orgName:'your clinic'})});
+      alert('Invite resent!');loadPatients();
+    }catch(e){alert('Failed: '+e.message);}setResending(null);
   }
 
   const filtered=patients.filter(p=>{
     const q=search.toLowerCase();
     const matchQ=!q||(p.full_name||'').toLowerCase().includes(q)||(p.email||'').toLowerCase().includes(q);
-    const matchF=filter==='all'||p.status===filter;
+    const matchF=filter==='all'||(filter==='critical'?p.status==='silent':p.status===filter);
     return matchQ&&matchF;
   });
 
@@ -78,8 +92,8 @@ function PatientsView(){
       </div>
 
       {/* Stats */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:22}}>
-        {[{icon:"👥",v:stats.total,l:"Active patients",c:G},{icon:"✅",v:stats.logged,l:"Logged today",c:GL},{icon:"📊",v:`${stats.compliance}%`,l:"Compliance",c:BLU},{icon:"⚠️",v:stats.silent,l:"Need attention",c:RED}].map(s=>(
+      <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:14,marginBottom:22}}>
+        {[{icon:"👥",v:stats.total,l:"Active patients",c:G},{icon:"✅",v:stats.logged,l:"Logged today",c:GL},{icon:"📊",v:`${stats.compliance}%`,l:"Compliance",c:BLU},{icon:"⚠️",v:stats.silent,l:"Not logged today",c:AMB},{icon:"🔴",v:stats.critical,l:"Need attention",c:RED}].map(s=>(
           <div key={s.l} style={{background:"linear-gradient(160deg,rgba(255,255,255,.07),rgba(255,255,255,.02))",border:`1px solid ${BRD}`,borderRadius:17,padding:16}}>
             <div style={{fontSize:17,marginBottom:9}}>{s.icon}</div>
             <div style={{fontSize:24,fontWeight:800,color:"#fff"}}>{s.v}</div>
@@ -88,11 +102,27 @@ function PatientsView(){
         ))}
       </div>
 
+      {/* Pending Invitations */}
+      {pendingInvites.length>0&&(
+        <div style={{marginBottom:18,background:"rgba(239,159,39,.06)",border:"1px solid rgba(239,159,39,.25)",borderRadius:16,padding:"14px 18px"}}>
+          <h3 style={{fontSize:13,fontWeight:700,color:AMB,margin:"0 0 8px"}}>📨 Pending Invitations ({pendingInvites.length})</h3>
+          {pendingInvites.map(inv=>(
+            <div key={inv.id} style={{display:"flex",alignItems:"center",gap:12,background:"rgba(255,255,255,.04)",borderRadius:12,padding:"8px 12px",marginBottom:6,border:`1px solid ${BRD}`}}>
+              <div style={{flex:1,fontSize:12,color:"#fff"}}>{inv.patient_profile?.full_name||inv.email} <span style={{color:BGY}}>· {inv.email}</span></div>
+              <button onClick={()=>resendInvite(inv)} disabled={resending===inv.id}
+                style={{padding:"6px 12px",borderRadius:10,background:"rgba(239,159,39,.15)",border:"1px solid rgba(239,159,39,.4)",color:AMB,fontSize:11,fontWeight:700,cursor:"pointer"}}>
+                {resending===inv.id?"Sending…":"↻ Resend"}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Search + Filter */}
       <div style={{display:"flex",gap:12,marginBottom:18}}>
         <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Search patients by name or email…"
           style={{flex:1,background:"rgba(255,255,255,.06)",border:`1px solid ${BRD}`,borderRadius:13,padding:"12px 16px",color:"#fff",fontSize:13,outline:"none"}}/>
-        {['all','logged','partial','silent'].map(f=>(
+        {['all','logged','partial','silent','critical'].map(f=>(
           <button key={f} onClick={()=>setFilter(f)} style={{padding:"10px 16px",borderRadius:11,border:`1px solid ${filter===f?"rgba(42,232,164,.4)":BRD}`,background:filter===f?"rgba(29,158,117,.18)":"rgba(255,255,255,.04)",color:filter===f?GL:BGY,fontSize:12,fontWeight:600,cursor:"pointer",textTransform:"capitalize"}}>
             {f==='all'?'All':f}
           </button>
