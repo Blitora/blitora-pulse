@@ -138,6 +138,40 @@ export default function SignupPage() {
   const [error,   setError]   = useState('');
   const [done,    setDone]    = useState(false);
 
+  // Post-verification mode: user already has a verified session (email
+  // verified or Google OAuth) and now completes the health questions.
+  const [postVerify,  setPostVerify]  = useState(false);
+  const [sessionUser, setSessionUser] = useState(null);
+  const [checking,    setChecking]    = useState(true);
+
+  // ── Detect existing session (arrives here from /auth/callback) ──────────
+  useEffect(() => {
+    (async () => {
+      try {
+        const sb = getSupabase();
+        const { data: { session } } = await sb.auth.getSession();
+        if (!session) { setChecking(false); return; }
+        setSessionUser(session.user);
+        setPostVerify(true);
+        const { data: profile } = await sb.from('profiles')
+          .select('account_type, setup_complete, full_name, country')
+          .eq('id', session.user.id).maybeSingle();
+        if (profile?.setup_complete) { router.replace('/dashboard'); return; }
+        if (profile?.full_name) setName(profile.full_name);
+        if (profile?.country)   setCountry(profile.country);
+        if (profile?.account_type === 'individual') {
+          // Email-verified individual — straight to health questions
+          setType('individual'); setStep(3);
+        } else if (profile?.account_type === 'clinic') {
+          setType('clinic'); setStep(3);
+        }
+        // No account_type (new Google user) → stay on step 1 to choose type
+        setChecking(false);
+      } catch (_) { setChecking(false); }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Account
   const [name,     setName]     = useState('');
   const [email,    setEmail]    = useState('');
@@ -240,6 +274,31 @@ export default function SignupPage() {
     return '353334b9-330b-4059-b816-1ba86ca14dd6';
   }
 
+  // ── Individual step 1: create account immediately, verify email first ──
+  async function handleAccountSubmit() {
+    const err = validateAccount();
+    if (err) { setError(err); return; }
+    setError('');
+    setLoading(true);
+    const supabase = getSupabase();
+    try {
+      const { data: authData, error: authErr } = await supabase.auth.signUp({
+        email: email.trim().toLowerCase(), password,
+        options: {
+          data: { full_name: name.trim(), phone, account_type: 'individual', clinic_name: null },
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+      if (authErr) throw authErr;
+      if (!authData.user?.id) throw new Error('Signup failed — please try again.');
+      setDone(true);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function handleFinalSubmit() {
     setError('');
     if (type === 'individual') {
@@ -253,35 +312,59 @@ export default function SignupPage() {
     setLoading(true);
     const supabase = getSupabase();
     try {
-      const { data: authData, error: authErr } = await supabase.auth.signUp({
-        email: email.trim().toLowerCase(), password,
-        options: {
-          data: { full_name: name.trim(), phone, account_type: type, clinic_name: type === 'clinic' ? clinicName.trim() : null },
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-        },
-      });
-      if (authErr) throw authErr;
-      const userId = authData.user?.id;
-      if (!userId) throw new Error('Signup failed — please try again.');
+      let userId, userEmail, userName;
 
-      fetch('/api/auth/signup-complete', {
+      if (postVerify && sessionUser) {
+        // Already verified (email link or Google) — no new account needed
+        userId    = sessionUser.id;
+        userEmail = sessionUser.email;
+        userName  = name.trim() || sessionUser.user_metadata?.full_name || '';
+      } else {
+        const { data: authData, error: authErr } = await supabase.auth.signUp({
+          email: email.trim().toLowerCase(), password,
+          options: {
+            data: { full_name: name.trim(), phone, account_type: type, clinic_name: type === 'clinic' ? clinicName.trim() : null },
+            emailRedirectTo: `${window.location.origin}/auth/callback`,
+          },
+        });
+        if (authErr) throw authErr;
+        userId = authData.user?.id;
+        if (!userId) throw new Error('Signup failed — please try again.');
+        userEmail = email.trim().toLowerCase();
+        userName  = name.trim();
+      }
+
+      const scCall = fetch('/api/auth/signup-complete', {
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({
-          userId, email: email.trim().toLowerCase(), name: name.trim(), type,
+          userId, email: userEmail, name: userName, type,
+          accountType: postVerify ? type : undefined,
           profile: type === 'individual' ? { dob, gender, heightCm: getHeightCm(), weight: weight?parseFloat(weight):null, goalWeight: goalWeight?parseFloat(goalWeight):null, activity, conditions, diets, goals, mealPlan, country } : null,
           clinicData: type === 'clinic' ? { clinicName:clinicName.trim(), clinicType, city, patVol, referral, country } : null,
         }),
-      }).catch(e => console.warn('Profile patch non-critical:', e));
+      });
+      if (postVerify) {
+        // Must complete before redirect so setup_complete=true is persisted
+        await scCall.catch(e => console.warn('Profile patch:', e));
+      } else {
+        scCall.catch(e => console.warn('Profile patch non-critical:', e));
+      }
 
       if (type === 'individual') {
         fetch('/api/ai/signup-meal-template', {
           method:'POST', headers:{'Content-Type':'application/json'},
           body: JSON.stringify({
             userId,
-            profile: { fullName:name.trim(), age: dob?Math.floor((Date.now()-new Date(dob))/(365.25*864e5)):25, gender:gender||'Not specified', heightCm:getHeightCm(), currentWeightKg:weight?parseFloat(weight):70, goalWeightKg:goalWeight?parseFloat(goalWeight):65, activityLevel:activity||'Moderate', healthConditions:conditions.length?conditions:[], dietaryPref:diets.length?diets[0]:'Mixed', primaryGoal:goals.length?goals[0]:'Stay healthy', mealPlanType:mealPlan?parseInt(mealPlan):5 },
+            profile: { fullName:userName, age: dob?Math.floor((Date.now()-new Date(dob))/(365.25*864e5)):25, gender:gender||'Not specified', heightCm:getHeightCm(), currentWeightKg:weight?parseFloat(weight):70, goalWeightKg:goalWeight?parseFloat(goalWeight):65, activityLevel:activity||'Moderate', healthConditions:conditions.length?conditions:[], dietaryPref:diets.length?diets[0]:'Mixed', primaryGoal:goals.length?goals[0]:'Stay healthy', mealPlanType:mealPlan?parseInt(mealPlan):5 },
             country: country||null,
           }),
         }).catch(e => console.warn('AI template non-critical:', e));
+      }
+
+      if (postVerify) {
+        // Verified user finishing their profile — straight into the app
+        router.replace(type === 'clinic' ? '/clinic/patients' : '/dashboard');
+        return;
       }
       setDone(true);
     } catch (err) {
@@ -301,11 +384,21 @@ export default function SignupPage() {
           <h1 style={{...s.h1,fontSize:'1.4rem',marginBottom:8}}>Check your inbox</h1>
           <p style={{fontSize:'0.82rem',color:'#6B7280',lineHeight:1.6,marginBottom:6}}>We sent a verification link to</p>
           <div style={{display:'inline-block',background:'#F0FDF4',border:`1px solid #A7F3D0`,borderRadius:8,padding:'6px 14px',fontSize:'0.82rem',fontWeight:700,color:G,marginBottom:16}}>{email}</div>
-          <p style={{fontSize:'0.76rem',color:'#6B7280',lineHeight:1.6,marginBottom:20}}>Click the link in the email to verify your account.<br/>After verification you'll be taken to your dashboard.</p>
+          <p style={{fontSize:'0.76rem',color:'#6B7280',lineHeight:1.6,marginBottom:20}}>Click the link in the email to verify your account.<br/>{type==='individual'?'After verification you\'ll answer a few quick questions and AI will build your personalised plan.':'After verification you\'ll be taken to your dashboard.'}</p>
           <div style={{background:'#FFFBEB',border:'1px solid #FDE68A',borderRadius:10,padding:'10px 14px',fontSize:'0.72rem',color:'#92400E',marginBottom:20,textAlign:'left'}}><strong>Didn't get it?</strong> Check your spam folder. The link expires in 1 hour.</div>
           <button style={{...s.btn,background:'none',border:`1.5px solid ${BORDER}`,color:'#6B7280',marginBottom:8}} onClick={async()=>{const sb=getSupabase();await sb.auth.resend({type:'signup',email,options:{emailRedirectTo:`${window.location.origin}/auth/callback`}});alert('Verification email resent!');}}>Resend verification email</button>
           <button style={{...s.btn,background:'none',border:'none',color:'#9CA3AF',fontSize:'0.72rem'}} onClick={()=>{setDone(false);setStep(1);setType('');}}>← Use a different email</button>
         </div>
+      </div>
+    </div>
+  );
+
+  if (checking) return (
+    <div style={s.page}>
+      <div style={{...s.card,textAlign:'center',paddingTop:60,paddingBottom:60}}>
+        <div style={{width:40,height:40,border:`4px solid ${G}`,borderTopColor:'transparent',borderRadius:'50%',animation:'spin .8s linear infinite',margin:'0 auto 16px'}}/>
+        <p style={{fontSize:'0.8rem',color:'#6B7280'}}>One moment…</p>
+        <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
       </div>
     </div>
   );
@@ -320,8 +413,8 @@ export default function SignupPage() {
           <h1 style={s.h1}>Create your account</h1>
           <p style={s.sub}>How will you be using Blitora Pulse?</p>
           <div style={s.typeGrid}>
-            <TypeCard icon="🏥" title="Clinic / Dietitian" desc="Manage patients, assign meal plans, track compliance" onClick={()=>{setType('clinic');setStep(2);}}/>
-            <TypeCard icon="👤" title="Individual User" desc="Track my own diet, health goals and daily habits" onClick={()=>{setType('individual');setStep(2);}}/>
+            <TypeCard icon="🏥" title="Clinic / Dietitian" desc="Manage patients, assign meal plans, track compliance" onClick={()=>{setType('clinic');setStep(postVerify?3:2);}}/>
+            <TypeCard icon="👤" title="Individual User" desc="Track my own diet, health goals and daily habits" onClick={()=>{setType('individual');setStep(postVerify?3:2);}}/>
           </div>
           <p style={s.loginLink}>Already have an account? <Link href="/" style={s.link}>Sign in</Link></p>
         </>)}
@@ -338,12 +431,19 @@ export default function SignupPage() {
           <PasswordInput value={password} onChange={setPassword} label="Password" autoComplete="new-password" showStrength/>
           {type==='clinic' && <Field label="Phone number"><input style={s.inp} type="tel" value={phone} onChange={e=>setPhone(e.target.value)} placeholder="+91 98765 43210"/></Field>}
 
-          <button style={s.btn} onClick={()=>{const err=validateAccount();if(err){setError(err);return;}setError('');setStep(3);}}>Continue →</button>
+          {type==='individual' ? (
+            <>
+              <button style={{...s.btn,opacity:loading?.7:1}} disabled={loading} onClick={handleAccountSubmit}>{loading?'Creating account…':'Create account & verify email →'}</button>
+              <p style={{fontSize:'0.68rem',color:'#9CA3AF',textAlign:'center',marginTop:10,lineHeight:1.5}}>We'll send you a verification link. After verifying, you'll answer a few quick questions so AI can personalise your plan.</p>
+            </>
+          ) : (
+            <button style={s.btn} onClick={()=>{const err=validateAccount();if(err){setError(err);return;}setError('');setStep(3);}}>Continue →</button>
+          )}
         </>)}
 
         {/* STEP 3 CLINIC */}
         {step===3 && type==='clinic' && (<>
-          <button style={s.back} onClick={()=>setStep(2)}>← Back</button>
+          <button style={s.back} onClick={()=>setStep(postVerify?1:2)}>← Back</button>
           <h1 style={s.h1}>Your clinic</h1>
           <p style={s.sub}>Step 2 of 2 — Clinic information</p>
           {error && <div style={s.err}>{error}</div>}
@@ -370,14 +470,19 @@ export default function SignupPage() {
           </Field>
 
           <div style={s.trialNote}>✓ 14-day free trial · No credit card required</div>
-          <button style={{...s.btn,opacity:loading?.7:1}} disabled={loading} onClick={handleFinalSubmit}>{loading?'Creating account…':'Create account →'}</button>
+          <button style={{...s.btn,opacity:loading?.7:1}} disabled={loading} onClick={handleFinalSubmit}>{loading?(postVerify?'Setting up…':'Creating account…'):(postVerify?'Finish setup →':'Create account →')}</button>
         </>)}
 
         {/* STEP 3 INDIVIDUAL */}
         {step===3 && type==='individual' && (<>
-          <button style={s.back} onClick={()=>setStep(2)}>← Back</button>
+          {!postVerify && <button style={s.back} onClick={()=>setStep(2)}>← Back</button>}
+          {postVerify && (
+            <div style={{display:'inline-flex',alignItems:'center',gap:6,background:'#F0FDF4',border:'1px solid #A7F3D0',borderRadius:20,padding:'5px 14px',fontSize:'0.7rem',fontWeight:700,color:G,marginBottom:14}}>
+              ✓ Email verified
+            </div>
+          )}
           <h1 style={s.h1}>Your health profile</h1>
-          <p style={s.sub}>Step 2 of 2 — Helps us personalise your plan</p>
+          <p style={s.sub}>{postVerify?'Last step — answer these and AI will build your personalised plan':'Step 2 of 2 — Helps us personalise your plan'}</p>
           {error && <div style={s.err}>{error}</div>}
 
           {/* ── DOB — full width, no overlap ── */}
@@ -468,10 +573,10 @@ export default function SignupPage() {
               <span style={{fontSize:'1rem'}}>🎉</span> 30-day free trial included — no credit card required
             </div>
             <div style={{fontSize:'0.66rem',color:'#047857',marginBottom:14,lineHeight:1.5}}>
-              Your AI-generated meal plan will be ready instantly after verification. Cancel anytime.
+              {postVerify?'AI will generate your personalised meal plan the moment you finish.':'Your AI-generated meal plan will be ready instantly after verification. Cancel anytime.'}
             </div>
             <button style={{...s.btn,opacity:loading?.7:1}} disabled={loading} onClick={handleFinalSubmit}>
-              {loading?'Creating account…':'Create account & verify email →'}
+              {loading?(postVerify?'Generating your plan…':'Creating account…'):(postVerify?'Finish & generate my plan →':'Create account & verify email →')}
             </button>
           </div>
         </>)}
