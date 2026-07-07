@@ -363,7 +363,7 @@ export default function SignupPage() {
 
       if (postVerify) {
         // Verified user finishing their profile — straight into the app
-        router.replace(type === 'clinic' ? '/clinic/patients' : '/dashboard');
+        router.replace(type === 'clinic' ? '/clinic/patients' : '/my-plan');
         return;
       }
       setDone(true);
