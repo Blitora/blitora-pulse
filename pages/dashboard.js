@@ -1,5 +1,5 @@
 // pages/dashboard.js — Blitora Pulse · Dark Theme · Vitality Orb
-import { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import Head from "next/head";
 import { useRouter } from "next/router";
 import { getSupabase } from "../lib/supabase";
@@ -160,7 +160,34 @@ function InsightCard({content,loading,downgraded}){
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+class DashboardErrorBoundary extends React.Component {
+  constructor(props){super(props);this.state={hasError:false,error:null};}
+  static getDerivedStateFromError(error){return{hasError:true,error};}
+  render(){
+    if(this.state.hasError){
+      return(<div style={{minHeight:'100vh',background:'#0B1121',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:"'Poppins',sans-serif"}}>
+        <div style={{textAlign:'center',maxWidth:400,padding:24}}>
+          <div style={{fontSize:40,marginBottom:16}}>⚠️</div>
+          <h2 style={{color:'#fff',fontSize:20,marginBottom:8}}>Dashboard couldn't load</h2>
+          <p style={{color:'#8B97AD',fontSize:13,marginBottom:6}}>{this.state.error?.message||'An unexpected error occurred.'}</p>
+          <p style={{color:'#5E6E96',fontSize:11,marginBottom:20}}>This usually means your profile setup isn't complete, or there's a data issue.</p>
+          <div style={{display:'flex',gap:10,justifyContent:'center'}}>
+            <button onClick={()=>window.location.reload()} style={{padding:'10px 20px',background:'#1D9E75',color:'#fff',border:'none',borderRadius:10,cursor:'pointer',fontWeight:600,fontSize:13}}>↻ Reload</button>
+            <button onClick={()=>window.location.href='/setup'} style={{padding:'10px 20px',background:'transparent',color:'#8B97AD',border:'1px solid rgba(255,255,255,.15)',borderRadius:10,cursor:'pointer',fontWeight:600,fontSize:13}}>Go to Setup</button>
+            <button onClick={()=>window.location.href='/login'} style={{padding:'10px 20px',background:'transparent',color:'#8B97AD',border:'1px solid rgba(255,255,255,.15)',borderRadius:10,cursor:'pointer',fontWeight:600,fontSize:13}}>Sign in</button>
+          </div>
+        </div>
+      </div>);
+    }
+    return this.props.children;
+  }
+}
+
 export default function Dashboard(){
+  return <RoleGuard allow={[ROLES.PATIENT,ROLES.UNASSIGNED]}><Layout><DashboardErrorBoundary><DashboardInner/></DashboardErrorBoundary></Layout></RoleGuard>;
+}
+
+function DashboardInner(){
   const router=useRouter();
   const [profile,setProfile]=useState(null);
   const [foods,setFoods]=useState([]);
