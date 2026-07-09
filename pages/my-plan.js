@@ -74,6 +74,13 @@ export default function MyPlan() {
 
   async function handleAccept() {
     setAccepting(true);
+    try {
+      const sb = getSupabase();
+      const { data: { session } } = await sb.auth.getSession();
+      if (session) {
+        await sb.from('profiles').update({ setup_complete: true }).eq('id', session.user.id);
+      }
+    } catch(e) { console.warn('Accept setup_complete:', e); }
     router.replace('/dashboard');
   }
 
