@@ -344,25 +344,8 @@ export default function SignupPage() {
         }),
       });
       if (postVerify) {
-        // Write setup_complete via RPC — works with user session, no service key needed
-        // Save ALL health profile data via RPC — guaranteed write with user session
-        try {
-          const profileData = type === 'individual' ? {
-            p_user_id: userId,
-            p_account_type: type,
-            p_dob: dob || null,
-            p_gender: gender || null,
-            p_height_cm: getHeightCm() || null,
-            p_weight_current: weight ? parseFloat(weight) : null,
-            p_weight_target: goalWeight ? parseFloat(goalWeight) : null,
-            p_activity_level: activity || null,
-            p_conditions: conditions.length ? conditions : null,
-            p_diet_type: diets.length ? diets[0] : null,
-            p_meals_per_day: mealPlan ? parseInt(mealPlan) : 5,
-          } : { p_user_id: userId, p_account_type: type };
-          await supabase.rpc('complete_user_setup', profileData);
-        } catch(e) { console.warn('RPC setup:', e); }
-        await scCall.catch(e => console.warn('Profile patch:', e));
+        // Profile data saved via API — setup_complete stays FALSE until user accepts plan on /my-plan
+        scCall.catch(e => console.warn('Profile patch:', e));
       } else {
         scCall.catch(e => console.warn('Profile patch non-critical:', e));
       }
