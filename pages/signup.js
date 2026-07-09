@@ -362,7 +362,16 @@ export default function SignupPage() {
       }
 
       if (postVerify) {
-        // Verified user finishing their profile — straight into the app
+        // Write setup_complete=true directly — user is authenticated so RLS allows this
+        // We do NOT route to /dashboard until user accepts the plan on /my-plan
+        // BUT we set setup_complete=true NOW so the loop cannot happen
+        // The /my-plan page is the gatekeeper — Accept button goes to dashboard
+        try {
+          await supabase.from('profiles')
+            .update({ setup_complete: true })
+            .eq('id', userId);
+        } catch(e) { console.warn('setup_complete write:', e); }
+        // Verified user finishing their profile — go to plan review
         router.replace(type === 'clinic' ? '/clinic/patients' : '/my-plan');
         return;
       }
