@@ -184,8 +184,7 @@ class DashboardErrorBoundary extends React.Component {
 }
 
 export default function Dashboard(){
-  return <RoleGuard allow={[ROLES.PATIENT,ROLES.UNASSIGNED]}><Layout><DashboardErrorBoundary><DashboardInner/></DashboardErrorBoundary></Layout></RoleGuard>;
-}
+  return <DashboardInner/>;
 
 function DashboardInner(){
   const router=useRouter();
