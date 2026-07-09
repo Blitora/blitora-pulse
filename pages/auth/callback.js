@@ -47,18 +47,23 @@ export default function AuthCallback() {
         // ── Profile check ───────────────────────────────────────────────
         const { data: profile } = await supabase
           .from('profiles')
-          .select('setup_complete, account_type')
+          .select('setup_complete, account_type, active_template_id')
           .eq('id', session.user.id)
           .maybeSingle();
 
-        if (profile?.setup_complete) {
+        if (profile?.setup_complete && profile?.active_template_id) {
+          // Fully set up with a meal plan — go to dashboard
           router.replace('/dashboard');
           return;
         }
 
-        // Setup not complete — everyone (email-verified individuals AND
-        // new Google users) goes to /signup, which detects the session
-        // and shows the health-profile questions directly.
+        if (profile?.setup_complete && !profile?.active_template_id) {
+          // Setup done but no plan yet — go to /my-plan to see/accept plan
+          router.replace('/my-plan');
+          return;
+        }
+
+        // Setup not complete — go to /signup to fill health profile
         router.replace('/signup');
       } catch (err) {
         console.warn('Callback routing error — falling back to /signup:', err);
