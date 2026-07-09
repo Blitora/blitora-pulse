@@ -234,7 +234,6 @@ function DashboardInner(){
       const{data:p}=await sb.from("profiles").select("*").eq("id",session.user.id).single();
       if(!p){router.push("/");return;}
       if(!p.setup_complete){router.push("/signup");return;}
-      if(!p.active_template_id && p.account_type==='individual'){router.replace("/my-plan");return;}
       setProfile(p);
       fetchInsight(p,{cal:0,pro:0,water:0,activity:{}},today());
       if(p.active_template_id){
