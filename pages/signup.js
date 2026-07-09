@@ -156,7 +156,7 @@ export default function SignupPage() {
         const { data: profile } = await sb.from('profiles')
           .select('account_type, setup_complete, full_name, country')
           .eq('id', session.user.id).maybeSingle();
-        if (profile?.setup_complete) { router.replace('/my-plan'); return; }
+        if (profile?.setup_complete) { router.replace('/dashboard'); return; }
         if (profile?.full_name) setName(profile.full_name);
         if (profile?.country)   setCountry(profile.country);
         if (profile?.account_type === 'individual') {
