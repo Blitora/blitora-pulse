@@ -233,7 +233,7 @@ function DashboardInner(){
       if(!session){router.push("/");return;}
       const{data:p}=await sb.from("profiles").select("*").eq("id",session.user.id).single();
       if(!p){router.push("/");return;}
-      if(!p.setup_complete){router.push("/setup");return;}
+      if(!p.setup_complete){const acct=p.account_type||p.user_type;if(acct==='clinic'){router.push("/clinic/patients");return;}router.push("/my-plan");return;}
       setProfile(p);
       fetchInsight(p,{cal:0,pro:0,water:0,activity:{}},today());
       if(p.active_template_id){
