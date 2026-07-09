@@ -185,6 +185,7 @@ class DashboardErrorBoundary extends React.Component {
 
 export default function Dashboard(){
   return <DashboardInner/>;
+}
 
 function DashboardInner(){
   const router=useRouter();
