@@ -47,19 +47,13 @@ export default function AuthCallback() {
         // ── Profile check ───────────────────────────────────────────────
         const { data: profile } = await supabase
           .from('profiles')
-          .select('setup_complete, account_type, active_template_id')
+          .select('setup_complete, account_type')
           .eq('id', session.user.id)
           .maybeSingle();
 
-        if (profile?.setup_complete && profile?.active_template_id) {
-          // Fully set up with a meal plan — go to dashboard
+        if (profile?.setup_complete) {
+          // Setup complete — go to dashboard
           router.replace('/dashboard');
-          return;
-        }
-
-        if (profile?.setup_complete && !profile?.active_template_id) {
-          // Setup done but no plan yet — go to /my-plan to see/accept plan
-          router.replace('/my-plan');
           return;
         }
 
